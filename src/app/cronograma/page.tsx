@@ -12,7 +12,7 @@ export default function CronogramaActualPage() {
 
   const fetchSchedule = useCallback(async () => {
     try {
-      const res = await fetch("/api/cronograma-actual");
+      const res = await fetch("/api/cronograma");
       if (!res.ok) {
         setError(true);
         setLoading(false);

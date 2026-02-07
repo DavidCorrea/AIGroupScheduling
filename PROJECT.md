@@ -64,14 +64,14 @@
 - **Rehearsal dates**: shown with distinct muted styling and "Ensayo" label
 
 ## Current Month Public View
-- Stable public URL at `/cronograma-actual` — always shows the committed schedule for the current running month
+- Stable public URL at `/cronograma` — always shows the committed schedule for the current running month
 - Same UI as the shared view (Spanish labels, filtering, dark mode, dependent role highlight)
 - Reuses the `SharedScheduleView` component extracted from the shared page
-- API route: `/api/cronograma-actual` — finds the committed schedule matching the current month/year; returns 404 if none exists
+- API route: `/api/cronograma` — finds the committed schedule matching the current month/year; returns 404 if none exists
 
 ## Admin Authentication
 - HTTP Basic Auth protects all non-public routes via Next.js middleware (`src/middleware.ts`)
-- Public routes (`/shared/*`, `/cronograma-actual`, `/api/shared/*`, `/api/cronograma-actual`) and static assets bypass auth
+- Public routes (`/shared/*`, `/cronograma`, `/api/shared/*`, `/api/cronograma`) and static assets bypass auth
 - Credentials configured via `ADMIN_USER` and `ADMIN_PASSWORD` environment variables
 - If no credentials are set, auth is skipped (no lockout during initial setup)
 - On Fly.io, set credentials with `fly secrets set ADMIN_USER=xxx ADMIN_PASSWORD=xxx`
