@@ -101,6 +101,26 @@ function getWeekdayName(dateStr: string): string {
 }
 
 /**
+ * Get a friendly relative label in Spanish for the distance between today and a target date.
+ */
+function getRelativeLabel(targetStr: string, todayStr: string): string {
+  const [ty, tm, td] = todayStr.split("-").map(Number);
+  const [dy, dm, dd] = targetStr.split("-").map(Number);
+  const todayDate = new Date(Date.UTC(ty, tm - 1, td));
+  const targetDate = new Date(Date.UTC(dy, dm - 1, dd));
+  const diffMs = targetDate.getTime() - todayDate.getTime();
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays <= 0) return "Hoy";
+  if (diffDays === 1) return "Mañana";
+  if (diffDays === 2) return "Pasado mañana";
+  if (diffDays <= 6) return `En ${diffDays} días`;
+  if (diffDays <= 13) return "La próxima semana";
+  const weeks = Math.floor(diffDays / 7);
+  return `En ${weeks} semanas`;
+}
+
+/**
  * Get today's date as YYYY-MM-DD in local timezone.
  */
 function getTodayISO(): string {
@@ -356,6 +376,11 @@ export default function SharedScheduleView({
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
               <span className="font-medium">
                 {formatDateLong(upcomingDate)}
+                {today && (
+                  <span className="ml-2 text-sm text-muted-foreground font-normal">
+                    — {getRelativeLabel(upcomingDate, today)}
+                  </span>
+                )}
               </span>
               <span className="text-sm text-muted-foreground">
                 {getRolesForDate(upcomingDate)}
