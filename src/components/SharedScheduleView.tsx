@@ -287,6 +287,11 @@ export default function SharedScheduleView({
       ? filteredDates.find((d) => d >= today && !rehearsalSet.has(d))
       : null;
 
+  // Dates to display in the list (exclude the upcoming date to avoid duplication)
+  const displayDates = upcomingDate
+    ? filteredDates.filter((d) => d !== upcomingDate)
+    : filteredDates;
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
@@ -401,14 +406,14 @@ export default function SharedScheduleView({
 
         {/* Mobile card view */}
         <div className="block lg:hidden space-y-4">
-          {filteredDates.map((date, index) => {
+          {displayDates.map((date, index) => {
             const isRehearsal = rehearsalSet.has(date);
             const entriesOnDate = filteredEntries.filter(
               (e) => e.date === date
             );
             const note = noteMap.get(date);
             const depRoleDate = hasDependentRoleOnDate(date);
-            const prevDate = index > 0 ? filteredDates[index - 1] : null;
+            const prevDate = index > 0 ? displayDates[index - 1] : null;
             const weekBreak = isNewWeek(date, prevDate);
 
             return (
@@ -523,11 +528,11 @@ export default function SharedScheduleView({
                 </tr>
               </thead>
               <tbody>
-                {filteredDates.map((date, index) => {
+                {displayDates.map((date, index) => {
                   const isRehearsal = rehearsalSet.has(date);
                   const note = noteMap.get(date);
                   const depRoleDate = hasDependentRoleOnDate(date);
-                  const prevDate = index > 0 ? filteredDates[index - 1] : null;
+                  const prevDate = index > 0 ? displayDates[index - 1] : null;
                   const weekBreak = isNewWeek(date, prevDate);
 
                   return (
@@ -668,7 +673,7 @@ export default function SharedScheduleView({
           )}
         </div>
 
-        {filteredDates.length === 0 && (
+        {displayDates.length === 0 && !upcomingDate && (
           <p className="text-center text-muted-foreground py-8">
             {filteredMemberId
               ? "Este miembro no tiene asignaciones este mes."
