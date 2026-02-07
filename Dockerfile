@@ -30,16 +30,10 @@ COPY . .
 # Build application
 RUN npx next build --experimental-build-mode compile
 
-<<<<<<< Updated upstream
-# Remove development dependencies
-RUN npm prune --omit=dev
-=======
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV PORT=8080
 ENV DATABASE_URL=/data/sqlite.db
->>>>>>> Stashed changes
-
 
 # Final stage for app image
 FROM base
@@ -55,7 +49,6 @@ VOLUME /data
 ENTRYPOINT [ "/app/docker-entrypoint.js" ]
 
 # Start the server by default, this can be overwritten at runtime
-ENV DATABASE_URL="file:///data/sqlite.db"
 CMD [ "npm", "run", "start" ]
 EXPOSE 8080
 
