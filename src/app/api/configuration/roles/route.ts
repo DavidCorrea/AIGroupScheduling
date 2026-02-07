@@ -1,0 +1,140 @@
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { roles, scheduleEntries, dayRolePriorities } from "@/db/schema";
+import { eq, sql } from "drizzle-orm";
+import { seedDefaults } from "@/lib/seed";
+
+export async function GET() {
+  seedDefaults();
+  const allRoles = db
+    .select()
+    .from(roles)
+    .orderBy(roles.displayOrder)
+    .all();
+  return NextResponse.json(allRoles);
+}
+
+export async function POST(request: NextRequest) {
+  const body = await request.json();
+  const { name, requiredCount = 1 } = body;
+
+  if (!name || typeof name !== "string" || name.trim().length === 0) {
+    return NextResponse.json(
+      { error: "Role name is required" },
+      { status: 400 }
+    );
+  }
+
+  // Assign displayOrder = max(existing) + 1 so new roles appear at the end
+  const maxResult = db
+    .select({ maxOrder: sql<number>`COALESCE(MAX(${roles.displayOrder}), -1)` })
+    .from(roles)
+    .get();
+  const nextOrder = (maxResult?.maxOrder ?? -1) + 1;
+
+  const role = db
+    .insert(roles)
+    .values({ name: name.trim(), requiredCount, displayOrder: nextOrder })
+    .returning()
+    .get();
+
+  return NextResponse.json(role, { status: 201 });
+}
+
+export async function PUT(request: NextRequest) {
+  const body = await request.json();
+  const { id, name, requiredCount, dependsOnRoleId, exclusiveGroup } = body;
+
+  if (!id) {
+    return NextResponse.json(
+      { error: "Role id is required" },
+      { status: 400 }
+    );
+  }
+
+  const existing = db.select().from(roles).where(eq(roles.id, id)).get();
+  if (!existing) {
+    return NextResponse.json({ error: "Role not found" }, { status: 404 });
+  }
+
+  const updates: Partial<{ name: string; requiredCount: number; dependsOnRoleId: number | null; exclusiveGroup: string | null }> = {};
+  if (name !== undefined) updates.name = name.trim();
+  if (requiredCount !== undefined) updates.requiredCount = requiredCount;
+  if (dependsOnRoleId !== undefined) updates.dependsOnRoleId = dependsOnRoleId;
+  if (exclusiveGroup !== undefined) updates.exclusiveGroup = exclusiveGroup;
+
+  db.update(roles).set(updates).where(eq(roles.id, id)).run();
+
+  const updated = db.select().from(roles).where(eq(roles.id, id)).get();
+  return NextResponse.json(updated);
+}
+
+/**
+ * PATCH: Batch reorder roles. Accepts an array of { id, displayOrder } pairs.
+ */
+export async function PATCH(request: NextRequest) {
+  const body = await request.json();
+  const { order } = body;
+
+  if (!Array.isArray(order)) {
+    return NextResponse.json(
+      { error: "order array is required" },
+      { status: 400 }
+    );
+  }
+
+  for (const item of order) {
+    if (typeof item.id !== "number" || typeof item.displayOrder !== "number") {
+      return NextResponse.json(
+        { error: "Each item must have id and displayOrder as numbers" },
+        { status: 400 }
+      );
+    }
+    db.update(roles)
+      .set({ displayOrder: item.displayOrder })
+      .where(eq(roles.id, item.id))
+      .run();
+  }
+
+  const allRoles = db
+    .select()
+    .from(roles)
+    .orderBy(roles.displayOrder)
+    .all();
+  return NextResponse.json(allRoles);
+}
+
+export async function DELETE(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return NextResponse.json(
+      { error: "Role id is required" },
+      { status: 400 }
+    );
+  }
+
+  const roleId = parseInt(id, 10);
+
+  const existing = db.select().from(roles).where(eq(roles.id, roleId)).get();
+  if (!existing) {
+    return NextResponse.json({ error: "Role not found" }, { status: 404 });
+  }
+
+  // Cascade: delete schedule entries referencing this role
+  db.delete(scheduleEntries)
+    .where(eq(scheduleEntries.roleId, roleId))
+    .run();
+
+  // member_roles and day_role_priorities cascade automatically via schema,
+  // but delete day_role_priorities explicitly in case schema cascades aren't enforced
+  db.delete(dayRolePriorities)
+    .where(eq(dayRolePriorities.roleId, roleId))
+    .run();
+
+  // Delete the role itself (member_roles cascade via schema)
+  db.delete(roles).where(eq(roles.id, roleId)).run();
+
+  return NextResponse.json({ success: true });
+}
