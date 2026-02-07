@@ -44,3 +44,16 @@ next-env.d.ts
 *.db
 *.db-journal
 *.db-wal
+node_modules
+.next
+.git
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+spec
+.cursor
+.env*
+README.md
+PROJECT.md
+AGENTS.md
