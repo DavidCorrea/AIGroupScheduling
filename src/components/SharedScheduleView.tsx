@@ -257,6 +257,15 @@ export default function SharedScheduleView({
     return dateEntries.map((e) => e.roleName).join(", ");
   };
 
+  // Helper: get non-dependent roles for the filtered member on a date
+  // (used in the upcoming assignment section to avoid duplicating dependent roles shown with ★)
+  const getNonDependentRolesForDate = (date: string): string => {
+    const dateEntries = filteredEntries.filter(
+      (e) => e.date === date && !dependentRoleIdSet.has(e.roleId)
+    );
+    return dateEntries.map((e) => e.roleName).join(", ");
+  };
+
   // Count non-rehearsal dates for filtered member
   const assignedDateCount = filteredMemberId
     ? filteredDates.filter((d) => !rehearsalSet.has(d)).length
@@ -324,7 +333,7 @@ export default function SharedScheduleView({
               }
               className="w-full sm:w-auto rounded-md border border-border bg-background px-3 py-2 text-sm"
             >
-              <option value="">Mostrar todos</option>
+              <option value="">Todas las personas</option>
               {schedule.members.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.name}
@@ -388,7 +397,7 @@ export default function SharedScheduleView({
                 )}
               </span>
               <span className="text-sm text-muted-foreground">
-                {getRolesForDate(upcomingDate)}
+                {getNonDependentRolesForDate(upcomingDate)}
                 {hasDependentRoleOnDate(upcomingDate) && (
                   <span className="ml-2 text-primary font-semibold">
                     ★ {getDependentRoleNamesOnDate(upcomingDate).join(", ")}

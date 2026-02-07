@@ -43,7 +43,7 @@
 ## Schedule Generation & Preview
 - Generate schedules for one or more months at a time via `/schedules`
 - Preview generated schedule in a grid (dates x roles) via `/schedules/[id]`
-- Manual swap: click "swap" on any assignment to replace with another eligible member (works on both draft and committed schedules)
+- Manual swap: click "swap" on any assignment to replace with another eligible member or select "— Vaciar —" to empty the slot (works on both draft and committed schedules)
 - **Manual dependent role selection**: For roles with a dependency (e.g., Leader depends on Voice), the schedule grid shows a dropdown populated with members assigned to the source role on that date. The user selects who fills the dependent role; clearing the selection removes the entry
 - **Date descriptions**: Add notes to specific dates (e.g., "Celebration day") shown inline in the grid
 - **Rehearsal dates**: Weekly rehearsal days auto-populate; individual dates can also be added/removed per schedule
@@ -59,7 +59,7 @@
 - **Light/dark mode toggle**: class-based dark mode (`.dark` / `.light` on `<html>`) with system-preference fallback; persists choice in `localStorage`
 - **Filter by member**: dropdown to select a specific person and show only their dates and roles
 - **Multi-role display**: when a member is filtered, all their roles on each date are grouped and listed together (e.g., "Leader, Voice, Teclado Principal"); both Voice and Leader entries are stored explicitly in the DB
-- **Dependent role highlight**: when a filtered member has a dependent role on a date (e.g., Leader), the card/row receives accent styling (coloured border, background tint, ★ badge with the role name)
+- **Dependent role highlight**: when a filtered member has a dependent role on a date (e.g., Leader), the card/row receives accent styling (coloured border, background tint, ★ badge with the role name). In the "Próxima asignación" section, dependent roles are shown only with the ★ badge and excluded from the regular roles text to avoid duplication
 - **Date notes**: displayed inline under each date in both mobile and desktop views
 - **Rehearsal dates**: shown with distinct muted styling and "Ensayo" label
 
@@ -68,6 +68,14 @@
 - Same UI as the shared view (Spanish labels, filtering, dark mode, dependent role highlight)
 - Reuses the `SharedScheduleView` component extracted from the shared page
 - API route: `/api/cronograma-actual` — finds the committed schedule matching the current month/year; returns 404 if none exists
+
+## Admin Authentication
+- HTTP Basic Auth protects all non-public routes via Next.js middleware (`src/middleware.ts`)
+- Public routes (`/shared/*`, `/cronograma-actual`, `/api/shared/*`, `/api/cronograma-actual`) and static assets bypass auth
+- Credentials configured via `ADMIN_USER` and `ADMIN_PASSWORD` environment variables
+- If no credentials are set, auth is skipped (no lockout during initial setup)
+- On Fly.io, set credentials with `fly secrets set ADMIN_USER=xxx ADMIN_PASSWORD=xxx`
+- `.env.example` documents the required variables for local development (copy to `.env.local`)
 
 ## Default Seed Roles
 - Leader (1, depends on Voice), Teclado Principal (1, Instrumento), Teclado Auxiliar (1, Instrumento), Electric Guitar (1, Instrumento), Acoustic Guitar (1, Instrumento), Bass (1, Instrumento), Drums (1, Instrumento), Voice (4)

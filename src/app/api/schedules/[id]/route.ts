@@ -130,6 +130,28 @@ export async function PUT(
     return NextResponse.json({ success: true });
   }
 
+  // Remove an entry (empty the slot)
+  if (body.action === "remove" && body.entryId) {
+    const entry = db
+      .select()
+      .from(scheduleEntries)
+      .where(eq(scheduleEntries.id, body.entryId))
+      .get();
+
+    if (!entry) {
+      return NextResponse.json(
+        { error: "Entry not found" },
+        { status: 404 }
+      );
+    }
+
+    db.delete(scheduleEntries)
+      .where(eq(scheduleEntries.id, body.entryId))
+      .run();
+
+    return NextResponse.json({ success: true });
+  }
+
   // Assign a member to a dependent role on a specific date
   if (body.action === "assign" && body.date && body.roleId && body.memberId) {
     const role = db

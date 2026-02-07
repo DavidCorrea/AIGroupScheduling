@@ -119,6 +119,16 @@ export default function SchedulePreviewPage() {
     fetchData();
   };
 
+  const handleRemove = async (entryId: number) => {
+    await fetch(`/api/schedules/${params.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "remove", entryId }),
+    });
+    setSwapping(null);
+    fetchData();
+  };
+
   const handleAssign = async (date: string, roleId: number, memberId: number | null) => {
     if (memberId === null) {
       // Unassign: find the existing entry for this dependent role on this date
@@ -394,7 +404,9 @@ export default function SchedulePreviewPage() {
                                       className="rounded border border-border bg-background px-2 py-0.5 text-sm"
                                       defaultValue=""
                                       onChange={(e) => {
-                                        if (e.target.value) {
+                                        if (e.target.value === "__remove__") {
+                                          handleRemove(entry.id);
+                                        } else if (e.target.value) {
                                           handleSwap(
                                             entry.id,
                                             parseInt(e.target.value, 10)
@@ -404,6 +416,7 @@ export default function SchedulePreviewPage() {
                                       onBlur={() => setSwapping(null)}
                                     >
                                       <option value="">Select...</option>
+                                      <option value="__remove__">— Vaciar —</option>
                                       {members
                                         .filter((m) =>
                                           m.roleIds.includes(role.id)
