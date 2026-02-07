@@ -1,6 +1,6 @@
 #!/bin/sh
 set -e
 echo "Running migrations..."
-drizzle-kit migrate --config /app/drizzle.config.ts
+node migrate.cjs
 echo "Starting server..."
 node server.js

@@ -25,20 +25,14 @@ ENV DATABASE_URL=/data/sqlite.db
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Install drizzle-kit globally for startup migrations
-# (global install doesn't touch the standalone node_modules)
-RUN apk add --no-cache python3 make g++
-RUN npm install -g drizzle-kit drizzle-orm better-sqlite3
-RUN apk del python3 make g++
-
-# Copy migration files and drizzle config
-COPY --from=builder /app/src/db/migrations ./src/db/migrations
-COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
-
-# Copy standalone output LAST so it is not overwritten
+# Copy standalone output (includes server.js, node_modules with drizzle-orm and better-sqlite3)
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
+
+# Copy migration files and migration script
+COPY --from=builder /app/src/db/migrations ./src/db/migrations
+COPY migrate.cjs ./migrate.cjs
 
 # Copy startup script
 COPY start.sh ./start.sh
