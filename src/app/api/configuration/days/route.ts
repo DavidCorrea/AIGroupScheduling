@@ -3,10 +3,12 @@ import { db } from "@/lib/db";
 import { scheduleDays } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { seedDefaults } from "@/lib/seed";
+import { dayIndex } from "@/lib/constants";
 
 export async function GET() {
   seedDefaults();
   const allDays = await db.select().from(scheduleDays);
+  allDays.sort((a, b) => dayIndex(a.dayOfWeek) - dayIndex(b.dayOfWeek));
   return NextResponse.json(allDays);
 }
 

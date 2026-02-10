@@ -1,8 +1,19 @@
 /**
+ * Returns the capitalised Spanish day-of-week name for a Date (UTC).
+ */
+function spanishDayName(date: Date): string {
+  const raw = date.toLocaleDateString("es-ES", {
+    weekday: "long",
+    timeZone: "UTC",
+  });
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
+/**
  * Returns all dates in a given month/year that fall on the specified days of the week.
  * @param month 1-based month (1 = January, 12 = December)
  * @param year 4-digit year
- * @param activeDays Array of day-of-week names (e.g. ["Wednesday", "Friday", "Sunday"])
+ * @param activeDays Array of day-of-week names (e.g. ["Miércoles", "Viernes", "Domingo"])
  * @returns Array of ISO date strings (YYYY-MM-DD) sorted chronologically
  */
 export function getScheduleDates(
@@ -15,10 +26,7 @@ export function getScheduleDates(
 
   for (let day = 1; day <= daysInMonth; day++) {
     const date = new Date(Date.UTC(year, month - 1, day));
-    const dayName = date.toLocaleDateString("en-US", {
-      weekday: "long",
-      timeZone: "UTC",
-    });
+    const dayName = spanishDayName(date);
 
     if (activeDays.includes(dayName)) {
       const iso = date.toISOString().split("T")[0];
@@ -48,10 +56,7 @@ export function getRehearsalDates(
 
   for (let day = 1; day <= daysInMonth; day++) {
     const date = new Date(Date.UTC(year, month - 1, day));
-    const dayName = date.toLocaleDateString("en-US", {
-      weekday: "long",
-      timeZone: "UTC",
-    });
+    const dayName = spanishDayName(date);
 
     if (rehearsalDays.includes(dayName)) {
       const iso = date.toISOString().split("T")[0];

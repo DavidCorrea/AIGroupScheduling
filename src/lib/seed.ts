@@ -2,13 +2,13 @@ import { db } from "./db";
 import { scheduleDays } from "@/db/schema";
 
 const DEFAULT_DAYS = [
-  { dayOfWeek: "Monday", active: false, isRehearsal: false },
-  { dayOfWeek: "Tuesday", active: false, isRehearsal: false },
-  { dayOfWeek: "Wednesday", active: true, isRehearsal: false },
-  { dayOfWeek: "Thursday", active: false, isRehearsal: false },
-  { dayOfWeek: "Friday", active: true, isRehearsal: false },
-  { dayOfWeek: "Saturday", active: false, isRehearsal: false },
-  { dayOfWeek: "Sunday", active: true, isRehearsal: false },
+  { dayOfWeek: "Lunes", active: false, isRehearsal: false },
+  { dayOfWeek: "Martes", active: false, isRehearsal: false },
+  { dayOfWeek: "Miércoles", active: true, isRehearsal: false },
+  { dayOfWeek: "Jueves", active: false, isRehearsal: false },
+  { dayOfWeek: "Viernes", active: true, isRehearsal: false },
+  { dayOfWeek: "Sábado", active: false, isRehearsal: false },
+  { dayOfWeek: "Domingo", active: true, isRehearsal: false },
 ];
 
 /**

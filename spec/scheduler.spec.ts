@@ -22,7 +22,7 @@ function makeMember(
   id: number,
   name: string,
   roleIds: number[],
-  availableDays: string[] = ["Wednesday", "Friday", "Sunday"],
+  availableDays: string[] = ["Miércoles", "Viernes", "Domingo"],
   holidays: MemberInfo["holidays"] = []
 ): MemberInfo {
   return { id, name, roleIds, availableDays, holidays };
@@ -181,9 +181,9 @@ describe("Schedule generation", () => {
     it("only assigns members to days they are available", () => {
       const roles = [makeRole(1, "Leader")];
       const members = [
-        makeMember(1, "Alice", [1], ["Wednesday"]),
-        makeMember(2, "Bob", [1], ["Friday"]),
-        makeMember(3, "Charlie", [1], ["Sunday"]),
+        makeMember(1, "Alice", [1], ["Miércoles"]),
+        makeMember(2, "Bob", [1], ["Viernes"]),
+        makeMember(3, "Charlie", [1], ["Domingo"]),
       ];
 
       const result = generateSchedule({
@@ -208,8 +208,8 @@ describe("Schedule generation", () => {
     it("skips members who are not available on a given day of the week", () => {
       const roles = [makeRole(1, "Leader")];
       const members = [
-        makeMember(1, "Alice", [1], ["Wednesday"]),
-        makeMember(2, "Bob", [1], ["Wednesday", "Friday"]),
+        makeMember(1, "Alice", [1], ["Miércoles"]),
+        makeMember(2, "Bob", [1], ["Miércoles", "Viernes"]),
       ];
 
       const result = generateSchedule({
@@ -229,7 +229,7 @@ describe("Schedule generation", () => {
     it("does not assign a member during their holiday period", () => {
       const roles = [makeRole(1, "Leader")];
       const members = [
-        makeMember(1, "Alice", [1], ["Wednesday", "Friday", "Sunday"], [
+        makeMember(1, "Alice", [1], ["Miércoles", "Viernes", "Domingo"], [
           { startDate: "2026-03-01", endDate: "2026-03-07" },
         ]),
         makeMember(2, "Bob", [1]),
@@ -258,7 +258,7 @@ describe("Schedule generation", () => {
     it("handles a holiday that spans exactly one day", () => {
       const roles = [makeRole(1, "Leader")];
       const members = [
-        makeMember(1, "Alice", [1], ["Wednesday"], [
+        makeMember(1, "Alice", [1], ["Miércoles"], [
           { startDate: "2026-03-04", endDate: "2026-03-04" },
         ]),
         makeMember(2, "Bob", [1]),
@@ -278,7 +278,7 @@ describe("Schedule generation", () => {
     it("reports unfilled slots when no one can play a role on a date", () => {
       const roles = [makeRole(1, "Leader")];
       const members = [
-        makeMember(1, "Alice", [1], ["Friday"]), // Not available on Wednesday
+        makeMember(1, "Alice", [1], ["Viernes"]), // Not available on Wednesday
       ];
 
       const result = generateSchedule({
@@ -440,7 +440,7 @@ describe("Schedule generation", () => {
         roles,
         members,
         dayRolePriorities: {
-          Wednesday: { 4: 0, 3: 1 }, // Acoustic first, Electric second
+          Miércoles: { 4: 0, 3: 1 }, // Acoustic first, Electric second
         },
       });
 
@@ -473,7 +473,7 @@ describe("Schedule generation", () => {
         roles,
         members,
         dayRolePriorities: {
-          Wednesday: { 4: 0, 3: 1 },
+          Miércoles: { 4: 0, 3: 1 },
         },
       });
 

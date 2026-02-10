@@ -7,16 +7,18 @@ import {
 } from "./scheduler.types";
 
 /**
- * Returns the day-of-week name for an ISO date string (e.g. "2026-03-04" → "Wednesday").
+ * Returns the capitalised Spanish day-of-week name for an ISO date string
+ * (e.g. "2026-03-04" → "Miércoles").
  * Parses as UTC to avoid timezone-related day shifts.
  */
 function getDayOfWeek(dateStr: string): string {
   const [year, month, day] = dateStr.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));
-  return date.toLocaleDateString("en-US", {
+  const raw = date.toLocaleDateString("es-ES", {
     weekday: "long",
     timeZone: "UTC",
   });
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
 /**
