@@ -9,6 +9,7 @@
 - Parallel work should be tacked by as many subagents as it is fit.
 
 # UI
+- All views must be thought of being mobile-first (if possible)
 - Any client-facing content must be in Spanish.
 
 # Code style guidelines

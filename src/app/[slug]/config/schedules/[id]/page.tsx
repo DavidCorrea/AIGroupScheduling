@@ -220,59 +220,220 @@ export default function SchedulePreviewPage() {
   const rehearsalSet = new Set(schedule.rehearsalDates);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          {schedule.prevScheduleId && (
-            <a
-              href={`/${slug}/config/schedules/${schedule.prevScheduleId}`}
-              className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
-            >
-              ← Anterior
-            </a>
-          )}
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3">
+            {schedule.prevScheduleId && (
+              <a
+                href={`/${slug}/config/schedules/${schedule.prevScheduleId}`}
+                className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors"
+              >
+                ← Anterior
+              </a>
+            )}
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
               {MONTH_NAMES[schedule.month - 1]} {schedule.year}
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {schedule.status === "committed" ? (
-                <>
-                  Cronograma creado.{" "}
-                  <a
-                    href={`/${slug}/cronograma/${schedule.year}/${schedule.month}`}
-                    className="text-primary hover:text-primary/80 transition-colors"
-                  >
-                    Ver enlace compartido
-                  </a>
-                </>
-              ) : (
-                "Borrador — revisa y edita antes de crear."
-              )}
-            </p>
+            {schedule.nextScheduleId && (
+              <a
+                href={`/${slug}/config/schedules/${schedule.nextScheduleId}`}
+                className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors"
+              >
+                Siguiente →
+              </a>
+            )}
           </div>
-          {schedule.nextScheduleId && (
-            <a
-              href={`/${slug}/config/schedules/${schedule.nextScheduleId}`}
-              className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
+          {schedule.status === "draft" && (
+            <button
+              onClick={handleCommit}
+              className="w-full sm:w-auto rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all"
             >
-              Siguiente →
-            </a>
+              Crear cronograma
+            </button>
           )}
         </div>
-        {schedule.status === "draft" && (
-          <button
-            onClick={handleCommit}
-            className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all"
-          >
-            Crear cronograma
-          </button>
-        )}
+        <p className="text-sm text-muted-foreground">
+          {schedule.status === "committed" ? (
+            <>
+              Cronograma creado.{" "}
+              <a
+                href={`/${slug}/cronograma/${schedule.year}/${schedule.month}`}
+                className="text-primary hover:text-primary/80 transition-colors"
+              >
+                Ver enlace compartido
+              </a>
+            </>
+          ) : (
+            "Borrador — revisa y edita antes de crear."
+          )}
+        </p>
       </div>
 
-      {/* Schedule grid */}
-      <div className="overflow-x-auto rounded-xl border border-border/50 shadow-[0_1px_3px_var(--shadow-color)]">
+      {/* Mobile card view */}
+      <div className="md:hidden space-y-3">
+        {allDates.map((date) => {
+          const isRehearsal = rehearsalSet.has(date);
+          const entriesOnDate = schedule.entries.filter((e) => e.date === date);
+          const note = noteMap.get(date);
+
+          return (
+            <div
+              key={date}
+              className={`rounded-xl border border-border/50 bg-card shadow-[0_1px_2px_var(--shadow-color)] overflow-hidden ${
+                isRehearsal ? "bg-muted/20" : ""
+              }`}
+            >
+              {/* Date header */}
+              <div className="px-4 py-3 bg-muted/40 border-b border-border/30">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-sm">{formatDate(date)}</span>
+                  {isRehearsal && (
+                    <span className="text-xs text-muted-foreground italic">Ensayo</span>
+                  )}
+                </div>
+                {/* Note editing */}
+                {editingNote === date ? (
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      type="text"
+                      value={noteText}
+                      onChange={(e) => setNoteText(e.target.value)}
+                      className="flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-xs"
+                      placeholder="Agregar nota..."
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveNote(date);
+                        if (e.key === "Escape") setEditingNote(null);
+                      }}
+                    />
+                    <button
+                      onClick={() => saveNote(date)}
+                      className="text-xs text-primary px-2 py-1.5 hover:text-primary/80 transition-colors"
+                    >
+                      Guardar
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-1">
+                    {note ? (
+                      <span
+                        className="text-xs text-primary cursor-pointer hover:text-primary/80 transition-colors"
+                        onClick={() => startEditNote(date)}
+                      >
+                        {note}
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => startEditNote(date)}
+                        className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        + nota
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Role entries */}
+              {isRehearsal ? (
+                <div className="px-4 py-3 text-sm text-muted-foreground italic text-center">
+                  Ensayo
+                </div>
+              ) : (
+                <div className="divide-y divide-border/30">
+                  {roleOrder.map((role) => {
+                    const roleEntries = entriesOnDate.filter((e) => e.roleId === role.id);
+                    const isDependentRole = role.dependsOnRoleId != null;
+
+                    if (isDependentRole) {
+                      const sourceMembers = entriesOnDate
+                        .filter((e) => e.roleId === role.dependsOnRoleId)
+                        .filter((e) => {
+                          const member = members.find((m) => m.id === e.memberId);
+                          return member?.roleIds.includes(role.id);
+                        });
+                      const currentEntry = roleEntries[0] ?? null;
+                      return (
+                        <div key={role.id} className="px-4 py-3">
+                          <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1.5">{role.name}</div>
+                          <select
+                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm w-full min-h-[40px]"
+                            value={currentEntry?.memberId ?? ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              handleAssign(date, role.id, val ? parseInt(val, 10) : null);
+                            }}
+                          >
+                            <option value="">Seleccionar...</option>
+                            {sourceMembers.map((sm) => (
+                              <option key={sm.memberId} value={sm.memberId}>{sm.memberName}</option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={role.id} className="px-4 py-3">
+                        <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1.5">{role.name}</div>
+                        {roleEntries.length === 0 ? (
+                          <span className="text-sm text-muted-foreground/50">—</span>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {roleEntries.map((entry) => (
+                              <div key={entry.id} className="flex items-center justify-between">
+                                {swapping?.entryId === entry.id ? (
+                                  <select
+                                    autoFocus
+                                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm w-full min-h-[40px]"
+                                    defaultValue=""
+                                    onChange={(e) => {
+                                      if (e.target.value === "__remove__") {
+                                        handleRemove(entry.id);
+                                      } else if (e.target.value) {
+                                        handleSwap(entry.id, parseInt(e.target.value, 10));
+                                      }
+                                    }}
+                                    onBlur={() => setSwapping(null)}
+                                  >
+                                    <option value="">Seleccionar...</option>
+                                    <option value="__remove__">— Vaciar —</option>
+                                    {members
+                                      .filter((m) => m.roleIds.includes(role.id))
+                                      .map((m) => (
+                                        <option key={m.id} value={m.id}>{m.name}</option>
+                                      ))}
+                                  </select>
+                                ) : (
+                                  <>
+                                    <span className="text-sm">{entry.memberName}</span>
+                                    <button
+                                      onClick={() => setSwapping({ entryId: entry.id, roleId: role.id })}
+                                      className="text-xs text-primary hover:text-primary/80 px-2 py-1 transition-colors"
+                                      title="Cambiar miembro"
+                                    >
+                                      cambiar
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop table view */}
+      <div className="hidden md:block overflow-x-auto rounded-xl border border-border/50 shadow-[0_1px_3px_var(--shadow-color)]">
         <table className="w-full border-collapse">
           <thead>
             <tr>
@@ -311,7 +472,6 @@ export default function SchedulePreviewPage() {
                         </span>
                       )}
                     </div>
-                    {/* Date note */}
                     {editingNote === date ? (
                       <div className="mt-1.5 flex gap-1">
                         <input
@@ -367,7 +527,6 @@ export default function SchedulePreviewPage() {
                       );
                       const isDependentRole = role.dependsOnRoleId != null;
 
-                      // For dependent roles, show a dropdown of source role members
                       if (isDependentRole) {
                         const sourceMembers = entriesOnDate
                           .filter((e) => e.roleId === role.dependsOnRoleId)

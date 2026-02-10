@@ -76,7 +76,7 @@ export default function GroupsPage() {
       <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
         {/* Header */}
         <div className="mb-10">
-          <h1 className="text-3xl font-bold tracking-tight">Cronogramas</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Cronogramas</h1>
           <p className="mt-2 text-muted-foreground">
             Selecciona un grupo para gestionar o crea uno nuevo.
           </p>
@@ -145,25 +145,27 @@ export default function GroupsPage() {
             groups.map((group) => (
               <div
                 key={group.id}
-                className="flex items-center justify-between rounded-xl border border-border/50 bg-card p-5 shadow-[0_1px_3px_var(--shadow-color)] hover:shadow-[0_4px_12px_var(--shadow-color)] hover:-translate-y-0.5 transition-all duration-200"
+                className="rounded-xl border border-border/50 bg-card p-4 sm:p-5 shadow-[0_1px_3px_var(--shadow-color)] hover:shadow-[0_4px_12px_var(--shadow-color)] hover:-translate-y-0.5 transition-all duration-200"
               >
-                <div className="min-w-0">
-                  <h3 className="font-semibold truncate">{group.name}</h3>
-                  <p className="text-sm text-muted-foreground mt-0.5">/{group.slug}</p>
-                </div>
-                <div className="flex gap-2 shrink-0 ml-4">
-                  <Link
-                    href={`/${group.slug}/config`}
-                    className="rounded-lg border border-border px-3.5 py-2 text-sm font-medium hover:bg-muted transition-colors"
-                  >
-                    Configurar
-                  </Link>
-                  <Link
-                    href={`/${group.slug}/cronograma`}
-                    className="rounded-lg bg-primary/10 text-primary px-3.5 py-2 text-sm font-medium hover:bg-primary/20 transition-colors"
-                  >
-                    Ver cronograma
-                  </Link>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="font-semibold truncate">{group.name}</h3>
+                    <p className="text-sm text-muted-foreground mt-0.5">/{group.slug}</p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Link
+                      href={`/${group.slug}/config`}
+                      className="flex-1 sm:flex-none text-center rounded-lg border border-border px-3.5 py-2 text-sm font-medium hover:bg-muted transition-colors"
+                    >
+                      Configurar
+                    </Link>
+                    <Link
+                      href={`/${group.slug}/cronograma`}
+                      className="flex-1 sm:flex-none text-center rounded-lg bg-primary/10 text-primary px-3.5 py-2 text-sm font-medium hover:bg-primary/20 transition-colors"
+                    >
+                      Ver cronograma
+                    </Link>
+                  </div>
                 </div>
               </div>
             ))

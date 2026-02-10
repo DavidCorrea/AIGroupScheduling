@@ -109,7 +109,7 @@ export default function SchedulesPage() {
   return (
     <div className="space-y-10">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Cronogramas</h1>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Cronogramas</h1>
         <p className="mt-1.5 text-muted-foreground">
           Genera nuevos cronogramas o consulta los existentes.
         </p>
@@ -126,13 +126,13 @@ export default function SchedulesPage() {
 
         <div className="space-y-3">
           {selectedMonths.map((sm, index) => (
-            <div key={index} className="flex items-center gap-3">
+            <div key={index} className="flex flex-wrap items-center gap-2 sm:gap-3">
               <select
                 value={sm.month}
                 onChange={(e) =>
                   updateMonth(index, "month", parseInt(e.target.value, 10))
                 }
-                className="rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm"
+                className="flex-1 sm:flex-none rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm min-h-[40px]"
               >
                 {MONTH_NAMES.map((name, i) => (
                   <option key={i} value={i + 1}>
@@ -146,14 +146,14 @@ export default function SchedulesPage() {
                 onChange={(e) =>
                   updateMonth(index, "year", parseInt(e.target.value, 10))
                 }
-                className="w-24 rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm"
+                className="w-24 rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm min-h-[40px]"
                 min={2020}
                 max={2040}
               />
               {selectedMonths.length > 1 && (
                 <button
                   onClick={() => removeMonth(index)}
-                  className="text-sm text-destructive hover:text-destructive/80 transition-colors"
+                  className="text-sm text-destructive hover:text-destructive/80 px-2 py-1 transition-colors"
                 >
                   Eliminar
                 </button>
@@ -162,17 +162,17 @@ export default function SchedulesPage() {
           ))}
         </div>
 
-        <div className="flex gap-3 pt-1">
+        <div className="flex flex-col sm:flex-row gap-3 pt-1">
           <button
             onClick={addMonth}
-            className="rounded-lg border border-border px-5 py-2.5 text-sm font-medium hover:bg-muted transition-colors"
+            className="w-full sm:w-auto rounded-lg border border-border px-5 py-2.5 text-sm font-medium hover:bg-muted transition-colors"
           >
             + Agregar mes
           </button>
           <button
             onClick={handleGenerate}
             disabled={generating}
-            className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all disabled:opacity-50"
+            className="w-full sm:w-auto rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all disabled:opacity-50"
           >
             {generating ? "Generando..." : "Generar"}
           </button>
@@ -193,47 +193,49 @@ export default function SchedulesPage() {
             {schedulesList.map((schedule) => (
               <div
                 key={schedule.id}
-                className="flex items-center justify-between rounded-xl border border-border/50 bg-card px-5 py-4 shadow-[0_1px_2px_var(--shadow-color)]"
+                className="rounded-xl border border-border/50 bg-card px-4 py-4 sm:px-5 shadow-[0_1px_2px_var(--shadow-color)]"
               >
-                <div className="flex items-center gap-3">
-                  <span className="font-medium">
-                    {MONTH_NAMES[schedule.month - 1]} {schedule.year}
-                  </span>
-                  <span
-                    className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      schedule.status === "committed"
-                        ? "bg-success/10 text-success"
-                        : "bg-amber-500/10 text-amber-600"
-                    }`}
-                  >
-                    {schedule.status === "committed"
-                      ? "Creado"
-                      : schedule.status === "draft"
-                        ? "Borrador"
-                        : schedule.status}
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  <Link
-                    href={`/${slug}/config/schedules/${schedule.id}`}
-                    className="rounded-lg border border-border px-3.5 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
-                  >
-                    Ver
-                  </Link>
-                  {schedule.status === "committed" && (
-                    <Link
-                      href={`/${slug}/cronograma/${schedule.year}/${schedule.month}`}
-                      className="rounded-lg bg-primary/10 text-primary px-3.5 py-1.5 text-sm font-medium hover:bg-primary/20 transition-colors"
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium">
+                      {MONTH_NAMES[schedule.month - 1]} {schedule.year}
+                    </span>
+                    <span
+                      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        schedule.status === "committed"
+                          ? "bg-success/10 text-success"
+                          : "bg-amber-500/10 text-amber-600"
+                      }`}
                     >
-                      Enlace compartido
+                      {schedule.status === "committed"
+                        ? "Creado"
+                        : schedule.status === "draft"
+                          ? "Borrador"
+                          : schedule.status}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Link
+                      href={`/${slug}/config/schedules/${schedule.id}`}
+                      className="flex-1 sm:flex-none text-center rounded-lg border border-border px-3.5 py-2 text-sm font-medium hover:bg-muted transition-colors"
+                    >
+                      Ver
                     </Link>
-                  )}
-                  <button
-                    onClick={() => handleDelete(schedule.id)}
-                    className="rounded-lg border border-destructive/30 px-3.5 py-1.5 text-sm font-medium text-destructive hover:bg-destructive hover:text-white transition-colors"
-                  >
-                    Eliminar
-                  </button>
+                    {schedule.status === "committed" && (
+                      <Link
+                        href={`/${slug}/cronograma/${schedule.year}/${schedule.month}`}
+                        className="flex-1 sm:flex-none text-center rounded-lg bg-primary/10 text-primary px-3.5 py-2 text-sm font-medium hover:bg-primary/20 transition-colors"
+                      >
+                        Compartido
+                      </Link>
+                    )}
+                    <button
+                      onClick={() => handleDelete(schedule.id)}
+                      className="flex-1 sm:flex-none rounded-lg border border-destructive/30 px-3.5 py-2 text-sm font-medium text-destructive hover:bg-destructive hover:text-white transition-colors"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

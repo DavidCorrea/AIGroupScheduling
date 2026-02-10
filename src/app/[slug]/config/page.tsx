@@ -40,7 +40,7 @@ export default function AdminHome() {
   return (
     <div className="space-y-10">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Bienvenido a {groupName}</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Bienvenido a {groupName}</h1>
         <p className="mt-2 text-muted-foreground">
           Genera cronogramas justos y rotacionales para tu grupo. Configura miembros, roles y disponibilidad, luego genera cronogramas para cualquier mes.
         </p>

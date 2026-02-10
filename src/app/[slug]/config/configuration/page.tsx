@@ -64,14 +64,14 @@ function PriorityEditor({
           <button
             onClick={() => moveUp(index)}
             disabled={index === 0}
-            className="px-1.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
+            className="p-2 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
           >
             ↑
           </button>
           <button
             onClick={() => moveDown(index)}
             disabled={index === orderedRoles.length - 1}
-            className="px-1.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
+            className="p-2 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
           >
             ↓
           </button>
@@ -81,7 +81,7 @@ function PriorityEditor({
         onClick={() =>
           onSave(orderedRoles.map((r, i) => ({ roleId: r.id, priority: i })))
         }
-        className="mt-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all"
+        className="mt-2 w-full sm:w-auto rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all"
       >
         Guardar orden
       </button>
@@ -139,14 +139,14 @@ function ColumnOrderEditor({
           <button
             onClick={() => moveUp(index)}
             disabled={index === 0}
-            className="px-1.5 py-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
+            className="p-2 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
           >
             ↑
           </button>
           <button
             onClick={() => moveDown(index)}
             disabled={index === orderedRoles.length - 1}
-            className="px-1.5 py-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
+            className="p-2 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
           >
             ↓
           </button>
@@ -156,7 +156,7 @@ function ColumnOrderEditor({
         onClick={() =>
           onSave(orderedRoles.map((r, i) => ({ id: r.id, displayOrder: i })))
         }
-        className="mt-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all"
+        className="mt-2 w-full sm:w-auto rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all"
       >
         Guardar orden
       </button>
@@ -317,7 +317,7 @@ export default function ConfigurationPage() {
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Configuración</h1>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Configuración</h1>
         <p className="mt-1.5 text-muted-foreground">
           Configura días activos, orden de columnas, prioridades de roles y gestiona vacaciones de miembros.
         </p>
@@ -572,28 +572,31 @@ export default function ConfigurationPage() {
               return (
                 <div
                   key={holiday.id}
-                  className="flex items-center justify-between rounded-xl border border-border/50 bg-card px-5 py-3.5 shadow-[0_1px_2px_var(--shadow-color)]"
+                  className="rounded-xl border border-border/50 bg-card px-4 py-3.5 sm:px-5 shadow-[0_1px_2px_var(--shadow-color)]"
                 >
-                  <div>
-                    <span className="font-medium">
-                      {member?.name ?? "Unknown"}
-                    </span>
-                    <span className="mx-2 text-muted-foreground/50">—</span>
-                    <span className="text-sm text-muted-foreground">
-                      {holiday.startDate} to {holiday.endDate}
-                    </span>
-                    {holiday.description && (
-                      <span className="ml-2 text-sm text-muted-foreground italic">
-                        ({holiday.description})
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div>
+                      <span className="font-medium">
+                        {member?.name ?? "Unknown"}
                       </span>
-                    )}
+                      <span className="mx-2 text-muted-foreground/50 hidden sm:inline">—</span>
+                      <br className="sm:hidden" />
+                      <span className="text-sm text-muted-foreground">
+                        {holiday.startDate} to {holiday.endDate}
+                      </span>
+                      {holiday.description && (
+                        <span className="ml-2 text-sm text-muted-foreground italic">
+                          ({holiday.description})
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => deleteHoliday(holiday.id)}
+                      className="w-full sm:w-auto rounded-lg border border-destructive/30 px-3.5 py-2 text-sm font-medium text-destructive hover:bg-destructive hover:text-white transition-colors"
+                    >
+                      Eliminar
+                    </button>
                   </div>
-                  <button
-                    onClick={() => deleteHoliday(holiday.id)}
-                    className="rounded-lg border border-destructive/30 px-3.5 py-1.5 text-sm font-medium text-destructive hover:bg-destructive hover:text-white transition-colors"
-                  >
-                    Eliminar
-                  </button>
                 </div>
               );
             })}

@@ -187,7 +187,7 @@ export default function RolesPage() {
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Roles</h1>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Roles</h1>
         <p className="mt-1.5 text-muted-foreground">
           Define los roles necesarios para cada fecha de servicio, cuántas
           personas se requieren y sus grupos exclusivos.
@@ -228,40 +228,51 @@ export default function RolesPage() {
           {roles.map((role) => (
             <div
               key={role.id}
-              className="flex items-center justify-between rounded-xl border border-border/50 bg-card px-5 py-3.5 shadow-[0_1px_2px_var(--shadow-color)]"
+              className="rounded-xl border border-border/50 bg-card px-4 py-4 sm:px-5 shadow-[0_1px_2px_var(--shadow-color)] space-y-3"
             >
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                {editingRoleId === role.id ? (
-                  <input
-                    type="text"
-                    value={editingRoleName}
-                    onChange={(e) => setEditingRoleName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") saveRoleName(role);
-                      if (e.key === "Escape") setEditingRoleId(null);
-                    }}
-                    onBlur={() => saveRoleName(role)}
-                    autoFocus
-                    className="rounded-lg border border-border bg-background px-2.5 py-1 text-sm font-medium focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 w-48"
-                  />
-                ) : (
-                  <span
-                    className="font-medium cursor-pointer hover:text-primary transition-colors"
-                    onClick={() => {
-                      setEditingRoleId(role.id);
-                      setEditingRoleName(role.name);
-                    }}
-                    title="Clic para renombrar"
-                  >
-                    {role.name}
-                  </span>
-                )}
+              {/* Role name + delete (always visible) */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  {editingRoleId === role.id ? (
+                    <input
+                      type="text"
+                      value={editingRoleName}
+                      onChange={(e) => setEditingRoleName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveRoleName(role);
+                        if (e.key === "Escape") setEditingRoleId(null);
+                      }}
+                      onBlur={() => saveRoleName(role)}
+                      autoFocus
+                      className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm font-medium focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 w-full max-w-[200px]"
+                    />
+                  ) : (
+                    <span
+                      className="font-medium cursor-pointer hover:text-primary transition-colors truncate"
+                      onClick={() => {
+                        setEditingRoleId(role.id);
+                        setEditingRoleName(role.name);
+                      }}
+                      title="Clic para renombrar"
+                    >
+                      {role.name}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => deleteRole(role)}
+                  className="rounded-lg border border-destructive/30 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive hover:text-white transition-colors shrink-0"
+                  title="Eliminar rol"
+                >
+                  Eliminar
+                </button>
               </div>
 
-              <div className="flex items-center gap-3 flex-wrap">
+              {/* Controls: stack on mobile, row on desktop */}
+              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-3">
                 {/* Required count */}
                 <div className="flex items-center gap-2">
-                  <label className="text-xs text-muted-foreground">
+                  <label className="text-xs text-muted-foreground whitespace-nowrap">
                     Requeridos:
                   </label>
                   <select
@@ -269,7 +280,7 @@ export default function RolesPage() {
                     onChange={(e) =>
                       updateRoleCount(role, parseInt(e.target.value, 10))
                     }
-                    className="rounded-lg border border-border bg-background px-2 py-1 text-sm"
+                    className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm min-h-[36px]"
                   >
                     {[1, 2, 3, 4, 5, 6].map((n) => (
                       <option key={n} value={n}>
@@ -279,81 +290,82 @@ export default function RolesPage() {
                   </select>
                 </div>
 
-                {/* Dependency */}
-                <div className="flex items-center gap-2">
-                  <label className="text-xs text-muted-foreground">
-                    Depende de:
-                  </label>
-                  <select
-                    value={role.dependsOnRoleId ?? ""}
-                    onChange={(e) =>
-                      updateRoleDependency(
-                        role,
-                        e.target.value ? parseInt(e.target.value, 10) : null
-                      )
-                    }
-                    className="rounded-lg border border-border bg-background px-2 py-1 text-sm"
-                  >
-                    <option value="">Ninguno</option>
-                    {roles
-                      .filter((r) => r.id !== role.id)
-                      .map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-
-                {/* Exclusive Group */}
-                <div className="flex items-center gap-2">
-                  <label className="text-xs text-muted-foreground">
-                    Grupo exclusivo:
-                  </label>
-                  <select
-                    value={role.exclusiveGroupId ?? ""}
-                    onChange={(e) =>
-                      updateRoleExclusiveGroup(
-                        role,
-                        e.target.value ? parseInt(e.target.value, 10) : null
-                      )
-                    }
-                    className="rounded-lg border border-border bg-background px-2 py-1 text-sm"
-                  >
-                    <option value="">Ninguno</option>
-                    {groups.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
                 {/* Relevant toggle */}
-                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                <label className="flex items-center gap-1.5 cursor-pointer select-none min-h-[36px]">
                   <input
                     type="checkbox"
                     checked={role.isRelevant}
                     onChange={() => toggleRelevant(role)}
-                    className="rounded border-border accent-primary"
+                    className="rounded border-border accent-primary w-4 h-4"
                   />
                   <span className="text-xs text-muted-foreground">Relevante</span>
                 </label>
 
-                {/* Delete */}
-                <button
-                  onClick={() => deleteRole(role)}
-                  className="rounded-lg border border-destructive/30 px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive hover:text-white transition-colors"
-                  title="Eliminar rol"
-                >
-                  Eliminar
-                </button>
+                {/* Dependency */}
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="text-xs text-muted-foreground mb-1 block sm:hidden">
+                    Depende de
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-muted-foreground whitespace-nowrap hidden sm:block">
+                      Depende de:
+                    </label>
+                    <select
+                      value={role.dependsOnRoleId ?? ""}
+                      onChange={(e) =>
+                        updateRoleDependency(
+                          role,
+                          e.target.value ? parseInt(e.target.value, 10) : null
+                        )
+                      }
+                      className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm w-full sm:w-auto min-h-[36px]"
+                    >
+                      <option value="">Ninguno</option>
+                      {roles
+                        .filter((r) => r.id !== role.id)
+                        .map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Exclusive Group */}
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="text-xs text-muted-foreground mb-1 block sm:hidden">
+                    Grupo exclusivo
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-muted-foreground whitespace-nowrap hidden sm:block">
+                      Grupo exclusivo:
+                    </label>
+                    <select
+                      value={role.exclusiveGroupId ?? ""}
+                      onChange={(e) =>
+                        updateRoleExclusiveGroup(
+                          role,
+                          e.target.value ? parseInt(e.target.value, 10) : null
+                        )
+                      }
+                      className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm w-full sm:w-auto min-h-[36px]"
+                    >
+                      <option value="">Ninguno</option>
+                      {groups.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               </div>
             </div>
           ))}
         </div>
 
-        <form onSubmit={addRole} className="flex items-end gap-3">
+        <form onSubmit={addRole} className="space-y-3 sm:space-y-0 sm:flex sm:items-end sm:gap-3">
           <div className="flex-1">
             <label className="block text-sm font-medium text-muted-foreground mb-1.5">
               Nombre del nuevo rol
@@ -366,7 +378,7 @@ export default function RolesPage() {
               placeholder="ej. Saxofón"
             />
           </div>
-          <div className="w-24">
+          <div className="w-full sm:w-24">
             <label className="block text-sm font-medium text-muted-foreground mb-1.5">
               Cantidad
             </label>
@@ -381,7 +393,7 @@ export default function RolesPage() {
           </div>
           <button
             type="submit"
-            className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all"
+            className="w-full sm:w-auto rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all"
           >
             Agregar rol
           </button>
@@ -423,7 +435,7 @@ export default function RolesPage() {
           </div>
         )}
 
-        <form onSubmit={addGroup} className="flex items-end gap-3">
+        <form onSubmit={addGroup} className="space-y-3 sm:space-y-0 sm:flex sm:items-end sm:gap-3">
           <div className="flex-1">
             <label className="block text-sm font-medium text-muted-foreground mb-1.5">
               Nombre del nuevo grupo
@@ -438,7 +450,7 @@ export default function RolesPage() {
           </div>
           <button
             type="submit"
-            className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all"
+            className="w-full sm:w-auto rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all"
           >
             Agregar
           </button>

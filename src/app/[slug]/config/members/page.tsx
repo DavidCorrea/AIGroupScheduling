@@ -126,7 +126,7 @@ export default function MembersPage() {
   return (
     <div className="space-y-10">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Miembros</h1>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Miembros</h1>
         <p className="mt-1.5 text-muted-foreground">
           Agrega y gestiona los miembros del grupo. Asigna roles y configura disponibilidad.
         </p>
@@ -233,50 +233,52 @@ export default function MembersPage() {
           members.map((member) => (
             <div
               key={member.id}
-              className="flex items-start justify-between rounded-xl border border-border/50 bg-card p-5 shadow-[0_1px_3px_var(--shadow-color)] hover:shadow-[0_2px_6px_var(--shadow-color)] transition-shadow"
+              className="rounded-xl border border-border/50 bg-card p-4 sm:p-5 shadow-[0_1px_3px_var(--shadow-color)] hover:shadow-[0_2px_6px_var(--shadow-color)] transition-shadow"
             >
-              <div className="space-y-2.5 min-w-0">
-                <h3 className="font-semibold">{member.name}</h3>
-                <div className="flex flex-wrap gap-1.5">
-                  {member.roleIds.map((roleId) => {
-                    const role = roles.find((r) => r.id === roleId);
-                    return (
-                      <span
-                        key={roleId}
-                        className="rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium"
-                      >
-                        {role?.name ?? "Unknown"}
-                      </span>
-                    );
-                  })}
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div className="space-y-2.5 min-w-0">
+                  <h3 className="font-semibold">{member.name}</h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {member.roleIds.map((roleId) => {
+                      const role = roles.find((r) => r.id === roleId);
+                      return (
+                        <span
+                          key={roleId}
+                          className="rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium"
+                        >
+                          {role?.name ?? "Unknown"}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {member.availableDayIds.map((dayId) => {
+                      const day = days.find((d) => d.id === dayId);
+                      return (
+                        <span
+                          key={dayId}
+                          className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground"
+                        >
+                          {day?.dayOfWeek ?? "Unknown"}
+                        </span>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {member.availableDayIds.map((dayId) => {
-                    const day = days.find((d) => d.id === dayId);
-                    return (
-                      <span
-                        key={dayId}
-                        className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground"
-                      >
-                        {day?.dayOfWeek ?? "Unknown"}
-                      </span>
-                    );
-                  })}
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => startEdit(member)}
+                    className="flex-1 sm:flex-none rounded-lg border border-border px-3.5 py-2 text-sm font-medium hover:bg-muted transition-colors"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => handleDelete(member.id)}
+                    className="flex-1 sm:flex-none rounded-lg border border-destructive/30 px-3.5 py-2 text-sm font-medium text-destructive hover:bg-destructive hover:text-white transition-colors"
+                  >
+                    Eliminar
+                  </button>
                 </div>
-              </div>
-              <div className="flex gap-2 shrink-0 ml-4">
-                <button
-                  onClick={() => startEdit(member)}
-                  className="rounded-lg border border-border px-3.5 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
-                >
-                  Editar
-                </button>
-                <button
-                  onClick={() => handleDelete(member.id)}
-                  className="rounded-lg border border-destructive/30 px-3.5 py-1.5 text-sm font-medium text-destructive hover:bg-destructive hover:text-white transition-colors"
-                >
-                  Eliminar
-                </button>
               </div>
             </div>
           ))
