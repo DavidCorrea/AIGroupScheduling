@@ -9,6 +9,7 @@ interface Role {
   displayOrder: number;
   dependsOnRoleId: number | null;
   exclusiveGroupId: number | null;
+  isRelevant: boolean;
 }
 
 interface ExclusiveGroup {
@@ -139,6 +140,15 @@ export default function RolesPage() {
     fetchData();
   };
 
+  const toggleRelevant = async (role: Role) => {
+    await fetch("/api/configuration/roles", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: role.id, isRelevant: !role.isRelevant }),
+    });
+    fetchData();
+  };
+
   const deleteRole = async (role: Role) => {
     if (
       !confirm(
@@ -173,6 +183,26 @@ export default function RolesPage() {
           Configura cada rol con la cantidad de personas requeridas,
           dependencias opcionales y grupo exclusivo.
         </p>
+
+        <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground space-y-1">
+          <p>
+            <span className="font-medium text-foreground">Depende de:</span>{" "}
+            El rol no se asigna automáticamente. Al generar el cronograma, se
+            elige manualmente entre los miembros asignados al rol del que depende.
+            Ej: si Líder depende de Voz, se elige un líder entre las voces del día.
+          </p>
+          <p>
+            <span className="font-medium text-foreground">Grupo exclusivo:</span>{" "}
+            Dos roles del mismo grupo no pueden asignarse a la misma persona en
+            la misma fecha. Ej: si Teclado y Guitarra Eléctrica están en el grupo
+            &quot;Instrumento&quot;, una persona solo tocará uno de ellos por día.
+          </p>
+          <p>
+            <span className="font-medium text-foreground">Relevante:</span>{" "}
+            Las fechas donde un miembro tiene un rol relevante se resaltan en la
+            vista compartida al filtrar por esa persona.
+          </p>
+        </div>
 
         <div className="space-y-2">
           {roles.map((role) => (
@@ -278,6 +308,17 @@ export default function RolesPage() {
                     ))}
                   </select>
                 </div>
+
+                {/* Relevant toggle */}
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={role.isRelevant}
+                    onChange={() => toggleRelevant(role)}
+                    className="rounded border-border"
+                  />
+                  <span className="text-sm text-muted-foreground">Relevante</span>
+                </label>
 
                 {/* Delete */}
                 <button
