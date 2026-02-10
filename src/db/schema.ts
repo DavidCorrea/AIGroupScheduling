@@ -17,6 +17,7 @@ export const roles = pgTable("roles", {
   displayOrder: integer("display_order").notNull().default(0),
   dependsOnRoleId: integer("depends_on_role_id"),
   exclusiveGroupId: integer("exclusive_group_id").references(() => exclusiveGroups.id, { onDelete: "set null" }),
+  isRelevant: boolean("is_relevant").notNull().default(false),
 });
 
 export const memberRoles = pgTable("member_roles", {

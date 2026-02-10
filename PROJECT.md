@@ -35,6 +35,7 @@
 - Dedicated `/roles` page for managing roles and exclusive groups
 - **Roles**: View, add, rename, delete, and configure roles with required person counts, optional dependencies (e.g., Leader depends on Voice), and optional exclusive groups via dropdown. Deleting a role cascade-deletes all schedule entries and member associations for that role
 - **Exclusive Groups**: CRUD management of exclusive groups (e.g., "Instrumento"). Deleting a group sets referencing roles' `exclusiveGroupId` to null
+- **Relevant roles**: Each role has an `isRelevant` boolean flag (default false), toggled via a "Relevante" checkbox in the roles page. Relevant roles cause date highlighting in the shared view when a member is filtered (see Shared Public View)
 - API routes: `/api/configuration/roles`, `/api/configuration/exclusive-groups`
 
 ## Configuration
@@ -68,12 +69,13 @@
 - **Filter by member**: dropdown to select a specific person and show only their dates and roles
 - **Multi-role display**: when a member is filtered, all their roles on each date are grouped and listed together (e.g., "Leader, Voice, Teclado Principal"); both Voice and Leader entries are stored explicitly in the DB
 - **Dependent role highlight**: when a filtered member has a dependent role on a date (e.g., Leader), the card/row receives accent styling (coloured border, background tint, ★ badge with the role name). In the "Próxima asignación" section, dependent roles are shown only with the ★ badge and excluded from the regular roles text to avoid duplication
+- **Relevant role highlight**: dates where the filtered member holds a role marked as "relevant" are visually highlighted with the same accent styling (border, background tint, ring) as dependent roles. Both indicators can coexist on the same date
 - **Date notes**: displayed inline under each date in both mobile and desktop views
 - **Rehearsal dates**: shown with distinct muted styling and "Ensayo" label
 
 ## Current Month Public View
 - Stable public URL at `/cronograma` — always shows the committed schedule for the current running month
-- Same UI as the shared view (Spanish labels, filtering, dark mode, dependent role highlight)
+- Same UI as the shared view (Spanish labels, filtering, dark mode, dependent/relevant role highlight)
 - Reuses the `SharedScheduleView` component extracted from the shared page
 - API route: `/api/cronograma` — finds the committed schedule matching the current month/year; returns 404 if none exists
 

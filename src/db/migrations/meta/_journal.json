@@ -29,6 +29,13 @@
       "when": 1770683815584,
       "tag": "0003_create_day_role_priorities",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1770685322700,
+      "tag": "0004_add_role_is_relevant",
+      "breakpoints": true
     }
   ]
 }

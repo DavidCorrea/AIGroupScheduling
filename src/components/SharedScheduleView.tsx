@@ -23,6 +23,7 @@ export interface RoleInfo {
   requiredCount: number;
   displayOrder: number;
   dependsOnRoleId?: number | null;
+  isRelevant?: boolean;
 }
 
 export interface SharedScheduleData {
@@ -172,6 +173,11 @@ export default function SharedScheduleView({
     ?? (schedule.leaderRoleId ? [schedule.leaderRoleId] : []);
   const dependentRoleIdSet = new Set(dependentRoleIds);
 
+  // Relevant role IDs for highlighting
+  const relevantRoleIdSet = new Set(
+    (schedule.roles ?? []).filter((r) => r.isRelevant).map((r) => r.id)
+  );
+
   const entryDates = [...new Set(schedule.entries.map((e) => e.date))];
 
   // Helper: check if a date should be excluded by past-date or day-of-week filters
@@ -240,6 +246,14 @@ export default function SharedScheduleView({
     if (!filteredMemberId || dependentRoleIdSet.size === 0) return false;
     return filteredEntries.some(
       (e) => e.date === date && dependentRoleIdSet.has(e.roleId)
+    );
+  };
+
+  // Helper: check if the filtered member has a relevant role on a given date
+  const hasRelevantRoleOnDate = (date: string): boolean => {
+    if (!filteredMemberId || relevantRoleIdSet.size === 0) return false;
+    return filteredEntries.some(
+      (e) => e.date === date && relevantRoleIdSet.has(e.roleId)
     );
   };
 
@@ -422,6 +436,8 @@ export default function SharedScheduleView({
             );
             const note = noteMap.get(date);
             const depRoleDate = hasDependentRoleOnDate(date);
+            const relevantRoleDate = hasRelevantRoleOnDate(date);
+            const highlighted = filteredMemberId && (depRoleDate || relevantRoleDate);
             const prevDate = index > 0 ? displayDates[index - 1] : null;
             const weekBreak = isNewWeek(date, prevDate);
 
@@ -436,14 +452,14 @@ export default function SharedScheduleView({
                   } ${
                     isRehearsal
                       ? "border-border/50 bg-muted/30"
-                      : depRoleDate && filteredMemberId
+                      : highlighted
                         ? "border-primary bg-accent/40 ring-2 ring-primary/30"
                         : "border-border bg-card"
                   }`}
                 >
                   <div
                     className={`px-4 py-2 font-medium text-sm cursor-pointer select-none ${
-                      depRoleDate && filteredMemberId
+                      highlighted
                         ? "bg-primary/10"
                         : "bg-muted"
                     }`}
@@ -541,6 +557,8 @@ export default function SharedScheduleView({
                   const isRehearsal = rehearsalSet.has(date);
                   const note = noteMap.get(date);
                   const depRoleDate = hasDependentRoleOnDate(date);
+                  const relevantRoleDate = hasRelevantRoleOnDate(date);
+                  const highlighted = depRoleDate || relevantRoleDate;
                   const prevDate = index > 0 ? displayDates[index - 1] : null;
                   const weekBreak = isNewWeek(date, prevDate);
 
@@ -550,7 +568,7 @@ export default function SharedScheduleView({
                       className={[
                         isRehearsal
                           ? "bg-muted/30"
-                          : depRoleDate
+                          : highlighted
                             ? "bg-accent/40 font-semibold"
                             : "",
                         isPast(date) ? "opacity-50" : "",
@@ -561,7 +579,7 @@ export default function SharedScheduleView({
                     >
                       <td
                         className={`border border-border px-4 py-2 text-sm ${
-                          depRoleDate ? "border-l-4 border-l-primary" : ""
+                          highlighted ? "border-l-4 border-l-primary" : ""
                         }`}
                       >
                         <div className="flex items-center gap-2">
