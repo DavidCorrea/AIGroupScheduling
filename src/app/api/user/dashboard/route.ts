@@ -1,0 +1,102 @@
+import { NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import {
+  members,
+  scheduleEntries,
+  schedules,
+  roles,
+  groups,
+} from "@/db/schema";
+import { eq, and, gte } from "drizzle-orm";
+import { requireAuth } from "@/lib/api-helpers";
+
+export async function GET() {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+  const userId = authResult.user.id;
+
+  // Get all memberships for this user
+  const userMembers = await db
+    .select()
+    .from(members)
+    .where(eq(members.userId, userId));
+
+  if (userMembers.length === 0) {
+    return NextResponse.json({ assignments: [], conflicts: [] });
+  }
+
+  const today = new Date().toISOString().split("T")[0];
+
+  // Gather upcoming assignments across all groups
+  const allAssignments: Array<{
+    date: string;
+    roleName: string;
+    groupName: string;
+    groupSlug: string;
+    groupId: number;
+  }> = [];
+
+  for (const membership of userMembers) {
+    const group = (await db
+      .select()
+      .from(groups)
+      .where(eq(groups.id, membership.groupId)))[0];
+
+    if (!group) continue;
+
+    // Find committed schedules for this group
+    const committedSchedules = await db
+      .select()
+      .from(schedules)
+      .where(and(eq(schedules.groupId, membership.groupId), eq(schedules.status, "committed")));
+
+    for (const schedule of committedSchedules) {
+      const entries = await db
+        .select()
+        .from(scheduleEntries)
+        .where(
+          and(
+            eq(scheduleEntries.scheduleId, schedule.id),
+            eq(scheduleEntries.memberId, membership.id),
+            gte(scheduleEntries.date, today)
+          )
+        );
+
+      for (const entry of entries) {
+        const role = (await db
+          .select()
+          .from(roles)
+          .where(eq(roles.id, entry.roleId)))[0];
+
+        allAssignments.push({
+          date: entry.date,
+          roleName: role?.name ?? "Desconocido",
+          groupName: group.name,
+          groupSlug: group.slug,
+          groupId: group.id,
+        });
+      }
+    }
+  }
+
+  // Sort by date
+  allAssignments.sort((a, b) => a.date.localeCompare(b.date));
+
+  // Detect conflicts: same date in multiple groups
+  const dateGroupMap = new Map<string, Set<string>>();
+  for (const a of allAssignments) {
+    if (!dateGroupMap.has(a.date)) {
+      dateGroupMap.set(a.date, new Set());
+    }
+    dateGroupMap.get(a.date)!.add(a.groupName);
+  }
+
+  const conflicts = [...dateGroupMap.entries()]
+    .filter(([, groupNames]) => groupNames.size > 1)
+    .map(([date, groupNames]) => ({
+      date,
+      groups: [...groupNames],
+    }));
+
+  return NextResponse.json({ assignments: allAssignments, conflicts });
+}

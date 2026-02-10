@@ -1,1 +1,0 @@
-ALTER TABLE "roles" ADD COLUMN "is_relevant" boolean DEFAULT false NOT NULL;

@@ -3,10 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import { GroupProvider, useGroup } from "@/lib/group-context";
 
 function AdminNav() {
   const { slug, groupName, loading, error } = useGroup();
+  const { data: session } = useSession();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -15,6 +17,7 @@ function AdminNav() {
     { href: `/${slug}/config/members`, label: "Miembros" },
     { href: `/${slug}/config/roles`, label: "Roles" },
     { href: `/${slug}/config/configuration`, label: "Configuración" },
+    { href: `/${slug}/config/collaborators`, label: "Colaboradores" },
     { href: `/${slug}/config/schedules`, label: "Cronogramas" },
   ];
 
@@ -83,6 +86,22 @@ function AdminNav() {
                 </Link>
               );
             })}
+            {session?.user && (
+              <div className="flex items-center gap-2 ml-4 pl-4 border-l border-border">
+                {session.user.image && (
+                  <img src={session.user.image} alt="" className="h-6 w-6 rounded-full" />
+                )}
+                <span className="text-xs text-muted-foreground max-w-[100px] truncate">
+                  {session.user.name}
+                </span>
+                <button
+                  onClick={() => signOut({ callbackUrl: "/login" })}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Salir
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -121,6 +140,23 @@ function AdminNav() {
                 </Link>
               );
             })}
+            {session?.user && (
+              <div className="border-t border-border mt-2 pt-3 px-3 flex items-center gap-3">
+                {session.user.image && (
+                  <img src={session.user.image} alt="" className="h-7 w-7 rounded-full" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm truncate">{session.user.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{session.user.email}</p>
+                </div>
+                <button
+                  onClick={() => signOut({ callbackUrl: "/login" })}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                >
+                  Salir
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

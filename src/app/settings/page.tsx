@@ -1,0 +1,237 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { signOut, useSession } from "next-auth/react";
+import Link from "next/link";
+
+interface Holiday {
+  id: number;
+  userId: string;
+  startDate: string;
+  endDate: string;
+  description: string | null;
+}
+
+export default function SettingsPage() {
+  const { data: session } = useSession();
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Holiday form state
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [description, setDescription] = useState("");
+  const [error, setError] = useState("");
+
+  const fetchHolidays = useCallback(async () => {
+    const res = await fetch("/api/holidays");
+    if (res.ok) {
+      setHolidays(await res.json());
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchHolidays();
+  }, [fetchHolidays]);
+
+  const handleAddHoliday = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (!startDate || !endDate) {
+      setError("Las fechas son obligatorias");
+      return;
+    }
+
+    const res = await fetch("/api/holidays", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        startDate,
+        endDate,
+        description: description.trim() || null,
+      }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      setError(data.error || "Error al crear la fecha");
+      return;
+    }
+
+    setStartDate("");
+    setEndDate("");
+    setDescription("");
+    fetchHolidays();
+  };
+
+  const handleDeleteHoliday = async (id: number) => {
+    await fetch(`/api/holidays?id=${id}`, { method: "DELETE" });
+    fetchHolidays();
+  };
+
+  const formatDateRange = (start: string, end: string) => {
+    const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" };
+    const [sy, sm, sd] = start.split("-").map(Number);
+    const [ey, em, ed] = end.split("-").map(Number);
+    const s = new Date(Date.UTC(sy, sm - 1, sd)).toLocaleDateString("es-ES", opts);
+    const e = new Date(Date.UTC(ey, em - 1, ed)).toLocaleDateString("es-ES", opts);
+    return start === end ? s : `${s} — ${e}`;
+  };
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
+        {/* Header */}
+        <div className="mb-12 flex items-start justify-between">
+          <div>
+            <h1 className="font-[family-name:var(--font-display)] text-4xl sm:text-5xl uppercase">
+              Ajustes
+            </h1>
+            <p className="mt-3 text-muted-foreground">
+              Configura tu perfil y fechas de ausencia.
+            </p>
+          </div>
+          <Link
+            href="/"
+            className="shrink-0 rounded-md border border-border px-4 py-2 text-sm hover:border-foreground transition-colors"
+          >
+            ← Inicio
+          </Link>
+        </div>
+
+        {/* Profile section */}
+        {session?.user && (
+          <div className="mb-12 border-t border-border pt-8">
+            <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">
+              Perfil
+            </h2>
+            <div className="flex items-center gap-4">
+              {session.user.image && (
+                <img
+                  src={session.user.image}
+                  alt=""
+                  className="h-12 w-12 rounded-full"
+                />
+              )}
+              <div>
+                <p className="font-medium">{session.user.name}</p>
+                <p className="text-sm text-muted-foreground">{session.user.email}</p>
+              </div>
+            </div>
+            <div className="mt-6 flex gap-3">
+              {(session.user as { isAdmin?: boolean }).isAdmin && (
+                <Link
+                  href="/admin"
+                  className="rounded-md border border-border px-4 py-2 text-sm hover:border-foreground transition-colors"
+                >
+                  Panel de administración
+                </Link>
+              )}
+              <button
+                onClick={() => signOut({ callbackUrl: "/login" })}
+                className="rounded-md border border-border px-4 py-2 text-sm text-destructive hover:border-destructive transition-colors"
+              >
+                Cerrar sesión
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Holidays section */}
+        <div className="border-t border-border pt-8">
+          <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">
+            Fechas de ausencia
+          </h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            Estas fechas aplican a todos los grupos en los que participas. No se te asignará en estos días.
+          </p>
+
+          <form onSubmit={handleAddHoliday} className="space-y-4 mb-8">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <label className="block text-sm text-muted-foreground mb-1.5">
+                  Desde
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm focus:outline-none focus:border-foreground"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-muted-foreground mb-1.5">
+                  Hasta
+                </label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm focus:outline-none focus:border-foreground"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-muted-foreground mb-1.5">
+                  Descripción
+                </label>
+                <input
+                  type="text"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
+                  placeholder="Opcional"
+                />
+              </div>
+            </div>
+
+            {error && <p className="text-sm text-destructive">{error}</p>}
+
+            <button
+              type="submit"
+              className="rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+            >
+              Agregar
+            </button>
+          </form>
+
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Cargando...</p>
+          ) : holidays.length === 0 ? (
+            <div className="border-t border-dashed border-border py-10 text-center">
+              <p className="text-sm text-muted-foreground">
+                No tienes fechas de ausencia configuradas.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {holidays.map((h) => (
+                <div key={h.id} className="py-4 first:pt-0 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">
+                      {formatDateRange(h.startDate, h.endDate)}
+                    </p>
+                    {h.description && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {h.description}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleDeleteHoliday(h.id)}
+                    className="shrink-0 rounded-md border border-border px-3 py-1.5 text-xs text-destructive hover:border-destructive transition-colors"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

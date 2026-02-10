@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 export interface ScheduleEntry {
   id: number;
@@ -355,14 +356,22 @@ export default function SharedScheduleView({
                 </a>
               )}
             </div>
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              className="self-start sm:self-auto rounded-md border border-border px-3 py-1.5 text-sm hover:border-foreground transition-colors flex items-center gap-1.5"
-              aria-label="Cambiar modo"
-            >
-              <span className="text-base leading-none">{darkMode ? "☀️" : "🌙"}</span>
-              <span>{darkMode ? "Claro" : "Oscuro"}</span>
-            </button>
+            <div className="self-start sm:self-auto flex items-center gap-2">
+              <button
+                onClick={() => setDarkMode(!darkMode)}
+                className="rounded-md border border-border px-3 py-1.5 text-sm hover:border-foreground transition-colors flex items-center gap-1.5"
+                aria-label="Cambiar modo"
+              >
+                <span className="text-base leading-none">{darkMode ? "☀️" : "🌙"}</span>
+                <span>{darkMode ? "Claro" : "Oscuro"}</span>
+              </button>
+              <Link
+                href="/login"
+                className="rounded-md border border-border px-3 py-1.5 text-sm hover:border-foreground transition-colors"
+              >
+                Iniciar sesión
+              </Link>
+            </div>
           </div>
 
           {/* Filters */}

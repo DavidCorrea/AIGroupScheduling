@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "members_group_email_unique" ON "members" USING btree ("group_id","email");

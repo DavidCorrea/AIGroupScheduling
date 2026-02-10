@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 
 function isPublicPath(pathname: string): boolean {
+  // Auth API routes
+  if (pathname.startsWith("/api/auth")) return true;
+
+  // Login page
+  if (pathname === "/login") return true;
+
+  // Admin routes (auth handled at API/page level for bootstrap support)
+  if (pathname.startsWith("/admin")) return true;
+  if (pathname.startsWith("/api/admin")) return true;
+
   const segments = pathname.split("/").filter(Boolean);
 
   // /:slug/cronograma and subpaths (public schedule views)
@@ -29,28 +39,20 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const adminUser = process.env.ADMIN_USER;
-  const adminPassword = process.env.ADMIN_PASSWORD;
+  // Check for Auth.js session cookie (JWT strategy)
+  const hasSession =
+    request.cookies.has("authjs.session-token") ||
+    request.cookies.has("__Secure-authjs.session-token");
 
-  const authHeader = request.headers.get("authorization");
-
-  if (authHeader) {
-    const [scheme, encoded] = authHeader.split(" ");
-    if (scheme === "Basic" && encoded) {
-      const decoded = atob(encoded);
-      const [user, password] = decoded.split(":");
-      if (user === adminUser && password === adminPassword) {
-        return NextResponse.next();
-      }
+  if (!hasSession) {
+    // API calls get 401, page requests get redirected to login
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  return new NextResponse("Authentication required", {
-    status: 401,
-    headers: {
-      "WWW-Authenticate": 'Basic realm="Cronogramas Admin"',
-    },
-  });
+  return NextResponse.next();
 }
 
 export const config = {

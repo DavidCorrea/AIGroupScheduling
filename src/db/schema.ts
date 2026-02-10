@@ -1,18 +1,66 @@
-import { pgTable, text, integer, serial, boolean, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, serial, boolean, uniqueIndex, timestamp, primaryKey } from "drizzle-orm/pg-core";
+
+// ── Auth.js tables ──
+
+export const users = pgTable("users", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name"),
+  email: text("email").unique().notNull(),
+  emailVerified: timestamp("email_verified", { mode: "date" }),
+  image: text("image"),
+  isAdmin: boolean("is_admin").notNull().default(false),
+  canCreateGroups: boolean("can_create_groups").notNull().default(false),
+});
+
+export const accounts = pgTable("accounts", {
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  provider: text("provider").notNull(),
+  providerAccountId: text("provider_account_id").notNull(),
+  refresh_token: text("refresh_token"),
+  access_token: text("access_token"),
+  expires_at: integer("expires_at"),
+  token_type: text("token_type"),
+  scope: text("scope"),
+  id_token: text("id_token"),
+  session_state: text("session_state"),
+}, (table) => [
+  primaryKey({ columns: [table.provider, table.providerAccountId] }),
+]);
+
+// ── App tables ──
 
 export const groups = pgTable("groups", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
+  ownerId: text("owner_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+});
+
+export const groupCollaborators = pgTable("group_collaborators", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  groupId: integer("group_id")
+    .notNull()
+    .references(() => groups.id, { onDelete: "cascade" }),
 });
 
 export const members = pgTable("members", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  email: text("email"),
+  userId: text("user_id")
+    .references(() => users.id, { onDelete: "set null" }),
   groupId: integer("group_id")
     .notNull()
     .references(() => groups.id, { onDelete: "cascade" }),
-});
+}, (table) => [
+  uniqueIndex("members_group_email_unique").on(table.groupId, table.email),
+]);
 
 export const exclusiveGroups = pgTable("exclusive_groups", {
   id: serial("id").primaryKey(),
@@ -67,8 +115,9 @@ export const memberAvailability = pgTable("member_availability", {
 
 export const holidays = pgTable("holidays", {
   id: serial("id").primaryKey(),
+  userId: text("user_id")
+    .references(() => users.id, { onDelete: "cascade" }),
   memberId: integer("member_id")
-    .notNull()
     .references(() => members.id, { onDelete: "cascade" }),
   startDate: text("start_date").notNull(),
   endDate: text("end_date").notNull(),

@@ -12,16 +12,17 @@ import {
   holidays,
   dayRolePriorities,
 } from "@/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, or, inArray } from "drizzle-orm";
 import { generateSchedule } from "@/lib/scheduler";
 import { MemberInfo, RoleDefinition } from "@/lib/scheduler.types";
 import { getScheduleDates, getRehearsalDates } from "@/lib/dates";
 import { seedDefaults } from "@/lib/seed";
-import { extractGroupId } from "@/lib/api-helpers";
+import { requireGroupAccess } from "@/lib/api-helpers";
 
 export async function GET(request: NextRequest) {
-  const groupId = extractGroupId(request);
-  if (groupId instanceof NextResponse) return groupId;
+  const accessResult = await requireGroupAccess(request);
+  if (accessResult.error) return accessResult.error;
+  const { groupId } = accessResult;
 
   const allSchedules = await db
     .select()
@@ -33,8 +34,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const groupId = extractGroupId(request);
-  if (groupId instanceof NextResponse) return groupId;
+  const accessResult = await requireGroupAccess(request);
+  if (accessResult.error) return accessResult.error;
+  const { groupId } = accessResult;
 
   await seedDefaults(groupId);
 
@@ -96,14 +98,35 @@ export async function POST(request: NextRequest) {
       exclusiveGroupId: r.exclusiveGroupId,
     }));
 
-  // Build member info
+  // Build member info (use members.name directly)
   const allMembers = await db
-    .select()
+    .select({
+      id: members.id,
+      name: members.name,
+      userId: members.userId,
+      groupId: members.groupId,
+    })
     .from(members)
     .where(eq(members.groupId, groupId));
+
+  // Fetch holidays from both sources:
+  // 1. User-scoped holidays (for linked members)
+  // 2. Member-scoped holidays (admin-set, for any member)
+  const linkedUserIds = allMembers
+    .filter((m) => m.userId != null)
+    .map((m) => m.userId!);
   const memberIds = allMembers.map((m) => m.id);
-  const allHolidays = memberIds.length > 0
-    ? await db.select().from(holidays).where(inArray(holidays.memberId, memberIds))
+
+  const holidayConditions = [];
+  if (linkedUserIds.length > 0) {
+    holidayConditions.push(inArray(holidays.userId, linkedUserIds));
+  }
+  if (memberIds.length > 0) {
+    holidayConditions.push(inArray(holidays.memberId, memberIds));
+  }
+
+  const allHolidays = holidayConditions.length > 0
+    ? await db.select().from(holidays).where(or(...holidayConditions))
     : [];
 
   const memberInfos: MemberInfo[] = [];
@@ -124,8 +147,9 @@ export async function POST(request: NextRequest) {
       return day?.dayOfWeek ?? "";
     }).filter(Boolean);
 
+    // Combine user-level holidays (by userId) and member-level holidays (by memberId)
     const mHolidays = allHolidays
-      .filter((h) => h.memberId === m.id)
+      .filter((h) => h.userId === m.userId || h.memberId === m.id)
       .map((h) => ({ startDate: h.startDate, endDate: h.endDate }));
 
     memberInfos.push({

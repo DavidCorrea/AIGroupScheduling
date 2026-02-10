@@ -5,50 +5,36 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1770683770895,
-      "tag": "0000_create_members_roles_and_exclusive_groups",
+      "when": 1770741556678,
+      "tag": "0000_initial_schema",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1770683783852,
-      "tag": "0001_create_schedule_days_and_availability",
+      "when": 1770743069344,
+      "tag": "0001_member_name_and_holidays",
       "breakpoints": true
     },
     {
       "idx": 2,
       "version": "7",
-      "when": 1770683799868,
-      "tag": "0002_create_schedules",
+      "when": 1770747423934,
+      "tag": "0002_admin_flags",
       "breakpoints": true
     },
     {
       "idx": 3,
       "version": "7",
-      "when": 1770683815584,
-      "tag": "0003_create_day_role_priorities",
+      "when": 1770749064931,
+      "tag": "0003_member_email",
       "breakpoints": true
     },
     {
       "idx": 4,
       "version": "7",
-      "when": 1770685322700,
-      "tag": "0004_add_role_is_relevant",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1770687176401,
-      "tag": "0005_drop_share_token_add_month_year_unique",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1770688799697,
-      "tag": "0006_add_groups_and_group_id",
+      "when": 1770749932156,
+      "tag": "0004_member_email_unique_per_group",
       "breakpoints": true
     }
   ]

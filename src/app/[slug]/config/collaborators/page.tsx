@@ -1,0 +1,208 @@
+"use client";
+
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useGroup } from "@/lib/group-context";
+
+interface UserSearchResult {
+  id: string;
+  name: string | null;
+  email: string;
+  image: string | null;
+}
+
+interface Collaborator {
+  id: number;
+  userId: string;
+  userName: string | null;
+  userEmail: string;
+  userImage: string | null;
+}
+
+interface Owner {
+  id: string;
+  name: string | null;
+  email: string;
+  image: string | null;
+}
+
+export default function CollaboratorsPage() {
+  const { groupId, loading: groupLoading } = useGroup();
+  const [owner, setOwner] = useState<Owner | null>(null);
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchData = useCallback(async () => {
+    if (!groupId) return;
+    const res = await fetch(`/api/groups/${groupId}/collaborators`);
+    const data = await res.json();
+    setOwner(data.owner);
+    setCollaborators(data.collaborators);
+    setLoading(false);
+  }, [groupId]);
+
+  useEffect(() => {
+    if (groupId) fetchData();
+  }, [groupId, fetchData]);
+
+  // Debounced user search
+  useEffect(() => {
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    if (searchQuery.length < 2) {
+      setSearchResults([]);
+      setShowDropdown(false);
+      return;
+    }
+    searchTimeout.current = setTimeout(async () => {
+      const res = await fetch(`/api/users/search?q=${encodeURIComponent(searchQuery)}`);
+      const results = await res.json();
+      // Filter out owner and existing collaborators
+      const existingIds = new Set([
+        owner?.id,
+        ...collaborators.map((c) => c.userId),
+      ]);
+      const filtered = results.filter((u: UserSearchResult) => !existingIds.has(u.id));
+      setSearchResults(filtered);
+      setShowDropdown(filtered.length > 0);
+    }, 300);
+    return () => {
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    };
+  }, [searchQuery, owner, collaborators]);
+
+  const addCollaborator = async (user: UserSearchResult) => {
+    if (!groupId) return;
+    await fetch(`/api/groups/${groupId}/collaborators`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id }),
+    });
+    setSearchQuery("");
+    setShowDropdown(false);
+    setSearchResults([]);
+    fetchData();
+  };
+
+  const removeCollaborator = async (collabId: number) => {
+    if (!groupId) return;
+    if (!confirm("¿Estás seguro de que deseas eliminar este colaborador?")) return;
+    await fetch(`/api/groups/${groupId}/collaborators?collabId=${collabId}`, {
+      method: "DELETE",
+    });
+    fetchData();
+  };
+
+  if (groupLoading || loading) {
+    return <p className="text-sm text-muted-foreground">Cargando...</p>;
+  }
+
+  return (
+    <div className="space-y-12">
+      <div>
+        <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl uppercase">
+          Colaboradores
+        </h1>
+        <p className="mt-3 text-muted-foreground">
+          Gestiona quién puede administrar este grupo. Los colaboradores tienen acceso completo.
+        </p>
+      </div>
+
+      {/* Owner */}
+      {owner && (
+        <div className="border-t border-border pt-8">
+          <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">
+            Dueño
+          </h2>
+          <div className="flex items-center gap-3">
+            {owner.image && (
+              <img src={owner.image} alt="" className="h-8 w-8 rounded-full" />
+            )}
+            <div>
+              <p className="text-sm font-medium">{owner.name ?? "Sin nombre"}</p>
+              <p className="text-xs text-muted-foreground">{owner.email}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add collaborator */}
+      <div className="border-t border-border pt-8">
+        <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">
+          Agregar colaborador
+        </h2>
+        <div className="relative max-w-md">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
+            onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+            className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
+            placeholder="Buscar usuario por email o nombre..."
+          />
+          {showDropdown && (
+            <div className="absolute z-10 top-full mt-1 w-full rounded-md border border-border bg-background shadow-sm max-h-60 overflow-y-auto">
+              {searchResults.map((user) => (
+                <button
+                  key={user.id}
+                  type="button"
+                  onClick={() => addCollaborator(user)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-muted transition-colors"
+                >
+                  {user.image && (
+                    <img src={user.image} alt="" className="h-6 w-6 rounded-full" />
+                  )}
+                  <div>
+                    <span className="text-sm block">{user.name}</span>
+                    <span className="text-xs text-muted-foreground">{user.email}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Collaborators list */}
+      <div className="border-t border-border pt-8">
+        <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">
+          Colaboradores ({collaborators.length})
+        </h2>
+        {collaborators.length === 0 ? (
+          <div className="border-t border-dashed border-border py-10 text-center">
+            <p className="text-sm text-muted-foreground">
+              No hay colaboradores aún.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {collaborators.map((collab) => (
+              <div key={collab.id} className="py-4 first:pt-0 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  {collab.userImage && (
+                    <img src={collab.userImage} alt="" className="h-7 w-7 rounded-full shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{collab.userName ?? "Sin nombre"}</p>
+                    <p className="text-xs text-muted-foreground truncate">{collab.userEmail}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => removeCollaborator(collab.id)}
+                  className="shrink-0 rounded-md border border-border px-3.5 py-2 text-sm text-destructive hover:border-destructive transition-colors"
+                >
+                  Eliminar
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

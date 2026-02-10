@@ -26,10 +26,16 @@ export async function buildPublicScheduleResponse(schedule: {
     .from(scheduleEntries)
     .where(eq(scheduleEntries.scheduleId, id));
 
+  // Get members (use members.name directly)
   const allMembers = await db
-    .select()
+    .select({
+      id: members.id,
+      name: members.name,
+      groupId: members.groupId,
+    })
     .from(members)
     .where(eq(members.groupId, groupId));
+
   const allRoles = await db
     .select()
     .from(roles)
@@ -42,18 +48,18 @@ export async function buildPublicScheduleResponse(schedule: {
   const enrichedEntries = entries.map((entry) => ({
     ...entry,
     memberName:
-      allMembers.find((m) => m.id === entry.memberId)?.name ?? "Unknown",
-    roleName: allRoles.find((r) => r.id === entry.roleId)?.name ?? "Unknown",
+      allMembers.find((m) => m.id === entry.memberId)?.name ?? "Desconocido",
+    roleName: allRoles.find((r) => r.id === entry.roleId)?.name ?? "Desconocido",
   }));
 
   const uniqueMembers = [
     ...new Map(
       entries.map((e) => {
         const member = allMembers.find((m) => m.id === e.memberId);
-        return [e.memberId, { id: e.memberId, name: member?.name ?? "Unknown" }];
+        return [e.memberId, { id: e.memberId, name: member?.name ?? "Desconocido" }];
       })
     ).values(),
-  ].sort((a, b) => a.name.localeCompare(b.name));
+  ].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
 
   const notes = await db
     .select()

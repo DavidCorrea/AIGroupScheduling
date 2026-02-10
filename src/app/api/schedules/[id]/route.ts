@@ -9,11 +9,15 @@ import {
   roles,
 } from "@/db/schema";
 import { eq, and, or, lt, gt, asc, desc } from "drizzle-orm";
+import { requireAuth } from "@/lib/api-helpers";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   const { id } = await params;
   const scheduleId = parseInt(id, 10);
 
@@ -24,7 +28,7 @@ export async function GET(
 
   if (!schedule) {
     return NextResponse.json(
-      { error: "Schedule not found" },
+      { error: "Cronograma no encontrado" },
       { status: 404 }
     );
   }
@@ -34,14 +38,26 @@ export async function GET(
     .from(scheduleEntries)
     .where(eq(scheduleEntries.scheduleId, scheduleId));
 
-  const allMembers = await db.select().from(members);
-  const allRoles = await db.select().from(roles);
+  // Get members (use members.name directly)
+  const allMembers = await db
+    .select({
+      id: members.id,
+      name: members.name,
+      groupId: members.groupId,
+    })
+    .from(members)
+    .where(eq(members.groupId, schedule.groupId));
+
+  const allRoles = await db
+    .select()
+    .from(roles)
+    .where(eq(roles.groupId, schedule.groupId));
 
   const enrichedEntries = entries.map((entry) => ({
     ...entry,
     memberName:
-      allMembers.find((m) => m.id === entry.memberId)?.name ?? "Unknown",
-    roleName: allRoles.find((r) => r.id === entry.roleId)?.name ?? "Unknown",
+      allMembers.find((m) => m.id === entry.memberId)?.name ?? "Desconocido",
+    roleName: allRoles.find((r) => r.id === entry.roleId)?.name ?? "Desconocido",
   }));
 
   const notes = await db
@@ -105,6 +121,9 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   const { id } = await params;
   const scheduleId = parseInt(id, 10);
   const body = await request.json();
@@ -116,7 +135,7 @@ export async function PUT(
 
   if (!schedule) {
     return NextResponse.json(
-      { error: "Schedule not found" },
+      { error: "Cronograma no encontrado" },
       { status: 404 }
     );
   }
@@ -142,7 +161,7 @@ export async function PUT(
 
     if (!entry) {
       return NextResponse.json(
-        { error: "Entry not found" },
+        { error: "Entrada no encontrada" },
         { status: 404 }
       );
     }
@@ -163,7 +182,7 @@ export async function PUT(
 
     if (!entry) {
       return NextResponse.json(
-        { error: "Entry not found" },
+        { error: "Entrada no encontrada" },
         { status: 404 }
       );
     }
@@ -183,7 +202,7 @@ export async function PUT(
 
     if (!role || role.dependsOnRoleId == null) {
       return NextResponse.json(
-        { error: "Role is not a dependent role" },
+        { error: "El rol no es un rol dependiente" },
         { status: 400 }
       );
     }
@@ -203,7 +222,7 @@ export async function PUT(
 
     if (!sourceEntry) {
       return NextResponse.json(
-        { error: "Member is not assigned to the source role on this date" },
+        { error: "El miembro no está asignado al rol fuente en esta fecha" },
         { status: 400 }
       );
     }
@@ -246,7 +265,7 @@ export async function PUT(
 
     if (!entry) {
       return NextResponse.json(
-        { error: "Entry not found" },
+        { error: "Entrada no encontrada" },
         { status: 404 }
       );
     }
@@ -259,7 +278,7 @@ export async function PUT(
 
     if (!role || role.dependsOnRoleId == null) {
       return NextResponse.json(
-        { error: "Entry role is not a dependent role" },
+        { error: "El rol de la entrada no es un rol dependiente" },
         { status: 400 }
       );
     }
@@ -270,13 +289,16 @@ export async function PUT(
     return NextResponse.json({ success: true });
   }
 
-  return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+  return NextResponse.json({ error: "Acción inválida" }, { status: 400 });
 }
 
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   const { id } = await params;
   const scheduleId = parseInt(id, 10);
 
@@ -287,7 +309,7 @@ export async function DELETE(
 
   if (!existing) {
     return NextResponse.json(
-      { error: "Schedule not found" },
+      { error: "Cronograma no encontrado" },
       { status: 404 }
     );
   }
