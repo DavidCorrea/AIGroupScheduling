@@ -43,7 +43,7 @@ export default function CronogramaActualPage() {
         <div className="text-center">
           <h1 className="text-2xl font-bold">Agenda no encontrada</h1>
           <p className="mt-2 text-muted-foreground">
-            No hay una agenda comprometida para el mes actual.
+            No hay una agenda creada para el mes actual.
           </p>
         </div>
       </div>

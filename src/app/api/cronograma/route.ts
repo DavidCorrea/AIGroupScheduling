@@ -8,7 +8,7 @@ import {
   members,
   roles,
 } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or, lt, gt, asc, desc } from "drizzle-orm";
 
 export async function GET() {
   const now = new Date();
@@ -28,7 +28,7 @@ export async function GET() {
 
   if (!schedule) {
     return NextResponse.json(
-      { error: "No hay agenda comprometida para este mes." },
+      { error: "No hay agenda creada para este mes." },
       { status: 404 }
     );
   }
@@ -75,6 +75,37 @@ export async function GET() {
     .from(scheduleRehearsalDates)
     .where(eq(scheduleRehearsalDates.scheduleId, schedule.id));
 
+  // Find previous and next committed schedules for navigation
+  const prevSchedule = (await db
+    .select({ month: schedules.month, year: schedules.year })
+    .from(schedules)
+    .where(
+      and(
+        eq(schedules.status, "committed"),
+        or(
+          lt(schedules.year, currentYear),
+          and(eq(schedules.year, currentYear), lt(schedules.month, currentMonth))
+        )
+      )
+    )
+    .orderBy(desc(schedules.year), desc(schedules.month))
+    .limit(1))[0] ?? null;
+
+  const nextSchedule = (await db
+    .select({ month: schedules.month, year: schedules.year })
+    .from(schedules)
+    .where(
+      and(
+        eq(schedules.status, "committed"),
+        or(
+          gt(schedules.year, currentYear),
+          and(eq(schedules.year, currentYear), gt(schedules.month, currentMonth))
+        )
+      )
+    )
+    .orderBy(asc(schedules.year), asc(schedules.month))
+    .limit(1))[0] ?? null;
+
   return NextResponse.json({
     month: schedule.month,
     year: schedule.year,
@@ -84,5 +115,7 @@ export async function GET() {
     rehearsalDates: rehearsalDates.map((r) => r.date),
     dependentRoleIds,
     roles: allRoles,
+    prevSchedule,
+    nextSchedule,
   });
 }

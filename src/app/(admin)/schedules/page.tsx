@@ -8,7 +8,7 @@ interface Schedule {
   month: number;
   year: number;
   status: string;
-  shareToken: string | null;
+  
   createdAt: string;
 }
 
@@ -199,7 +199,7 @@ export default function SchedulesPage() {
                         : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
                     }`}
                   >
-                    {schedule.status === "committed" ? "Comprometido" : schedule.status === "draft" ? "Borrador" : schedule.status}
+                    {schedule.status === "committed" ? "Creado" : schedule.status === "draft" ? "Borrador" : schedule.status}
                   </span>
                 </div>
               </div>
@@ -210,9 +210,9 @@ export default function SchedulesPage() {
                 >
                   Ver
                 </Link>
-                {schedule.shareToken && (
+                {schedule.status === "committed" && (
                   <Link
-                    href={`/shared/${schedule.shareToken}`}
+                    href={`/shared/${schedule.year}/${schedule.month}`}
                     className="rounded-md border border-primary text-primary px-3 py-1 text-sm hover:bg-accent transition-colors"
                   >
                     Enlace compartido

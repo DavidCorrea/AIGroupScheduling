@@ -1,4 +1,4 @@
-import { pgTable, text, integer, serial, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, serial, boolean, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const members = pgTable("members", {
   id: serial("id").primaryKey(),
@@ -64,11 +64,12 @@ export const schedules = pgTable("schedules", {
   status: text("status", { enum: ["draft", "committed"] })
     .notNull()
     .default("draft"),
-  shareToken: text("share_token"),
   createdAt: text("created_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
-});
+}, (table) => [
+  uniqueIndex("schedules_month_year_unique").on(table.month, table.year),
+]);
 
 export const scheduleEntries = pgTable("schedule_entries", {
   id: serial("id").primaryKey(),

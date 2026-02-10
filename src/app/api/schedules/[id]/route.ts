@@ -8,8 +8,7 @@ import {
   members,
   roles,
 } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
-import crypto from "crypto";
+import { eq, and, or, lt, gt, asc, desc } from "drizzle-orm";
 
 export async function GET(
   _request: NextRequest,
@@ -55,12 +54,41 @@ export async function GET(
     .from(scheduleRehearsalDates)
     .where(eq(scheduleRehearsalDates.scheduleId, scheduleId));
 
+  // Find previous and next schedules (any status) for admin navigation
+  const { month, year } = schedule;
+
+  const prevSchedule = (await db
+    .select({ id: schedules.id })
+    .from(schedules)
+    .where(
+      or(
+        lt(schedules.year, year),
+        and(eq(schedules.year, year), lt(schedules.month, month))
+      )
+    )
+    .orderBy(desc(schedules.year), desc(schedules.month))
+    .limit(1))[0] ?? null;
+
+  const nextSchedule = (await db
+    .select({ id: schedules.id })
+    .from(schedules)
+    .where(
+      or(
+        gt(schedules.year, year),
+        and(eq(schedules.year, year), gt(schedules.month, month))
+      )
+    )
+    .orderBy(asc(schedules.year), asc(schedules.month))
+    .limit(1))[0] ?? null;
+
   return NextResponse.json({
     ...schedule,
     entries: enrichedEntries,
     notes,
     rehearsalDates: rehearsalDates.map((r) => r.date),
     roles: allRoles,
+    prevScheduleId: prevSchedule?.id ?? null,
+    nextScheduleId: nextSchedule?.id ?? null,
   });
 }
 
@@ -89,15 +117,13 @@ export async function PUT(
 
   // Commit action
   if (body.action === "commit") {
-    const shareToken = crypto.randomUUID();
     await db.update(schedules)
-      .set({ status: "committed", shareToken })
+      .set({ status: "committed" })
       .where(eq(schedules.id, scheduleId));
 
     return NextResponse.json({
       ...schedule,
       status: "committed",
-      shareToken,
     });
   }
 

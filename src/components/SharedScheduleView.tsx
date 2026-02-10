@@ -26,6 +26,11 @@ export interface RoleInfo {
   isRelevant?: boolean;
 }
 
+export interface ScheduleNavLink {
+  month: number;
+  year: number;
+}
+
 export interface SharedScheduleData {
   month: number;
   year: number;
@@ -37,6 +42,8 @@ export interface SharedScheduleData {
   leaderRoleId?: number | null;
   dependentRoleIds?: number[];
   roles?: RoleInfo[];
+  prevSchedule?: ScheduleNavLink | null;
+  nextSchedule?: ScheduleNavLink | null;
 }
 
 const MONTH_NAMES = [
@@ -134,8 +141,10 @@ function getTodayISO(): string {
 
 export default function SharedScheduleView({
   schedule,
+  basePath = "/shared",
 }: {
   schedule: SharedScheduleData;
+  basePath?: string;
 }) {
   const [filteredMemberId, setFilteredMemberId] = useState<number | null>(null);
   const [darkMode, setDarkMode] = useState(true);
@@ -321,11 +330,31 @@ export default function SharedScheduleView({
       <header className="border-b border-border bg-card sticky top-0 z-10">
         <div className="mx-auto max-w-4xl px-4 py-4 sm:px-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold">
-                {MONTH_NAMES[schedule.month - 1]} {schedule.year}
-              </h1>
-              <p className="text-sm text-muted-foreground">Agenda del Grupo</p>
+            <div className="flex items-center gap-3">
+              {schedule.prevSchedule && (
+                <a
+                  href={`${basePath}/${schedule.prevSchedule.year}/${schedule.prevSchedule.month}`}
+                  className="rounded-md border border-border px-2 py-1 text-sm hover:bg-muted transition-colors"
+                  title={`${MONTH_NAMES[schedule.prevSchedule.month - 1]} ${schedule.prevSchedule.year}`}
+                >
+                  ← Anterior
+                </a>
+              )}
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold">
+                  {MONTH_NAMES[schedule.month - 1]} {schedule.year}
+                </h1>
+                <p className="text-sm text-muted-foreground">Agenda del Grupo</p>
+              </div>
+              {schedule.nextSchedule && (
+                <a
+                  href={`${basePath}/${schedule.nextSchedule.year}/${schedule.nextSchedule.month}`}
+                  className="rounded-md border border-border px-2 py-1 text-sm hover:bg-muted transition-colors"
+                  title={`${MONTH_NAMES[schedule.nextSchedule.month - 1]} ${schedule.nextSchedule.year}`}
+                >
+                  Siguiente →
+                </a>
+              )}
             </div>
             <button
               onClick={() => setDarkMode(!darkMode)}

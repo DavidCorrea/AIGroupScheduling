@@ -12,7 +12,7 @@ import {
   holidays,
   dayRolePriorities,
 } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { generateSchedule } from "@/lib/scheduler";
 import { MemberInfo, RoleDefinition } from "@/lib/scheduler.types";
 import { getScheduleDates, getRehearsalDates } from "@/lib/dates";
@@ -137,9 +137,25 @@ export async function POST(request: NextRequest) {
   }
 
   // Generate schedules for each requested month
+  const MONTH_NAMES = [
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+  ];
   const createdSchedules = [];
 
   for (const { month, year } of months) {
+    // Enforce one schedule per month/year
+    const existing = (await db
+      .select()
+      .from(schedules)
+      .where(and(eq(schedules.month, month), eq(schedules.year, year))))[0];
+    if (existing) {
+      return NextResponse.json(
+        { error: `Ya existe un cronograma para ${MONTH_NAMES[month - 1]} ${year}.` },
+        { status: 409 }
+      );
+    }
+
     const dates = getScheduleDates(month, year, activeDayNames);
     const rehearsalDatesList = getRehearsalDates(month, year, rehearsalDayNames);
 

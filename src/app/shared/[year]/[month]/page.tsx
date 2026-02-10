@@ -14,7 +14,7 @@ export default function SharedSchedulePage() {
 
   const fetchSchedule = useCallback(async () => {
     try {
-      const res = await fetch(`/api/shared/${params.token}`);
+      const res = await fetch(`/api/shared/${params.year}/${params.month}`);
       if (!res.ok) {
         setError(true);
         setLoading(false);
@@ -25,7 +25,7 @@ export default function SharedSchedulePage() {
       setError(true);
     }
     setLoading(false);
-  }, [params.token]);
+  }, [params.year, params.month]);
 
   useEffect(() => {
     fetchSchedule();
@@ -45,7 +45,7 @@ export default function SharedSchedulePage() {
         <div className="text-center">
           <h1 className="text-2xl font-bold">Agenda no encontrada</h1>
           <p className="mt-2 text-muted-foreground">
-            Este enlace puede haber expirado o no es válido.
+            No se encontró una agenda creada para este mes.
           </p>
         </div>
       </div>

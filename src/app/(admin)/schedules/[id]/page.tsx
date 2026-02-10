@@ -33,11 +33,12 @@ interface ScheduleDetail {
   month: number;
   year: number;
   status: string;
-  shareToken: string | null;
   entries: ScheduleEntry[];
   notes: DateNote[];
   rehearsalDates: string[];
   roles: RoleInfo[];
+  prevScheduleId: number | null;
+  nextScheduleId: number | null;
 }
 
 interface Member {
@@ -153,7 +154,7 @@ export default function SchedulePreviewPage() {
   };
 
   const handleCommit = async () => {
-    if (!confirm("¿Comprometer este cronograma? Se finalizará y se generará un enlace compartido."))
+    if (!confirm("¿Crear este cronograma? Se finalizará y se generará un enlace compartido."))
       return;
 
     const res = await fetch(`/api/schedules/${params.id}`, {
@@ -217,34 +218,50 @@ export default function SchedulePreviewPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">
-            {MONTH_NAMES[schedule.month - 1]} {schedule.year}
-          </h1>
+        <div className="flex items-center gap-3">
+          {schedule.prevScheduleId && (
+            <a
+              href={`/schedules/${schedule.prevScheduleId}`}
+              className="rounded-md border border-border px-2 py-1 text-sm hover:bg-muted transition-colors"
+            >
+              ← Anterior
+            </a>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold">
+              {MONTH_NAMES[schedule.month - 1]} {schedule.year}
+            </h1>
           <p className="mt-1 text-muted-foreground">
             {schedule.status === "committed" ? (
               <>
-                Cronograma comprometido.{" "}
-                {schedule.shareToken && (
-                  <a
-                    href={`/shared/${schedule.shareToken}`}
-                    className="text-primary hover:underline"
-                  >
-                    Ver enlace compartido
-                  </a>
-                )}
+                Cronograma creado.{" "}
+                <a
+                  href={`/shared/${schedule.year}/${schedule.month}`}
+                  className="text-primary hover:underline"
+                >
+                  Ver enlace compartido
+                </a>
               </>
             ) : (
-              "Borrador — revisa y edita antes de comprometer."
+              "Borrador — revisa y edita antes de crear."
             )}
           </p>
+          </div>
+          {schedule.nextScheduleId && (
+            <a
+              href={`/schedules/${schedule.nextScheduleId}`}
+              className="rounded-md border border-border px-2 py-1 text-sm hover:bg-muted transition-colors"
+            >
+              Siguiente →
+            </a>
+          )}
         </div>
         {schedule.status === "draft" && (
           <button
             onClick={handleCommit}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
           >
-            Comprometer cronograma
+            Crear cronograma
           </button>
         )}
       </div>

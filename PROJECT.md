@@ -48,14 +48,16 @@
 
 ## Schedule Generation & Preview
 - Generate schedules for one or more months at a time via `/schedules`
+- **One schedule per month/year**: Enforced at database level with a unique index on `(month, year)`. The API also returns a 409 error if a schedule already exists for the requested month and year. The existing schedule must be deleted before generating a new one
 - Preview generated schedule in a grid (dates x roles) via `/schedules/[id]`
-- Manual swap: click "swap" on any assignment to replace with another eligible member or select "— Vaciar —" to empty the slot (works on both draft and committed schedules)
+- Manual swap: click "swap" on any assignment to replace with another eligible member or select "— Vaciar —" to empty the slot (works on both draft and created schedules)
 - **Manual dependent role selection**: For roles with a dependency (e.g., Leader depends on Voice), the schedule grid shows a dropdown populated with members assigned to the source role on that date. The user selects who fills the dependent role; clearing the selection removes the entry
 - **Date descriptions**: Add notes to specific dates (e.g., "Celebration day") shown inline in the grid
 - **Rehearsal dates**: Weekly rehearsal days auto-populate; individual dates can also be added/removed per schedule
-- Commit action finalises the schedule and generates a shareable link
-- **Edit committed schedules**: Committed schedules can be edited in-place (swaps, notes); changes are reflected live on the share link
-- Rotation continuity: previously committed schedules feed into the algorithm for fair distribution
+- "Crear" action finalises the schedule (status changes from "Borrador" to "Creado"); the shareable link is always `/shared/{year}/{month}`
+- **Previous/Next navigation**: admin schedule detail page includes "Anterior" and "Siguiente" links to navigate between schedules (any status)
+- **Edit created schedules**: Created schedules can be edited in-place (swaps, notes); changes are reflected live on the share link
+- Rotation continuity: previously created schedules feed into the algorithm for fair distribution
 - API routes: `/api/schedules`, `/api/schedules/[id]`, `/api/schedules/[id]/notes`, `/api/schedules/[id]/rehearsals`
 
 ## Localisation
@@ -63,7 +65,7 @@
 - App name: **Cronogramas**
 
 ## Shared Public View
-- Public read-only page at `/shared/[token]` — no admin navigation shown
+- Public read-only page at `/shared/{year}/{month}` (e.g. `/shared/2026/2`) — no admin navigation shown
 - **Mobile-first responsive design**: card-based layout on small screens, table grid on desktop (breakpoint: `lg`)
 - **Light/dark mode toggle**: class-based dark mode (`.dark` / `.light` on `<html>`) with system-preference fallback; persists choice in `localStorage`
 - **Filter by member**: dropdown to select a specific person and show only their dates and roles
@@ -72,10 +74,11 @@
 - **Relevant role highlight**: dates where the filtered member holds a role marked as "relevant" are visually highlighted with the same accent styling (border, background tint, ring) as dependent roles. Both indicators can coexist on the same date
 - **Date notes**: displayed inline under each date in both mobile and desktop views
 - **Rehearsal dates**: shown with distinct muted styling and "Ensayo" label
+- **Previous/Next navigation**: "Anterior" and "Siguiente" links in the header to navigate between committed schedules by month
 
 ## Current Month Public View
 - Stable public URL at `/cronograma` — always shows the committed schedule for the current running month
-- Same UI as the shared view (Spanish labels, filtering, dark mode, dependent/relevant role highlight)
+- Same UI as the shared view (Spanish labels, filtering, dark mode, dependent/relevant role highlight, prev/next navigation)
 - Reuses the `SharedScheduleView` component extracted from the shared page
 - API route: `/api/cronograma` — finds the committed schedule matching the current month/year; returns 404 if none exists
 

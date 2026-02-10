@@ -8,22 +8,37 @@ import {
   members,
   roles,
 } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, or, lt, gt, asc, desc } from "drizzle-orm";
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ token: string }> }
+  { params }: { params: Promise<{ year: string; month: string }> }
 ) {
-  const { token } = await params;
+  const { year: yearStr, month: monthStr } = await params;
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+
+  if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+    return NextResponse.json(
+      { error: "Parámetros inválidos" },
+      { status: 400 }
+    );
+  }
 
   const schedule = (await db
     .select()
     .from(schedules)
-    .where(eq(schedules.shareToken, token)))[0];
+    .where(
+      and(
+        eq(schedules.month, month),
+        eq(schedules.year, year),
+        eq(schedules.status, "committed")
+      )
+    ))[0];
 
-  if (!schedule || schedule.status !== "committed") {
+  if (!schedule) {
     return NextResponse.json(
-      { error: "Schedule not found" },
+      { error: "Agenda no encontrada" },
       { status: 404 }
     );
   }
@@ -68,6 +83,37 @@ export async function GET(
     .from(scheduleRehearsalDates)
     .where(eq(scheduleRehearsalDates.scheduleId, schedule.id));
 
+  // Find previous and next committed schedules for navigation
+  const prevSchedule = (await db
+    .select({ month: schedules.month, year: schedules.year })
+    .from(schedules)
+    .where(
+      and(
+        eq(schedules.status, "committed"),
+        or(
+          lt(schedules.year, year),
+          and(eq(schedules.year, year), lt(schedules.month, month))
+        )
+      )
+    )
+    .orderBy(desc(schedules.year), desc(schedules.month))
+    .limit(1))[0] ?? null;
+
+  const nextSchedule = (await db
+    .select({ month: schedules.month, year: schedules.year })
+    .from(schedules)
+    .where(
+      and(
+        eq(schedules.status, "committed"),
+        or(
+          gt(schedules.year, year),
+          and(eq(schedules.year, year), gt(schedules.month, month))
+        )
+      )
+    )
+    .orderBy(asc(schedules.year), asc(schedules.month))
+    .limit(1))[0] ?? null;
+
   return NextResponse.json({
     month: schedule.month,
     year: schedule.year,
@@ -77,5 +123,7 @@ export async function GET(
     rehearsalDates: rehearsalDates.map((r) => r.date),
     dependentRoleIds,
     roles: allRoles,
+    prevSchedule,
+    nextSchedule,
   });
 }
