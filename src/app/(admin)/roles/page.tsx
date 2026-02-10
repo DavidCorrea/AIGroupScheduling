@@ -166,60 +166,7 @@ export default function RolesPage() {
         </p>
       </div>
 
-      {/* ── Section 1: Grupos Exclusivos ── */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Grupos Exclusivos</h2>
-        <p className="text-sm text-muted-foreground">
-          Los roles dentro del mismo grupo exclusivo no pueden asignarse al
-          mismo miembro en la misma fecha.
-        </p>
-
-        {groups.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No hay grupos exclusivos configurados.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {groups.map((group) => (
-              <div
-                key={group.id}
-                className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3"
-              >
-                <span className="font-medium">{group.name}</span>
-                <button
-                  onClick={() => deleteGroup(group)}
-                  className="rounded-md border border-destructive px-3 py-1 text-sm text-destructive hover:bg-destructive hover:text-white transition-colors"
-                >
-                  Eliminar
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <form onSubmit={addGroup} className="flex items-end gap-3">
-          <div className="flex-1">
-            <label className="block text-sm font-medium mb-1">
-              Nombre del nuevo grupo
-            </label>
-            <input
-              type="text"
-              value={newGroupName}
-              onChange={(e) => setNewGroupName(e.target.value)}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="ej. Instrumento"
-            />
-          </div>
-          <button
-            type="submit"
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
-          >
-            Agregar
-          </button>
-        </form>
-      </section>
-
-      {/* ── Section 2: Roles ── */}
+      {/* ── Section 1: Roles ── */}
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">Roles</h2>
         <p className="text-sm text-muted-foreground">
@@ -374,6 +321,59 @@ export default function RolesPage() {
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
           >
             Agregar rol
+          </button>
+        </form>
+      </section>
+
+      {/* ── Section 2: Grupos Exclusivos ── */}
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold">Grupos Exclusivos</h2>
+        <p className="text-sm text-muted-foreground">
+          Los roles dentro del mismo grupo exclusivo no pueden asignarse al
+          mismo miembro en la misma fecha.
+        </p>
+
+        {groups.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No hay grupos exclusivos configurados.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {groups.map((group) => (
+              <div
+                key={group.id}
+                className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3"
+              >
+                <span className="font-medium">{group.name}</span>
+                <button
+                  onClick={() => deleteGroup(group)}
+                  className="rounded-md border border-destructive px-3 py-1 text-sm text-destructive hover:bg-destructive hover:text-white transition-colors"
+                >
+                  Eliminar
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <form onSubmit={addGroup} className="flex items-end gap-3">
+          <div className="flex-1">
+            <label className="block text-sm font-medium mb-1">
+              Nombre del nuevo grupo
+            </label>
+            <input
+              type="text"
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="ej. Instrumento"
+            />
+          </div>
+          <button
+            type="submit"
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+          >
+            Agregar
           </button>
         </form>
       </section>

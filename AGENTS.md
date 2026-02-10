@@ -33,3 +33,4 @@
 
 # Git
 - All commits must only include related changes (e.g. related to the same feature or task being tackled)
+- When multiple features are requested at the same time, ensure you make a commit for each feature in particular (e.g. given two features were requested, one commit for feature 1 and another commit for feature 2)
