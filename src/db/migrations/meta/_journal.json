@@ -5,8 +5,29 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1770681871049,
-      "tag": "0000_productive_prodigy",
+      "when": 1770682990289,
+      "tag": "0000_create_members_and_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1770683001751,
+      "tag": "0001_create_schedule_days_and_availability",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1770683016031,
+      "tag": "0002_create_schedules",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1770683031535,
+      "tag": "0003_create_day_role_priorities",
       "breakpoints": true
     }
   ]
