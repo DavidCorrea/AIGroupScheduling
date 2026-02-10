@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useGroup } from "@/lib/group-context";
 
 function PriorityEditor({
   roles,
@@ -202,6 +203,7 @@ interface DayRolePriority {
 }
 
 export default function ConfigurationPage() {
+  const { groupId, loading: groupLoading } = useGroup();
   const [roles, setRoles] = useState<Role[]>([]);
   const [days, setDays] = useState<ScheduleDay[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
@@ -221,13 +223,14 @@ export default function ConfigurationPage() {
   );
 
   const fetchData = useCallback(async () => {
+    if (!groupId) return;
     const [rolesRes, daysRes, holidaysRes, membersRes, prioritiesRes] =
       await Promise.all([
-        fetch("/api/configuration/roles"),
-        fetch("/api/configuration/days"),
-        fetch("/api/configuration/holidays"),
-        fetch("/api/members"),
-        fetch("/api/configuration/priorities"),
+        fetch(`/api/configuration/roles?groupId=${groupId}`),
+        fetch(`/api/configuration/days?groupId=${groupId}`),
+        fetch(`/api/configuration/holidays?groupId=${groupId}`),
+        fetch(`/api/members?groupId=${groupId}`),
+        fetch(`/api/configuration/priorities?groupId=${groupId}`),
       ]);
     setRoles(await rolesRes.json());
     setDays(await daysRes.json());
@@ -235,14 +238,14 @@ export default function ConfigurationPage() {
     setMembers(await membersRes.json());
     setPriorities(await prioritiesRes.json());
     setLoading(false);
-  }, []);
+  }, [groupId]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (groupId) fetchData();
+  }, [groupId, fetchData]);
 
   const toggleDay = async (day: ScheduleDay) => {
-    await fetch("/api/configuration/days", {
+    await fetch(`/api/configuration/days?groupId=${groupId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: day.id, active: !day.active }),
@@ -251,7 +254,7 @@ export default function ConfigurationPage() {
   };
 
   const toggleRehearsal = async (day: ScheduleDay) => {
-    await fetch("/api/configuration/days", {
+    await fetch(`/api/configuration/days?groupId=${groupId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: day.id, isRehearsal: !day.isRehearsal }),
@@ -262,7 +265,7 @@ export default function ConfigurationPage() {
   const addHoliday = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!holidayMemberId || !holidayStart || !holidayEnd) return;
-    await fetch("/api/configuration/holidays", {
+    await fetch(`/api/configuration/holidays?groupId=${groupId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -283,7 +286,7 @@ export default function ConfigurationPage() {
     scheduleDayId: number,
     rolePriorities: { roleId: number; priority: number }[]
   ) => {
-    await fetch("/api/configuration/priorities", {
+    await fetch(`/api/configuration/priorities?groupId=${groupId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ scheduleDayId, priorities: rolePriorities }),
@@ -293,7 +296,7 @@ export default function ConfigurationPage() {
   };
 
   const clearPriorities = async (scheduleDayId: number) => {
-    await fetch(`/api/configuration/priorities?scheduleDayId=${scheduleDayId}`, {
+    await fetch(`/api/configuration/priorities?scheduleDayId=${scheduleDayId}&groupId=${groupId}`, {
       method: "DELETE",
     });
     setEditingPriorityDay(null);
@@ -301,13 +304,13 @@ export default function ConfigurationPage() {
   };
 
   const deleteHoliday = async (id: number) => {
-    await fetch(`/api/configuration/holidays?id=${id}`, {
+    await fetch(`/api/configuration/holidays?id=${id}&groupId=${groupId}`, {
       method: "DELETE",
     });
     fetchData();
   };
 
-  if (loading) {
+  if (groupLoading || loading) {
     return <p className="text-muted-foreground">Cargando...</p>;
   }
 
@@ -375,7 +378,7 @@ export default function ConfigurationPage() {
         <ColumnOrderEditor
           roles={roles}
           onSave={async (order) => {
-            await fetch("/api/configuration/roles", {
+            await fetch(`/api/configuration/roles?groupId=${groupId}`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ order }),

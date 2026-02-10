@@ -2,17 +2,32 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { dayRolePriorities, scheduleDays, roles } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { seedDefaults } from "@/lib/seed";
+import { extractGroupId } from "@/lib/api-helpers";
 
-export async function GET() {
-  seedDefaults();
+export async function GET(request: NextRequest) {
+  const groupId = extractGroupId(request);
+  if (groupId instanceof NextResponse) return groupId;
+
+  const allDays = await db
+    .select()
+    .from(scheduleDays)
+    .where(eq(scheduleDays.groupId, groupId));
+  const allRoles = await db
+    .select()
+    .from(roles)
+    .where(eq(roles.groupId, groupId));
 
   const allPriorities = await db.select().from(dayRolePriorities);
-  const allDays = await db.select().from(scheduleDays);
-  const allRoles = await db.select().from(roles);
+
+  // Filter priorities to only those belonging to this group's days and roles
+  const dayIds = new Set(allDays.map((d) => d.id));
+  const roleIds = new Set(allRoles.map((r) => r.id));
+  const filtered = allPriorities.filter(
+    (p) => dayIds.has(p.scheduleDayId) && roleIds.has(p.roleId)
+  );
 
   // Enrich with names
-  const enriched = allPriorities.map((p) => ({
+  const enriched = filtered.map((p) => ({
     ...p,
     dayOfWeek: allDays.find((d) => d.id === p.scheduleDayId)?.dayOfWeek ?? "Unknown",
     roleName: allRoles.find((r) => r.id === p.roleId)?.name ?? "Unknown",

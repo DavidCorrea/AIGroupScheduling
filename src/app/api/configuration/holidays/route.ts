@@ -1,10 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { holidays } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { holidays, members } from "@/db/schema";
+import { eq, inArray } from "drizzle-orm";
+import { extractGroupId } from "@/lib/api-helpers";
 
-export async function GET() {
-  const allHolidays = await db.select().from(holidays);
+export async function GET(request: NextRequest) {
+  const groupId = extractGroupId(request);
+  if (groupId instanceof NextResponse) return groupId;
+
+  // Get member IDs for this group, then filter holidays
+  const groupMembers = await db
+    .select({ id: members.id })
+    .from(members)
+    .where(eq(members.groupId, groupId));
+
+  const memberIds = groupMembers.map((m) => m.id);
+  if (memberIds.length === 0) {
+    return NextResponse.json([]);
+  }
+
+  const allHolidays = await db
+    .select()
+    .from(holidays)
+    .where(inArray(holidays.memberId, memberIds));
   return NextResponse.json(allHolidays);
 }
 

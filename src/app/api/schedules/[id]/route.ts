@@ -54,16 +54,19 @@ export async function GET(
     .from(scheduleRehearsalDates)
     .where(eq(scheduleRehearsalDates.scheduleId, scheduleId));
 
-  // Find previous and next schedules (any status) for admin navigation
-  const { month, year } = schedule;
+  // Find previous and next schedules (any status) for admin navigation, scoped to same group
+  const { month, year, groupId } = schedule;
 
   const prevSchedule = (await db
     .select({ id: schedules.id })
     .from(schedules)
     .where(
-      or(
-        lt(schedules.year, year),
-        and(eq(schedules.year, year), lt(schedules.month, month))
+      and(
+        eq(schedules.groupId, groupId),
+        or(
+          lt(schedules.year, year),
+          and(eq(schedules.year, year), lt(schedules.month, month))
+        )
       )
     )
     .orderBy(desc(schedules.year), desc(schedules.month))
@@ -73,9 +76,12 @@ export async function GET(
     .select({ id: schedules.id })
     .from(schedules)
     .where(
-      or(
-        gt(schedules.year, year),
-        and(eq(schedules.year, year), gt(schedules.month, month))
+      and(
+        eq(schedules.groupId, groupId),
+        or(
+          gt(schedules.year, year),
+          and(eq(schedules.year, year), gt(schedules.month, month))
+        )
       )
     )
     .orderBy(asc(schedules.year), asc(schedules.month))

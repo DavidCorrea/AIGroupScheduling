@@ -6,15 +6,16 @@ import SharedScheduleView, {
   SharedScheduleData,
 } from "@/components/SharedScheduleView";
 
-export default function SharedSchedulePage() {
+export default function CronogramaPage() {
   const params = useParams();
+  const slug = params.slug as string;
   const [schedule, setSchedule] = useState<SharedScheduleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   const fetchSchedule = useCallback(async () => {
     try {
-      const res = await fetch(`/api/shared/${params.year}/${params.month}`);
+      const res = await fetch(`/api/cronograma/${slug}`);
       if (!res.ok) {
         setError(true);
         setLoading(false);
@@ -25,7 +26,7 @@ export default function SharedSchedulePage() {
       setError(true);
     }
     setLoading(false);
-  }, [params.year, params.month]);
+  }, [slug]);
 
   useEffect(() => {
     fetchSchedule();
@@ -45,12 +46,12 @@ export default function SharedSchedulePage() {
         <div className="text-center">
           <h1 className="text-2xl font-bold">Agenda no encontrada</h1>
           <p className="mt-2 text-muted-foreground">
-            No se encontró una agenda creada para este mes.
+            No hay una agenda creada para el mes actual.
           </p>
         </div>
       </div>
     );
   }
 
-  return <SharedScheduleView schedule={schedule} />;
+  return <SharedScheduleView schedule={schedule} basePath={`/${slug}/cronograma`} />;
 }

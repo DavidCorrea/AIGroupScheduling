@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useGroup } from "@/lib/group-context";
 
 interface Role {
   id: number;
@@ -18,6 +19,7 @@ interface ExclusiveGroup {
 }
 
 export default function RolesPage() {
+  const { groupId, loading: groupLoading } = useGroup();
   const [roles, setRoles] = useState<Role[]>([]);
   const [groups, setGroups] = useState<ExclusiveGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,25 +36,31 @@ export default function RolesPage() {
   const [editingRoleName, setEditingRoleName] = useState("");
 
   const fetchData = useCallback(async () => {
+    if (!groupId) return;
     const [rolesRes, groupsRes] = await Promise.all([
-      fetch("/api/configuration/roles"),
-      fetch("/api/configuration/exclusive-groups"),
+      fetch(`/api/configuration/roles?groupId=${groupId}`),
+      fetch(`/api/configuration/exclusive-groups?groupId=${groupId}`),
     ]);
     setRoles(await rolesRes.json());
     setGroups(await groupsRes.json());
     setLoading(false);
-  }, []);
+  }, [groupId]);
 
   useEffect(() => {
+    if (!groupId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     fetchData();
-  }, [fetchData]);
+  }, [groupId, fetchData]);
 
   // ── Exclusive Groups ──
 
   const addGroup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newGroupName.trim()) return;
-    await fetch("/api/configuration/exclusive-groups", {
+    if (!newGroupName.trim() || !groupId) return;
+    await fetch(`/api/configuration/exclusive-groups?groupId=${groupId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: newGroupName.trim() }),
@@ -68,9 +76,13 @@ export default function RolesPage() {
       )
     )
       return;
-    await fetch(`/api/configuration/exclusive-groups?id=${group.id}`, {
-      method: "DELETE",
-    });
+    if (!groupId) return;
+    await fetch(
+      `/api/configuration/exclusive-groups?id=${group.id}&groupId=${groupId}`,
+      {
+        method: "DELETE",
+      }
+    );
     fetchData();
   };
 
@@ -78,8 +90,8 @@ export default function RolesPage() {
 
   const addRole = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newRoleName.trim()) return;
-    await fetch("/api/configuration/roles", {
+    if (!newRoleName.trim() || !groupId) return;
+    await fetch(`/api/configuration/roles?groupId=${groupId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -98,7 +110,8 @@ export default function RolesPage() {
       setEditingRoleId(null);
       return;
     }
-    await fetch("/api/configuration/roles", {
+    if (!groupId) return;
+    await fetch(`/api/configuration/roles?groupId=${groupId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: role.id, name: trimmed }),
@@ -108,7 +121,8 @@ export default function RolesPage() {
   };
 
   const updateRoleCount = async (role: Role, newCount: number) => {
-    await fetch("/api/configuration/roles", {
+    if (!groupId) return;
+    await fetch(`/api/configuration/roles?groupId=${groupId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: role.id, requiredCount: newCount }),
@@ -120,7 +134,8 @@ export default function RolesPage() {
     role: Role,
     dependsOnRoleId: number | null
   ) => {
-    await fetch("/api/configuration/roles", {
+    if (!groupId) return;
+    await fetch(`/api/configuration/roles?groupId=${groupId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: role.id, dependsOnRoleId }),
@@ -132,7 +147,8 @@ export default function RolesPage() {
     role: Role,
     exclusiveGroupId: number | null
   ) => {
-    await fetch("/api/configuration/roles", {
+    if (!groupId) return;
+    await fetch(`/api/configuration/roles?groupId=${groupId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: role.id, exclusiveGroupId }),
@@ -141,7 +157,8 @@ export default function RolesPage() {
   };
 
   const toggleRelevant = async (role: Role) => {
-    await fetch("/api/configuration/roles", {
+    if (!groupId) return;
+    await fetch(`/api/configuration/roles?groupId=${groupId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: role.id, isRelevant: !role.isRelevant }),
@@ -156,13 +173,14 @@ export default function RolesPage() {
       )
     )
       return;
-    await fetch(`/api/configuration/roles?id=${role.id}`, {
+    if (!groupId) return;
+    await fetch(`/api/configuration/roles?id=${role.id}&groupId=${groupId}`, {
       method: "DELETE",
     });
     fetchData();
   };
 
-  if (loading) {
+  if (groupLoading || loading) {
     return <p className="text-muted-foreground">Cargando...</p>;
   }
 

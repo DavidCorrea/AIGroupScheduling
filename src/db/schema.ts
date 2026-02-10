@@ -1,13 +1,25 @@
 import { pgTable, text, integer, serial, boolean, uniqueIndex } from "drizzle-orm/pg-core";
 
+export const groups = pgTable("groups", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+});
+
 export const members = pgTable("members", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  groupId: integer("group_id")
+    .notNull()
+    .references(() => groups.id, { onDelete: "cascade" }),
 });
 
 export const exclusiveGroups = pgTable("exclusive_groups", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  groupId: integer("group_id")
+    .notNull()
+    .references(() => groups.id, { onDelete: "cascade" }),
 });
 
 export const roles = pgTable("roles", {
@@ -18,6 +30,9 @@ export const roles = pgTable("roles", {
   dependsOnRoleId: integer("depends_on_role_id"),
   exclusiveGroupId: integer("exclusive_group_id").references(() => exclusiveGroups.id, { onDelete: "set null" }),
   isRelevant: boolean("is_relevant").notNull().default(false),
+  groupId: integer("group_id")
+    .notNull()
+    .references(() => groups.id, { onDelete: "cascade" }),
 });
 
 export const memberRoles = pgTable("member_roles", {
@@ -35,6 +50,9 @@ export const scheduleDays = pgTable("schedule_days", {
   dayOfWeek: text("day_of_week").notNull(),
   active: boolean("active").notNull().default(true),
   isRehearsal: boolean("is_rehearsal").notNull().default(false),
+  groupId: integer("group_id")
+    .notNull()
+    .references(() => groups.id, { onDelete: "cascade" }),
 });
 
 export const memberAvailability = pgTable("member_availability", {
@@ -67,8 +85,11 @@ export const schedules = pgTable("schedules", {
   createdAt: text("created_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
+  groupId: integer("group_id")
+    .notNull()
+    .references(() => groups.id, { onDelete: "cascade" }),
 }, (table) => [
-  uniqueIndex("schedules_month_year_unique").on(table.month, table.year),
+  uniqueIndex("schedules_group_month_year_unique").on(table.groupId, table.month, table.year),
 ]);
 
 export const scheduleEntries = pgTable("schedule_entries", {

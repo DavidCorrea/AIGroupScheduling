@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useGroup } from "@/lib/group-context";
 
 interface Schedule {
   id: number;
   month: number;
   year: number;
   status: string;
-  
+
   createdAt: string;
 }
 
@@ -28,6 +29,7 @@ const MONTH_NAMES = [
 ];
 
 export default function SchedulesPage() {
+  const { groupId, slug, loading: groupLoading } = useGroup();
   const [schedulesList, setSchedulesList] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -38,15 +40,16 @@ export default function SchedulesPage() {
     { month: number; year: number }[]
   >([{ month: now.getMonth() + 1, year: now.getFullYear() }]);
 
-  const fetchSchedules = useCallback(async () => {
-    const res = await fetch("/api/schedules");
+  const fetchData = useCallback(async () => {
+    if (!groupId) return;
+    const res = await fetch(`/api/schedules?groupId=${groupId}`);
     setSchedulesList(await res.json());
     setLoading(false);
-  }, []);
+  }, [groupId]);
 
   useEffect(() => {
-    fetchSchedules();
-  }, [fetchSchedules]);
+    if (groupId) fetchData();
+  }, [groupId, fetchData]);
 
   const addMonth = () => {
     const last = selectedMonths[selectedMonths.length - 1];
@@ -75,7 +78,7 @@ export default function SchedulesPage() {
   const handleGenerate = async () => {
     setGenerating(true);
     try {
-      const res = await fetch("/api/schedules", {
+      const res = await fetch(`/api/schedules?groupId=${groupId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ months: selectedMonths }),
@@ -87,7 +90,7 @@ export default function SchedulesPage() {
         return;
       }
 
-      fetchSchedules();
+      fetchData();
     } finally {
       setGenerating(false);
     }
@@ -96,10 +99,10 @@ export default function SchedulesPage() {
   const handleDelete = async (id: number) => {
     if (!confirm("¿Estás seguro de que deseas eliminar este cronograma?")) return;
     await fetch(`/api/schedules/${id}`, { method: "DELETE" });
-    fetchSchedules();
+    fetchData();
   };
 
-  if (loading) {
+  if (groupLoading || loading) {
     return <p className="text-muted-foreground">Cargando...</p>;
   }
 
@@ -199,20 +202,24 @@ export default function SchedulesPage() {
                         : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
                     }`}
                   >
-                    {schedule.status === "committed" ? "Creado" : schedule.status === "draft" ? "Borrador" : schedule.status}
+                    {schedule.status === "committed"
+                      ? "Creado"
+                      : schedule.status === "draft"
+                        ? "Borrador"
+                        : schedule.status}
                   </span>
                 </div>
               </div>
               <div className="flex gap-2">
                 <Link
-                  href={`/schedules/${schedule.id}`}
+                  href={`/${slug}/config/schedules/${schedule.id}`}
                   className="rounded-md border border-border px-3 py-1 text-sm hover:bg-muted transition-colors"
                 >
                   Ver
                 </Link>
                 {schedule.status === "committed" && (
                   <Link
-                    href={`/shared/${schedule.year}/${schedule.month}`}
+                    href={`/${slug}/cronograma/${schedule.year}/${schedule.month}`}
                     className="rounded-md border border-primary text-primary px-3 py-1 text-sm hover:bg-accent transition-colors"
                   >
                     Enlace compartido

@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const PUBLIC_PATHS = [
-  "/shared",
-  "/cronograma",
-  "/api/shared",
-  "/api/cronograma",
-];
-
 function isPublicPath(pathname: string): boolean {
-  return PUBLIC_PATHS.some(
-    (p) => pathname === p || pathname.startsWith(p + "/")
-  );
+  const segments = pathname.split("/").filter(Boolean);
+
+  // /:slug/cronograma and subpaths (public schedule views)
+  if (segments.length >= 2 && segments[1] === "cronograma") return true;
+
+  // /api/cronograma/:slug/... (public API)
+  if (segments[0] === "api" && segments[1] === "cronograma") return true;
+
+  return false;
 }
 
 export function middleware(request: NextRequest) {
@@ -49,7 +48,7 @@ export function middleware(request: NextRequest) {
   return new NextResponse("Authentication required", {
     status: 401,
     headers: {
-      "WWW-Authenticate": 'Basic realm="Band Scheduler Admin"',
+      "WWW-Authenticate": 'Basic realm="Cronogramas Admin"',
     },
   });
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useGroup } from "@/lib/group-context";
 
 interface ScheduleEntry {
   id: number;
@@ -76,6 +77,7 @@ function formatDate(dateStr: string): string {
 export default function SchedulePreviewPage() {
   const params = useParams();
   const router = useRouter();
+  const { groupId, slug, loading: groupLoading } = useGroup();
   const [schedule, setSchedule] = useState<ScheduleDetail | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,9 +89,11 @@ export default function SchedulePreviewPage() {
   const [noteText, setNoteText] = useState("");
 
   const fetchData = useCallback(async () => {
+    if (!groupId) return;
+
     const [scheduleRes, membersRes] = await Promise.all([
       fetch(`/api/schedules/${params.id}`),
-      fetch("/api/members"),
+      fetch(`/api/members?groupId=${groupId}`),
     ]);
 
     if (!scheduleRes.ok) {
@@ -100,11 +104,11 @@ export default function SchedulePreviewPage() {
     setSchedule(await scheduleRes.json());
     setMembers(await membersRes.json());
     setLoading(false);
-  }, [params.id, router]);
+  }, [params.id, router, groupId]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (groupId) fetchData();
+  }, [groupId, fetchData]);
 
   const handleSwap = async (entryId: number, newMemberId: number) => {
     await fetch(`/api/schedules/${params.id}`, {
@@ -191,7 +195,7 @@ export default function SchedulePreviewPage() {
     fetchData();
   };
 
-  if (loading || !schedule) {
+  if (groupLoading || loading || !schedule) {
     return <p className="text-muted-foreground">Cargando...</p>;
   }
 
@@ -221,7 +225,7 @@ export default function SchedulePreviewPage() {
         <div className="flex items-center gap-3">
           {schedule.prevScheduleId && (
             <a
-              href={`/schedules/${schedule.prevScheduleId}`}
+              href={`/${slug}/config/schedules/${schedule.prevScheduleId}`}
               className="rounded-md border border-border px-2 py-1 text-sm hover:bg-muted transition-colors"
             >
               ← Anterior
@@ -236,7 +240,7 @@ export default function SchedulePreviewPage() {
               <>
                 Cronograma creado.{" "}
                 <a
-                  href={`/shared/${schedule.year}/${schedule.month}`}
+                  href={`/${slug}/cronograma/${schedule.year}/${schedule.month}`}
                   className="text-primary hover:underline"
                 >
                   Ver enlace compartido
@@ -249,7 +253,7 @@ export default function SchedulePreviewPage() {
           </div>
           {schedule.nextScheduleId && (
             <a
-              href={`/schedules/${schedule.nextScheduleId}`}
+              href={`/${slug}/config/schedules/${schedule.nextScheduleId}`}
               className="rounded-md border border-border px-2 py-1 text-sm hover:bg-muted transition-colors"
             >
               Siguiente →

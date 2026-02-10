@@ -43,6 +43,13 @@
       "when": 1770687176401,
       "tag": "0005_drop_share_token_add_month_year_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1770688799697,
+      "tag": "0006_add_groups_and_group_id",
+      "breakpoints": true
     }
   ]
 }

@@ -4,10 +4,17 @@ import { scheduleDays } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { seedDefaults } from "@/lib/seed";
 import { dayIndex } from "@/lib/constants";
+import { extractGroupId } from "@/lib/api-helpers";
 
-export async function GET() {
-  seedDefaults();
-  const allDays = await db.select().from(scheduleDays);
+export async function GET(request: NextRequest) {
+  const groupId = extractGroupId(request);
+  if (groupId instanceof NextResponse) return groupId;
+
+  await seedDefaults(groupId);
+  const allDays = await db
+    .select()
+    .from(scheduleDays)
+    .where(eq(scheduleDays.groupId, groupId));
   allDays.sort((a, b) => dayIndex(a.dayOfWeek) - dayIndex(b.dayOfWeek));
   return NextResponse.json(allDays);
 }

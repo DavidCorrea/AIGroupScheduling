@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { scheduleDays } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 const DEFAULT_DAYS = [
   { dayOfWeek: "Lunes", active: false, isRehearsal: false },
@@ -12,13 +13,18 @@ const DEFAULT_DAYS = [
 ];
 
 /**
- * Seeds the database with default schedule days if they don't already exist.
+ * Seeds the database with default schedule days for a given group
+ * if that group doesn't already have any.
  */
-export async function seedDefaults() {
-  const existingDays = await db.select().from(scheduleDays);
+export async function seedDefaults(groupId: number) {
+  const existingDays = await db
+    .select()
+    .from(scheduleDays)
+    .where(eq(scheduleDays.groupId, groupId));
+
   if (existingDays.length === 0) {
     for (const day of DEFAULT_DAYS) {
-      await db.insert(scheduleDays).values(day);
+      await db.insert(scheduleDays).values({ ...day, groupId });
     }
   }
 }

@@ -2,18 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { roles, scheduleEntries, dayRolePriorities } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
-import { seedDefaults } from "@/lib/seed";
+import { extractGroupId } from "@/lib/api-helpers";
 
-export async function GET() {
-  seedDefaults();
+export async function GET(request: NextRequest) {
+  const groupId = extractGroupId(request);
+  if (groupId instanceof NextResponse) return groupId;
+
   const allRoles = await db
     .select()
     .from(roles)
+    .where(eq(roles.groupId, groupId))
     .orderBy(roles.displayOrder);
   return NextResponse.json(allRoles);
 }
 
 export async function POST(request: NextRequest) {
+  const groupId = extractGroupId(request);
+  if (groupId instanceof NextResponse) return groupId;
+
   const body = await request.json();
   const { name, requiredCount = 1 } = body;
 
@@ -27,12 +33,13 @@ export async function POST(request: NextRequest) {
   // Assign displayOrder = max(existing) + 1 so new roles appear at the end
   const maxResult = (await db
     .select({ maxOrder: sql<number>`COALESCE(MAX(${roles.displayOrder}), -1)` })
-    .from(roles))[0];
+    .from(roles)
+    .where(eq(roles.groupId, groupId)))[0];
   const nextOrder = (maxResult?.maxOrder ?? -1) + 1;
 
   const role = (await db
     .insert(roles)
-    .values({ name: name.trim(), requiredCount, displayOrder: nextOrder })
+    .values({ name: name.trim(), requiredCount, displayOrder: nextOrder, groupId })
     .returning())[0];
 
   return NextResponse.json(role, { status: 201 });
@@ -122,8 +129,6 @@ export async function DELETE(request: NextRequest) {
   await db.delete(scheduleEntries)
     .where(eq(scheduleEntries.roleId, roleId));
 
-  // member_roles and day_role_priorities cascade automatically via schema,
-  // but delete day_role_priorities explicitly in case schema cascades aren't enforced
   await db.delete(dayRolePriorities)
     .where(eq(dayRolePriorities.roleId, roleId));
 

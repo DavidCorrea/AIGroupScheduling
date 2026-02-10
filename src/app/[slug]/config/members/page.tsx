@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useGroup } from "@/lib/group-context";
 
 interface Role {
   id: number;
@@ -22,6 +23,7 @@ interface Member {
 }
 
 export default function MembersPage() {
+  const { groupId, loading: groupLoading } = useGroup();
   const [members, setMembers] = useState<Member[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [days, setDays] = useState<ScheduleDay[]>([]);
@@ -34,20 +36,22 @@ export default function MembersPage() {
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
 
   const fetchData = useCallback(async () => {
+    if (!groupId) return;
+    const q = `?groupId=${groupId}`;
     const [membersRes, rolesRes, daysRes] = await Promise.all([
-      fetch("/api/members"),
-      fetch("/api/configuration/roles"),
-      fetch("/api/configuration/days"),
+      fetch(`/api/members${q}`),
+      fetch(`/api/configuration/roles${q}`),
+      fetch(`/api/configuration/days${q}`),
     ]);
     setMembers(await membersRes.json());
     setRoles(await rolesRes.json());
     setDays(await daysRes.json());
     setLoading(false);
-  }, []);
+  }, [groupId]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (groupId) fetchData();
+  }, [groupId, fetchData]);
 
   const resetForm = () => {
     setEditingId(null);
@@ -96,7 +100,7 @@ export default function MembersPage() {
         body: JSON.stringify(payload),
       });
     } else {
-      await fetch("/api/members", {
+      await fetch(`/api/members?groupId=${groupId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -115,7 +119,7 @@ export default function MembersPage() {
 
   const activeDays = days.filter((d) => d.active);
 
-  if (loading) {
+  if (groupLoading || loading) {
     return <p className="text-muted-foreground">Cargando...</p>;
   }
 
@@ -124,7 +128,7 @@ export default function MembersPage() {
       <div>
         <h1 className="text-2xl font-bold">Miembros</h1>
         <p className="mt-1 text-muted-foreground">
-          Agrega y gestiona los miembros de la banda. Asigna roles y configura disponibilidad.
+          Agrega y gestiona los miembros del grupo. Asigna roles y configura disponibilidad.
         </p>
       </div>
 
@@ -151,7 +155,6 @@ export default function MembersPage() {
 
         <div>
           <label className="block text-sm font-medium mb-2">Roles</label>
-
           <div className="flex flex-wrap gap-2">
             {roles.map((role) => (
               <button
