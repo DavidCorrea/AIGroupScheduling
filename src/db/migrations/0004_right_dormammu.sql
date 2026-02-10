@@ -1,1 +1,0 @@
-ALTER TABLE `roles` ADD `exclusive_group` text;

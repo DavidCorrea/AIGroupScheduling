@@ -108,7 +108,7 @@ export default function MembersPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to remove this member?")) return;
+    if (!confirm("¿Estás seguro de que deseas eliminar este miembro?")) return;
     await fetch(`/api/members/${id}`, { method: "DELETE" });
     fetchData();
   };
@@ -116,16 +116,15 @@ export default function MembersPage() {
   const activeDays = days.filter((d) => d.active);
 
   if (loading) {
-    return <p className="text-muted-foreground">Loading...</p>;
+    return <p className="text-muted-foreground">Cargando...</p>;
   }
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold">Members</h1>
+        <h1 className="text-2xl font-bold">Miembros</h1>
         <p className="mt-1 text-muted-foreground">
-          Manage band members, assign their roles, and set which days they are
-          available.
+          Agrega y gestiona los miembros de la banda. Asigna roles y configura disponibilidad.
         </p>
       </div>
 
@@ -135,23 +134,24 @@ export default function MembersPage() {
         className="space-y-4 rounded-lg border border-border bg-card p-6"
       >
         <h2 className="text-lg font-semibold">
-          {editingId ? "Edit Member" : "Add Member"}
+          {editingId ? "Editar miembro" : "Agregar miembro"}
         </h2>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Name</label>
+          <label className="block text-sm font-medium mb-1">Nombre</label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            placeholder="Member name"
+            placeholder="Nombre del miembro"
             required
           />
         </div>
 
         <div>
           <label className="block text-sm font-medium mb-2">Roles</label>
+
           <div className="flex flex-wrap gap-2">
             {roles.map((role) => (
               <button
@@ -172,7 +172,7 @@ export default function MembersPage() {
 
         <div>
           <label className="block text-sm font-medium mb-2">
-            Available Days
+            Días disponibles
           </label>
           <div className="flex flex-wrap gap-2">
             {activeDays.map((day) => (
@@ -197,7 +197,7 @@ export default function MembersPage() {
             type="submit"
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
           >
-            {editingId ? "Update" : "Add Member"}
+            {editingId ? "Actualizar" : "Agregar miembro"}
           </button>
           {editingId && (
             <button
@@ -205,7 +205,7 @@ export default function MembersPage() {
               onClick={resetForm}
               className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
             >
-              Cancel
+              Cancelar
             </button>
           )}
         </div>
@@ -215,8 +215,7 @@ export default function MembersPage() {
       <div className="space-y-3">
         {members.length === 0 ? (
           <p className="text-muted-foreground text-sm">
-            No members added yet. Use the form above to add your first band
-            member.
+            Aún no se han agregado miembros. Usa el formulario de arriba para agregar el primer miembro.
           </p>
         ) : (
           members.map((member) => (
@@ -258,13 +257,13 @@ export default function MembersPage() {
                   onClick={() => startEdit(member)}
                   className="rounded-md border border-border px-3 py-1 text-sm hover:bg-muted transition-colors"
                 >
-                  Edit
+                  Editar
                 </button>
                 <button
                   onClick={() => handleDelete(member.id)}
                   className="rounded-md border border-destructive px-3 py-1 text-sm text-destructive hover:bg-destructive hover:text-white transition-colors"
                 >
-                  Remove
+                  Eliminar
                 </button>
               </div>
             </div>

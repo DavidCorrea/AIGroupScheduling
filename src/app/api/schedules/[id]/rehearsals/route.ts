@@ -10,11 +10,10 @@ export async function GET(
   const { id } = await params;
   const scheduleId = parseInt(id, 10);
 
-  const dates = db
+  const dates = await db
     .select()
     .from(scheduleRehearsalDates)
-    .where(eq(scheduleRehearsalDates.scheduleId, scheduleId))
-    .all();
+    .where(eq(scheduleRehearsalDates.scheduleId, scheduleId));
 
   return NextResponse.json(dates.map((d) => d.date));
 }
@@ -36,7 +35,7 @@ export async function POST(
   }
 
   // Check if already exists
-  const existing = db
+  const existing = (await db
     .select()
     .from(scheduleRehearsalDates)
     .where(
@@ -44,16 +43,14 @@ export async function POST(
         eq(scheduleRehearsalDates.scheduleId, scheduleId),
         eq(scheduleRehearsalDates.date, date)
       )
-    )
-    .get();
+    ))[0];
 
   if (existing) {
     return NextResponse.json({ date }, { status: 200 });
   }
 
-  db.insert(scheduleRehearsalDates)
-    .values({ scheduleId, date })
-    .run();
+  await db.insert(scheduleRehearsalDates)
+    .values({ scheduleId, date });
 
   return NextResponse.json({ date }, { status: 201 });
 }
@@ -74,14 +71,13 @@ export async function DELETE(
     );
   }
 
-  db.delete(scheduleRehearsalDates)
+  await db.delete(scheduleRehearsalDates)
     .where(
       and(
         eq(scheduleRehearsalDates.scheduleId, scheduleId),
         eq(scheduleRehearsalDates.date, date)
       )
-    )
-    .run();
+    );
 
   return NextResponse.json({ success: true });
 }

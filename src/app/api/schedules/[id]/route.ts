@@ -18,11 +18,10 @@ export async function GET(
   const { id } = await params;
   const scheduleId = parseInt(id, 10);
 
-  const schedule = db
+  const schedule = (await db
     .select()
     .from(schedules)
-    .where(eq(schedules.id, scheduleId))
-    .get();
+    .where(eq(schedules.id, scheduleId)))[0];
 
   if (!schedule) {
     return NextResponse.json(
@@ -31,14 +30,13 @@ export async function GET(
     );
   }
 
-  const entries = db
+  const entries = await db
     .select()
     .from(scheduleEntries)
-    .where(eq(scheduleEntries.scheduleId, scheduleId))
-    .all();
+    .where(eq(scheduleEntries.scheduleId, scheduleId));
 
-  const allMembers = db.select().from(members).all();
-  const allRoles = db.select().from(roles).all();
+  const allMembers = await db.select().from(members);
+  const allRoles = await db.select().from(roles);
 
   const enrichedEntries = entries.map((entry) => ({
     ...entry,
@@ -47,17 +45,15 @@ export async function GET(
     roleName: allRoles.find((r) => r.id === entry.roleId)?.name ?? "Unknown",
   }));
 
-  const notes = db
+  const notes = await db
     .select()
     .from(scheduleDateNotes)
-    .where(eq(scheduleDateNotes.scheduleId, scheduleId))
-    .all();
+    .where(eq(scheduleDateNotes.scheduleId, scheduleId));
 
-  const rehearsalDates = db
+  const rehearsalDates = await db
     .select()
     .from(scheduleRehearsalDates)
-    .where(eq(scheduleRehearsalDates.scheduleId, scheduleId))
-    .all();
+    .where(eq(scheduleRehearsalDates.scheduleId, scheduleId));
 
   return NextResponse.json({
     ...schedule,
@@ -79,11 +75,10 @@ export async function PUT(
   const scheduleId = parseInt(id, 10);
   const body = await request.json();
 
-  const schedule = db
+  const schedule = (await db
     .select()
     .from(schedules)
-    .where(eq(schedules.id, scheduleId))
-    .get();
+    .where(eq(schedules.id, scheduleId)))[0];
 
   if (!schedule) {
     return NextResponse.json(
@@ -95,10 +90,9 @@ export async function PUT(
   // Commit action
   if (body.action === "commit") {
     const shareToken = crypto.randomUUID();
-    db.update(schedules)
+    await db.update(schedules)
       .set({ status: "committed", shareToken })
-      .where(eq(schedules.id, scheduleId))
-      .run();
+      .where(eq(schedules.id, scheduleId));
 
     return NextResponse.json({
       ...schedule,
@@ -109,11 +103,10 @@ export async function PUT(
 
   // Swap entry
   if (body.action === "swap" && body.entryId && body.newMemberId) {
-    const entry = db
+    const entry = (await db
       .select()
       .from(scheduleEntries)
-      .where(eq(scheduleEntries.id, body.entryId))
-      .get();
+      .where(eq(scheduleEntries.id, body.entryId)))[0];
 
     if (!entry) {
       return NextResponse.json(
@@ -122,21 +115,19 @@ export async function PUT(
       );
     }
 
-    db.update(scheduleEntries)
+    await db.update(scheduleEntries)
       .set({ memberId: body.newMemberId })
-      .where(eq(scheduleEntries.id, body.entryId))
-      .run();
+      .where(eq(scheduleEntries.id, body.entryId));
 
     return NextResponse.json({ success: true });
   }
 
   // Remove an entry (empty the slot)
   if (body.action === "remove" && body.entryId) {
-    const entry = db
+    const entry = (await db
       .select()
       .from(scheduleEntries)
-      .where(eq(scheduleEntries.id, body.entryId))
-      .get();
+      .where(eq(scheduleEntries.id, body.entryId)))[0];
 
     if (!entry) {
       return NextResponse.json(
@@ -145,20 +136,18 @@ export async function PUT(
       );
     }
 
-    db.delete(scheduleEntries)
-      .where(eq(scheduleEntries.id, body.entryId))
-      .run();
+    await db.delete(scheduleEntries)
+      .where(eq(scheduleEntries.id, body.entryId));
 
     return NextResponse.json({ success: true });
   }
 
   // Assign a member to a dependent role on a specific date
   if (body.action === "assign" && body.date && body.roleId && body.memberId) {
-    const role = db
+    const role = (await db
       .select()
       .from(roles)
-      .where(eq(roles.id, body.roleId))
-      .get();
+      .where(eq(roles.id, body.roleId)))[0];
 
     if (!role || role.dependsOnRoleId == null) {
       return NextResponse.json(
@@ -168,7 +157,7 @@ export async function PUT(
     }
 
     // Validate that the member is assigned to the source role on that date
-    const sourceEntry = db
+    const sourceEntry = (await db
       .select()
       .from(scheduleEntries)
       .where(
@@ -178,8 +167,7 @@ export async function PUT(
           eq(scheduleEntries.roleId, role.dependsOnRoleId),
           eq(scheduleEntries.memberId, body.memberId)
         )
-      )
-      .get();
+      ))[0];
 
     if (!sourceEntry) {
       return NextResponse.json(
@@ -189,7 +177,7 @@ export async function PUT(
     }
 
     // Remove any existing entry for this dependent role on this date
-    const existingEntries = db
+    const existingEntries = await db
       .select()
       .from(scheduleEntries)
       .where(
@@ -198,35 +186,31 @@ export async function PUT(
           eq(scheduleEntries.date, body.date),
           eq(scheduleEntries.roleId, body.roleId)
         )
-      )
-      .all();
+      );
 
     for (const existing of existingEntries) {
-      db.delete(scheduleEntries)
-        .where(eq(scheduleEntries.id, existing.id))
-        .run();
+      await db.delete(scheduleEntries)
+        .where(eq(scheduleEntries.id, existing.id));
     }
 
     // Create the new entry
-    db.insert(scheduleEntries)
+    await db.insert(scheduleEntries)
       .values({
         scheduleId,
         date: body.date,
         roleId: body.roleId,
         memberId: body.memberId,
-      })
-      .run();
+      });
 
     return NextResponse.json({ success: true });
   }
 
   // Unassign a dependent role entry
   if (body.action === "unassign" && body.entryId) {
-    const entry = db
+    const entry = (await db
       .select()
       .from(scheduleEntries)
-      .where(eq(scheduleEntries.id, body.entryId))
-      .get();
+      .where(eq(scheduleEntries.id, body.entryId)))[0];
 
     if (!entry) {
       return NextResponse.json(
@@ -236,11 +220,10 @@ export async function PUT(
     }
 
     // Verify the role is a dependent role
-    const role = db
+    const role = (await db
       .select()
       .from(roles)
-      .where(eq(roles.id, entry.roleId))
-      .get();
+      .where(eq(roles.id, entry.roleId)))[0];
 
     if (!role || role.dependsOnRoleId == null) {
       return NextResponse.json(
@@ -249,9 +232,8 @@ export async function PUT(
       );
     }
 
-    db.delete(scheduleEntries)
-      .where(eq(scheduleEntries.id, body.entryId))
-      .run();
+    await db.delete(scheduleEntries)
+      .where(eq(scheduleEntries.id, body.entryId));
 
     return NextResponse.json({ success: true });
   }
@@ -266,11 +248,10 @@ export async function DELETE(
   const { id } = await params;
   const scheduleId = parseInt(id, 10);
 
-  const existing = db
+  const existing = (await db
     .select()
     .from(schedules)
-    .where(eq(schedules.id, scheduleId))
-    .get();
+    .where(eq(schedules.id, scheduleId)))[0];
 
   if (!existing) {
     return NextResponse.json(
@@ -279,6 +260,6 @@ export async function DELETE(
     );
   }
 
-  db.delete(schedules).where(eq(schedules.id, scheduleId)).run();
+  await db.delete(schedules).where(eq(schedules.id, scheduleId));
   return NextResponse.json({ success: true });
 }

@@ -6,7 +6,7 @@ import { seedDefaults } from "@/lib/seed";
 
 export async function GET() {
   seedDefaults();
-  const allDays = db.select().from(scheduleDays).all();
+  const allDays = await db.select().from(scheduleDays);
   return NextResponse.json(allDays);
 }
 
@@ -21,11 +21,10 @@ export async function PUT(request: NextRequest) {
     );
   }
 
-  const existing = db
+  const existing = (await db
     .select()
     .from(scheduleDays)
-    .where(eq(scheduleDays.id, id))
-    .get();
+    .where(eq(scheduleDays.id, id)))[0];
 
   if (!existing) {
     return NextResponse.json({ error: "Day not found" }, { status: 404 });
@@ -42,16 +41,14 @@ export async function PUT(request: NextRequest) {
     );
   }
 
-  db.update(scheduleDays)
+  await db.update(scheduleDays)
     .set(updates)
-    .where(eq(scheduleDays.id, id))
-    .run();
+    .where(eq(scheduleDays.id, id));
 
-  const updated = db
+  const updated = (await db
     .select()
     .from(scheduleDays)
-    .where(eq(scheduleDays.id, id))
-    .get();
+    .where(eq(scheduleDays.id, id)))[0];
 
   return NextResponse.json(updated);
 }

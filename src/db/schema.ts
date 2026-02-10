@@ -1,12 +1,12 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { pgTable, text, integer, serial, boolean } from "drizzle-orm/pg-core";
 
-export const members = sqliteTable("members", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const members = pgTable("members", {
+  id: serial("id").primaryKey(),
   name: text("name").notNull(),
 });
 
-export const roles = sqliteTable("roles", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const roles = pgTable("roles", {
+  id: serial("id").primaryKey(),
   name: text("name").notNull(),
   requiredCount: integer("required_count").notNull().default(1),
   displayOrder: integer("display_order").notNull().default(0),
@@ -14,8 +14,8 @@ export const roles = sqliteTable("roles", {
   exclusiveGroup: text("exclusive_group"),
 });
 
-export const memberRoles = sqliteTable("member_roles", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const memberRoles = pgTable("member_roles", {
+  id: serial("id").primaryKey(),
   memberId: integer("member_id")
     .notNull()
     .references(() => members.id, { onDelete: "cascade" }),
@@ -24,15 +24,15 @@ export const memberRoles = sqliteTable("member_roles", {
     .references(() => roles.id, { onDelete: "cascade" }),
 });
 
-export const scheduleDays = sqliteTable("schedule_days", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const scheduleDays = pgTable("schedule_days", {
+  id: serial("id").primaryKey(),
   dayOfWeek: text("day_of_week").notNull(),
-  active: integer("active", { mode: "boolean" }).notNull().default(true),
-  isRehearsal: integer("is_rehearsal", { mode: "boolean" }).notNull().default(false),
+  active: boolean("active").notNull().default(true),
+  isRehearsal: boolean("is_rehearsal").notNull().default(false),
 });
 
-export const memberAvailability = sqliteTable("member_availability", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const memberAvailability = pgTable("member_availability", {
+  id: serial("id").primaryKey(),
   memberId: integer("member_id")
     .notNull()
     .references(() => members.id, { onDelete: "cascade" }),
@@ -41,8 +41,8 @@ export const memberAvailability = sqliteTable("member_availability", {
     .references(() => scheduleDays.id, { onDelete: "cascade" }),
 });
 
-export const holidays = sqliteTable("holidays", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const holidays = pgTable("holidays", {
+  id: serial("id").primaryKey(),
   memberId: integer("member_id")
     .notNull()
     .references(() => members.id, { onDelete: "cascade" }),
@@ -51,8 +51,8 @@ export const holidays = sqliteTable("holidays", {
   description: text("description"),
 });
 
-export const schedules = sqliteTable("schedules", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const schedules = pgTable("schedules", {
+  id: serial("id").primaryKey(),
   month: integer("month").notNull(),
   year: integer("year").notNull(),
   status: text("status", { enum: ["draft", "committed"] })
@@ -64,8 +64,8 @@ export const schedules = sqliteTable("schedules", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
-export const scheduleEntries = sqliteTable("schedule_entries", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const scheduleEntries = pgTable("schedule_entries", {
+  id: serial("id").primaryKey(),
   scheduleId: integer("schedule_id")
     .notNull()
     .references(() => schedules.id, { onDelete: "cascade" }),
@@ -78,8 +78,8 @@ export const scheduleEntries = sqliteTable("schedule_entries", {
     .references(() => members.id),
 });
 
-export const scheduleDateNotes = sqliteTable("schedule_date_notes", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const scheduleDateNotes = pgTable("schedule_date_notes", {
+  id: serial("id").primaryKey(),
   scheduleId: integer("schedule_id")
     .notNull()
     .references(() => schedules.id, { onDelete: "cascade" }),
@@ -87,16 +87,16 @@ export const scheduleDateNotes = sqliteTable("schedule_date_notes", {
   description: text("description").notNull(),
 });
 
-export const scheduleRehearsalDates = sqliteTable("schedule_rehearsal_dates", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const scheduleRehearsalDates = pgTable("schedule_rehearsal_dates", {
+  id: serial("id").primaryKey(),
   scheduleId: integer("schedule_id")
     .notNull()
     .references(() => schedules.id, { onDelete: "cascade" }),
   date: text("date").notNull(),
 });
 
-export const dayRolePriorities = sqliteTable("day_role_priorities", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const dayRolePriorities = pgTable("day_role_priorities", {
+  id: serial("id").primaryKey(),
   scheduleDayId: integer("schedule_day_id")
     .notNull()
     .references(() => scheduleDays.id, { onDelete: "cascade" }),

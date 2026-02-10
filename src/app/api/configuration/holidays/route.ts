@@ -4,7 +4,7 @@ import { holidays } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 export async function GET() {
-  const allHolidays = db.select().from(holidays).all();
+  const allHolidays = await db.select().from(holidays);
   return NextResponse.json(allHolidays);
 }
 
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const holiday = db
+  const holiday = (await db
     .insert(holidays)
     .values({
       memberId,
@@ -34,8 +34,7 @@ export async function POST(request: NextRequest) {
       endDate,
       description: description ?? null,
     })
-    .returning()
-    .get();
+    .returning())[0];
 
   return NextResponse.json(holiday, { status: 201 });
 }
@@ -52,11 +51,10 @@ export async function DELETE(request: NextRequest) {
   }
 
   const holidayId = parseInt(id, 10);
-  const existing = db
+  const existing = (await db
     .select()
     .from(holidays)
-    .where(eq(holidays.id, holidayId))
-    .get();
+    .where(eq(holidays.id, holidayId)))[0];
 
   if (!existing) {
     return NextResponse.json(
@@ -65,7 +63,7 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  db.delete(holidays).where(eq(holidays.id, holidayId)).run();
+  await db.delete(holidays).where(eq(holidays.id, holidayId));
 
   return NextResponse.json({ success: true });
 }

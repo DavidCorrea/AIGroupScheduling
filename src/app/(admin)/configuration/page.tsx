@@ -49,7 +49,7 @@ function PriorityEditor({
   return (
     <div className="space-y-2">
       <p className="text-xs text-muted-foreground mb-2">
-        Reorder roles using the arrows. Top role is filled first.
+        Reordena los roles usando las flechas. El rol superior se llena primero.
       </p>
       {orderedRoles.map((role, index) => (
         <div
@@ -82,7 +82,7 @@ function PriorityEditor({
         }
         className="mt-2 rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
       >
-        Save Order
+        Guardar orden
       </button>
     </div>
   );
@@ -157,7 +157,7 @@ function ColumnOrderEditor({
         }
         className="mt-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
       >
-        Save Order
+        Guardar orden
       </button>
     </div>
   );
@@ -328,7 +328,7 @@ export default function ConfigurationPage() {
   const deleteRole = async (role: Role) => {
     if (
       !confirm(
-        `Delete "${role.name}"? This will also remove all schedule entries for this role from every schedule.`
+        `¿Eliminar "${role.name}"? Esto también eliminará todas las entradas de cronograma para este rol de cada cronograma.`
       )
     )
       return;
@@ -387,23 +387,23 @@ export default function ConfigurationPage() {
   };
 
   if (loading) {
-    return <p className="text-muted-foreground">Loading...</p>;
+    return <p className="text-muted-foreground">Cargando...</p>;
   }
 
   return (
     <div className="space-y-10">
       <div>
-        <h1 className="text-2xl font-bold">Configuration</h1>
+        <h1 className="text-2xl font-bold">Configuración</h1>
         <p className="mt-1 text-muted-foreground">
-          Configure roles, active schedule days, and manage member holidays.
+          Configura roles, días activos y gestiona vacaciones de miembros.
         </p>
       </div>
 
       {/* Schedule Days */}
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Active Days</h2>
+        <h2 className="text-lg font-semibold">Días activos</h2>
         <p className="text-sm text-muted-foreground">
-          Toggle which days of the week are included in the schedule.
+          Selecciona qué días de la semana se incluyen en el cronograma.
         </p>
         <div className="flex flex-wrap gap-2">
           {days.map((day) => (
@@ -424,10 +424,9 @@ export default function ConfigurationPage() {
 
       {/* Rehearsal Days */}
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Rehearsal Days</h2>
+        <h2 className="text-lg font-semibold">Días de ensayo</h2>
         <p className="text-sm text-muted-foreground">
-          Toggle which days of the week are rehearsal days. Rehearsal dates
-          appear in the schedule but do not have member assignments.
+          Selecciona qué días de la semana son días de ensayo. Las fechas de ensayo aparecen en el cronograma pero no tienen asignaciones de miembros.
         </p>
         <div className="flex flex-wrap gap-2">
           {days.map((day) => (
@@ -450,8 +449,7 @@ export default function ConfigurationPage() {
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">Roles</h2>
         <p className="text-sm text-muted-foreground">
-          Define the roles needed for each service date and how many people are
-          required per role.
+          Define los roles necesarios para cada fecha de servicio y cuántas personas se requieren por rol.
         </p>
 
         <div className="space-y-2">
@@ -481,7 +479,7 @@ export default function ConfigurationPage() {
                       setEditingRoleId(role.id);
                       setEditingRoleName(role.name);
                     }}
-                    title="Click to rename"
+                    title="Clic para renombrar"
                   >
                     {role.name}
                   </span>
@@ -490,7 +488,7 @@ export default function ConfigurationPage() {
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <label className="text-sm text-muted-foreground">
-                    Required:
+                    Requeridos:
                   </label>
                   <select
                     value={role.requiredCount}
@@ -508,7 +506,7 @@ export default function ConfigurationPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <label className="text-sm text-muted-foreground">
-                    Depends on:
+                    Depende de:
                   </label>
                   <select
                     value={role.dependsOnRoleId ?? ""}
@@ -520,7 +518,7 @@ export default function ConfigurationPage() {
                     }
                     className="rounded-md border border-border bg-background px-2 py-1 text-sm"
                   >
-                    <option value="">None</option>
+                    <option value="">Ninguno</option>
                     {roles
                       .filter((r) => r.id !== role.id)
                       .map((r) => (
@@ -532,7 +530,7 @@ export default function ConfigurationPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <label className="text-sm text-muted-foreground">
-                    Exclusive group:
+                    Grupo exclusivo:
                   </label>
                   <input
                     type="text"
@@ -546,7 +544,7 @@ export default function ConfigurationPage() {
                     onKeyDown={(e) => {
                       if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                     }}
-                    placeholder="None"
+                    placeholder="Ninguno"
                     className="rounded-md border border-border bg-background px-2 py-1 text-sm w-32"
                   />
                 </div>
@@ -555,7 +553,7 @@ export default function ConfigurationPage() {
                   className="rounded-md border border-destructive px-2 py-1 text-xs text-destructive hover:bg-destructive hover:text-white transition-colors"
                   title="Delete role"
                 >
-                  Delete
+                  Eliminar
                 </button>
               </div>
             </div>
@@ -565,18 +563,18 @@ export default function ConfigurationPage() {
         <form onSubmit={addRole} className="flex items-end gap-3">
           <div className="flex-1">
             <label className="block text-sm font-medium mb-1">
-              New Role Name
+              Nombre del nuevo rol
             </label>
             <input
               type="text"
               value={newRoleName}
               onChange={(e) => setNewRoleName(e.target.value)}
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="e.g. Saxophone"
+              placeholder="ej. Saxofón"
             />
           </div>
           <div className="w-24">
-            <label className="block text-sm font-medium mb-1">Count</label>
+            <label className="block text-sm font-medium mb-1">Cantidad</label>
             <input
               type="number"
               min={1}
@@ -590,17 +588,16 @@ export default function ConfigurationPage() {
             type="submit"
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
           >
-            Add Role
+            Agregar rol
           </button>
         </form>
       </section>
 
       {/* Column Order */}
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Column Order</h2>
+        <h2 className="text-lg font-semibold">Orden de columnas</h2>
         <p className="text-sm text-muted-foreground">
-          Set the display order of role columns in all schedule views. Use the
-          arrows to reorder, then click &quot;Save Order&quot; to apply.
+          Configura el orden de visualización de las columnas de roles en todas las vistas de cronogramas. Usa las flechas para reordenar, luego haz clic en &quot;Guardar orden&quot; para aplicar.
         </p>
         <ColumnOrderEditor
           roles={roles}
@@ -617,12 +614,9 @@ export default function ConfigurationPage() {
 
       {/* Role Priorities per Day */}
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Role Priorities by Day</h2>
+        <h2 className="text-lg font-semibold">Prioridades de roles por día</h2>
         <p className="text-sm text-muted-foreground">
-          Set the priority order of roles for each active day. Roles with lower
-          priority numbers are filled first. This is useful when a member can
-          play multiple roles and you want to ensure a specific role gets filled
-          first on certain days (e.g., prioritise Acoustic Guitar on Wednesdays).
+          Configura el orden de prioridad de roles para cada día activo. Los roles con números de prioridad más bajos se llenan primero. Esto es útil cuando un miembro puede tocar múltiples roles y quieres asegurar que un rol específico se llene primero en ciertos días.
         </p>
 
         <div className="space-y-3">
@@ -647,7 +641,7 @@ export default function ConfigurationPage() {
                           onClick={() => setEditingPriorityDay(null)}
                           className="text-sm text-muted-foreground hover:underline"
                         >
-                          Cancel
+                          Cancelar
                         </button>
                       ) : (
                         <>
@@ -655,14 +649,14 @@ export default function ConfigurationPage() {
                             onClick={() => setEditingPriorityDay(day.id)}
                             className="text-sm text-primary hover:underline"
                           >
-                            {dayPriorities.length > 0 ? "Edit" : "Set Priorities"}
+                            {dayPriorities.length > 0 ? "Editar" : "Establecer prioridades"}
                           </button>
                           {dayPriorities.length > 0 && (
                             <button
                               onClick={() => clearPriorities(day.id)}
                               className="text-sm text-destructive hover:underline"
                             >
-                              Clear
+                              Limpiar
                             </button>
                           )}
                         </>
@@ -691,7 +685,7 @@ export default function ConfigurationPage() {
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      Using default role order.
+                      Usando el orden de roles predeterminado.
                     </p>
                   )}
                 </div>
@@ -702,10 +696,9 @@ export default function ConfigurationPage() {
 
       {/* Holidays */}
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Holidays</h2>
+        <h2 className="text-lg font-semibold">Vacaciones</h2>
         <p className="text-sm text-muted-foreground">
-          Set date ranges when members are unavailable. They will be skipped
-          during schedule generation.
+          Configura rangos de fechas cuando los miembros no están disponibles. Se omitirán durante la generación de cronogramas.
         </p>
 
         <form
@@ -714,7 +707,7 @@ export default function ConfigurationPage() {
         >
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Member</label>
+              <label className="block text-sm font-medium mb-1">Miembro</label>
               <select
                 value={holidayMemberId}
                 onChange={(e) =>
@@ -725,7 +718,7 @@ export default function ConfigurationPage() {
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
                 required
               >
-                <option value="">Select member...</option>
+                <option value="">Seleccionar miembro...</option>
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.name}
@@ -735,7 +728,7 @@ export default function ConfigurationPage() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
-                Start Date
+                Fecha inicio
               </label>
               <input
                 type="date"
@@ -747,7 +740,7 @@ export default function ConfigurationPage() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
-                End Date
+                Fecha fin
               </label>
               <input
                 type="date"
@@ -759,14 +752,14 @@ export default function ConfigurationPage() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
-                Description
+                Descripción
               </label>
               <input
                 type="text"
                 value={holidayDescription}
                 onChange={(e) => setHolidayDescription(e.target.value)}
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                placeholder="Optional note"
+                placeholder="Nota opcional"
               />
             </div>
           </div>
@@ -774,13 +767,13 @@ export default function ConfigurationPage() {
             type="submit"
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
           >
-            Add Holiday
+            Agregar vacación
           </button>
         </form>
 
         {holidays.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No holidays configured.
+            No hay vacaciones configuradas.
           </p>
         ) : (
           <div className="space-y-2">
@@ -809,7 +802,7 @@ export default function ConfigurationPage() {
                     onClick={() => deleteHoliday(holiday.id)}
                     className="rounded-md border border-destructive px-3 py-1 text-sm text-destructive hover:bg-destructive hover:text-white transition-colors"
                   >
-                    Remove
+                    Eliminar
                   </button>
                 </div>
               );

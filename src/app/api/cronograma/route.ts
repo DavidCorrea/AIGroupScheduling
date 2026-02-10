@@ -15,7 +15,7 @@ export async function GET() {
   const currentMonth = now.getMonth() + 1; // 1-based
   const currentYear = now.getFullYear();
 
-  const schedule = db
+  const schedule = (await db
     .select()
     .from(schedules)
     .where(
@@ -24,8 +24,7 @@ export async function GET() {
         eq(schedules.year, currentYear),
         eq(schedules.status, "committed")
       )
-    )
-    .get();
+    ))[0];
 
   if (!schedule) {
     return NextResponse.json(
@@ -34,14 +33,13 @@ export async function GET() {
     );
   }
 
-  const entries = db
+  const entries = await db
     .select()
     .from(scheduleEntries)
-    .where(eq(scheduleEntries.scheduleId, schedule.id))
-    .all();
+    .where(eq(scheduleEntries.scheduleId, schedule.id));
 
-  const allMembers = db.select().from(members).all();
-  const allRoles = db.select().from(roles).all();
+  const allMembers = await db.select().from(members);
+  const allRoles = await db.select().from(roles);
 
   // Detect dependent role IDs for frontend highlighting (roles that depend on another role)
   const dependentRoleIds = allRoles
@@ -67,17 +65,15 @@ export async function GET() {
     ).values(),
   ].sort((a, b) => a.name.localeCompare(b.name));
 
-  const notes = db
+  const notes = await db
     .select()
     .from(scheduleDateNotes)
-    .where(eq(scheduleDateNotes.scheduleId, schedule.id))
-    .all();
+    .where(eq(scheduleDateNotes.scheduleId, schedule.id));
 
-  const rehearsalDates = db
+  const rehearsalDates = await db
     .select()
     .from(scheduleRehearsalDates)
-    .where(eq(scheduleRehearsalDates.scheduleId, schedule.id))
-    .all();
+    .where(eq(scheduleRehearsalDates.scheduleId, schedule.id));
 
   return NextResponse.json({
     month: schedule.month,

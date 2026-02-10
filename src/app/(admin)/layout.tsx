@@ -1,10 +1,10 @@
 import Link from "next/link";
 
 const navLinks = [
-  { href: "/", label: "Home" },
-  { href: "/members", label: "Members" },
-  { href: "/configuration", label: "Configuration" },
-  { href: "/schedules", label: "Schedules" },
+  { href: "/", label: "Inicio" },
+  { href: "/members", label: "Miembros" },
+  { href: "/configuration", label: "Configuración" },
+  { href: "/schedules", label: "Cronogramas" },
 ];
 
 export default function AdminLayout({
@@ -19,7 +19,7 @@ export default function AdminLayout({
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-xl font-bold text-primary">
-                Band Scheduler
+                Cronogramas
               </span>
             </div>
             <div className="flex gap-1">

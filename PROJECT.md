@@ -2,7 +2,7 @@
 
 ## Project Setup
 - Next.js 16 with App Router, TypeScript, Tailwind CSS
-- Drizzle ORM with SQLite (better-sqlite3) for data persistence
+- Drizzle ORM with PostgreSQL (postgres-js driver, Neon-hosted) for data persistence
 - Jest with ts-jest for testing (TDD)
 - Database schema with tables: members, roles, member_roles, schedule_days, member_availability, holidays, schedules, schedule_entries, schedule_date_notes, schedule_rehearsal_dates, day_role_priorities
 
@@ -52,9 +52,12 @@
 - Rotation continuity: previously committed schedules feed into the algorithm for fair distribution
 - API routes: `/api/schedules`, `/api/schedules/[id]`, `/api/schedules/[id]/notes`, `/api/schedules/[id]/rehearsals`
 
+## Localisation
+- **All UI text in Spanish**: both admin and public views use Spanish labels, month names, date formatting (`es-ES` locale), buttons, and messages; role and member names remain as configured in the database
+- App name: **Cronogramas**
+
 ## Shared Public View
 - Public read-only page at `/shared/[token]` — no admin navigation shown
-- **All UI text in Spanish**: month names, date formatting (`es-ES` locale), labels, and messages are displayed in Spanish; role and member names remain as configured in the database
 - **Mobile-first responsive design**: card-based layout on small screens, table grid on desktop (breakpoint: `lg`)
 - **Light/dark mode toggle**: class-based dark mode (`.dark` / `.light` on `<html>`) with system-preference fallback; persists choice in `localStorage`
 - **Filter by member**: dropdown to select a specific person and show only their dates and roles
@@ -73,8 +76,8 @@
 - HTTP Basic Auth protects all non-public routes via Next.js middleware (`src/middleware.ts`)
 - Public routes (`/shared/*`, `/cronograma`, `/api/shared/*`, `/api/cronograma`) and static assets bypass auth
 - Credentials configured via `ADMIN_USER` and `ADMIN_PASSWORD` environment variables
-- If no credentials are set, auth is skipped (no lockout during initial setup)
-- On Fly.io, set credentials with `fly secrets set ADMIN_USER=xxx ADMIN_PASSWORD=xxx`
+- If no credentials are set, all admin routes return 401 (locked by default)
+- Set credentials as environment variables on your hosting provider
 - `.env.example` documents the required variables for local development (copy to `.env.local`)
 
 ## Default Seed Roles

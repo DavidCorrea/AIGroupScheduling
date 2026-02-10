@@ -10,27 +10,24 @@ export async function GET(
   const { id } = await params;
   const memberId = parseInt(id, 10);
 
-  const member = db
+  const member = (await db
     .select()
     .from(members)
-    .where(eq(members.id, memberId))
-    .get();
+    .where(eq(members.id, memberId)))[0];
 
   if (!member) {
     return NextResponse.json({ error: "Member not found" }, { status: 404 });
   }
 
-  const roles = db
+  const roles = await db
     .select()
     .from(memberRoles)
-    .where(eq(memberRoles.memberId, memberId))
-    .all();
+    .where(eq(memberRoles.memberId, memberId));
 
-  const availability = db
+  const availability = await db
     .select()
     .from(memberAvailability)
-    .where(eq(memberAvailability.memberId, memberId))
-    .all();
+    .where(eq(memberAvailability.memberId, memberId));
 
   return NextResponse.json({
     ...member,
@@ -48,11 +45,10 @@ export async function PUT(
   const body = await request.json();
   const { name, roleIds, availableDayIds } = body;
 
-  const existing = db
+  const existing = (await db
     .select()
     .from(members)
-    .where(eq(members.id, memberId))
-    .get();
+    .where(eq(members.id, memberId)))[0];
 
   if (!existing) {
     return NextResponse.json({ error: "Member not found" }, { status: 404 });
@@ -65,54 +61,46 @@ export async function PUT(
         { status: 400 }
       );
     }
-    db.update(members)
+    await db.update(members)
       .set({ name: name.trim() })
-      .where(eq(members.id, memberId))
-      .run();
+      .where(eq(members.id, memberId));
   }
 
   if (roleIds !== undefined) {
     // Replace all role assignments
-    db.delete(memberRoles)
-      .where(eq(memberRoles.memberId, memberId))
-      .run();
+    await db.delete(memberRoles)
+      .where(eq(memberRoles.memberId, memberId));
     for (const roleId of roleIds) {
-      db.insert(memberRoles)
-        .values({ memberId, roleId })
-        .run();
+      await db.insert(memberRoles)
+        .values({ memberId, roleId });
     }
   }
 
   if (availableDayIds !== undefined) {
     // Replace all availability assignments
-    db.delete(memberAvailability)
-      .where(eq(memberAvailability.memberId, memberId))
-      .run();
+    await db.delete(memberAvailability)
+      .where(eq(memberAvailability.memberId, memberId));
     for (const dayId of availableDayIds) {
-      db.insert(memberAvailability)
-        .values({ memberId, scheduleDayId: dayId })
-        .run();
+      await db.insert(memberAvailability)
+        .values({ memberId, scheduleDayId: dayId });
     }
   }
 
   // Return updated member
-  const updated = db
+  const updated = (await db
     .select()
     .from(members)
-    .where(eq(members.id, memberId))
-    .get();
+    .where(eq(members.id, memberId)))[0];
 
-  const updatedRoles = db
+  const updatedRoles = await db
     .select()
     .from(memberRoles)
-    .where(eq(memberRoles.memberId, memberId))
-    .all();
+    .where(eq(memberRoles.memberId, memberId));
 
-  const updatedAvailability = db
+  const updatedAvailability = await db
     .select()
     .from(memberAvailability)
-    .where(eq(memberAvailability.memberId, memberId))
-    .all();
+    .where(eq(memberAvailability.memberId, memberId));
 
   return NextResponse.json({
     ...updated,
@@ -128,17 +116,16 @@ export async function DELETE(
   const { id } = await params;
   const memberId = parseInt(id, 10);
 
-  const existing = db
+  const existing = (await db
     .select()
     .from(members)
-    .where(eq(members.id, memberId))
-    .get();
+    .where(eq(members.id, memberId)))[0];
 
   if (!existing) {
     return NextResponse.json({ error: "Member not found" }, { status: 404 });
   }
 
-  db.delete(members).where(eq(members.id, memberId)).run();
+  await db.delete(members).where(eq(members.id, memberId));
 
   return NextResponse.json({ success: true });
 }

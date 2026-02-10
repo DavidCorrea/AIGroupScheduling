@@ -4,10 +4,9 @@ export default function Home() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Welcome to Band Scheduler</h1>
+        <h1 className="text-3xl font-bold">Bienvenido a Cronogramas</h1>
         <p className="mt-2 text-muted-foreground">
-          Generate fair, rotational schedules for your band. Configure members,
-          roles, and availability, then generate schedules for any month.
+          Genera cronogramas justos y rotacionales para tu banda. Configura miembros, roles y disponibilidad, luego genera cronogramas para cualquier mes.
         </p>
       </div>
 
@@ -16,9 +15,9 @@ export default function Home() {
           href="/members"
           className="rounded-lg border border-border bg-card p-6 hover:border-primary transition-colors"
         >
-          <h2 className="text-lg font-semibold">Members</h2>
+          <h2 className="text-lg font-semibold">Miembros</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Add and manage band members. Assign roles and set availability.
+            Agrega y gestiona los miembros de la banda. Asigna roles y configura disponibilidad.
           </p>
         </Link>
 
@@ -26,9 +25,9 @@ export default function Home() {
           href="/configuration"
           className="rounded-lg border border-border bg-card p-6 hover:border-primary transition-colors"
         >
-          <h2 className="text-lg font-semibold">Configuration</h2>
+          <h2 className="text-lg font-semibold">Configuración</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Configure roles, active days, and manage member holidays.
+            Configura roles, días activos y gestiona vacaciones de miembros.
           </p>
         </Link>
 
@@ -36,9 +35,9 @@ export default function Home() {
           href="/schedules"
           className="rounded-lg border border-border bg-card p-6 hover:border-primary transition-colors"
         >
-          <h2 className="text-lg font-semibold">Schedules</h2>
+          <h2 className="text-lg font-semibold">Cronogramas</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Generate, preview, and share band schedules.
+            Genera, previsualiza y comparte los cronogramas de la banda.
           </p>
         </Link>
       </div>

@@ -1,1 +1,0 @@
-ALTER TABLE `roles` ADD `depends_on_role_id` integer;

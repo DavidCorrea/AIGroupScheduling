@@ -6,11 +6,10 @@ import { seedDefaults } from "@/lib/seed";
 
 export async function GET() {
   seedDefaults();
-  const allRoles = db
+  const allRoles = await db
     .select()
     .from(roles)
-    .orderBy(roles.displayOrder)
-    .all();
+    .orderBy(roles.displayOrder);
   return NextResponse.json(allRoles);
 }
 
@@ -26,17 +25,15 @@ export async function POST(request: NextRequest) {
   }
 
   // Assign displayOrder = max(existing) + 1 so new roles appear at the end
-  const maxResult = db
+  const maxResult = (await db
     .select({ maxOrder: sql<number>`COALESCE(MAX(${roles.displayOrder}), -1)` })
-    .from(roles)
-    .get();
+    .from(roles))[0];
   const nextOrder = (maxResult?.maxOrder ?? -1) + 1;
 
-  const role = db
+  const role = (await db
     .insert(roles)
     .values({ name: name.trim(), requiredCount, displayOrder: nextOrder })
-    .returning()
-    .get();
+    .returning())[0];
 
   return NextResponse.json(role, { status: 201 });
 }
@@ -52,7 +49,7 @@ export async function PUT(request: NextRequest) {
     );
   }
 
-  const existing = db.select().from(roles).where(eq(roles.id, id)).get();
+  const existing = (await db.select().from(roles).where(eq(roles.id, id)))[0];
   if (!existing) {
     return NextResponse.json({ error: "Role not found" }, { status: 404 });
   }
@@ -63,9 +60,9 @@ export async function PUT(request: NextRequest) {
   if (dependsOnRoleId !== undefined) updates.dependsOnRoleId = dependsOnRoleId;
   if (exclusiveGroup !== undefined) updates.exclusiveGroup = exclusiveGroup;
 
-  db.update(roles).set(updates).where(eq(roles.id, id)).run();
+  await db.update(roles).set(updates).where(eq(roles.id, id));
 
-  const updated = db.select().from(roles).where(eq(roles.id, id)).get();
+  const updated = (await db.select().from(roles).where(eq(roles.id, id)))[0];
   return NextResponse.json(updated);
 }
 
@@ -90,17 +87,15 @@ export async function PATCH(request: NextRequest) {
         { status: 400 }
       );
     }
-    db.update(roles)
+    await db.update(roles)
       .set({ displayOrder: item.displayOrder })
-      .where(eq(roles.id, item.id))
-      .run();
+      .where(eq(roles.id, item.id));
   }
 
-  const allRoles = db
+  const allRoles = await db
     .select()
     .from(roles)
-    .orderBy(roles.displayOrder)
-    .all();
+    .orderBy(roles.displayOrder);
   return NextResponse.json(allRoles);
 }
 
@@ -117,24 +112,22 @@ export async function DELETE(request: NextRequest) {
 
   const roleId = parseInt(id, 10);
 
-  const existing = db.select().from(roles).where(eq(roles.id, roleId)).get();
+  const existing = (await db.select().from(roles).where(eq(roles.id, roleId)))[0];
   if (!existing) {
     return NextResponse.json({ error: "Role not found" }, { status: 404 });
   }
 
   // Cascade: delete schedule entries referencing this role
-  db.delete(scheduleEntries)
-    .where(eq(scheduleEntries.roleId, roleId))
-    .run();
+  await db.delete(scheduleEntries)
+    .where(eq(scheduleEntries.roleId, roleId));
 
   // member_roles and day_role_priorities cascade automatically via schema,
   // but delete day_role_priorities explicitly in case schema cascades aren't enforced
-  db.delete(dayRolePriorities)
-    .where(eq(dayRolePriorities.roleId, roleId))
-    .run();
+  await db.delete(dayRolePriorities)
+    .where(eq(dayRolePriorities.roleId, roleId));
 
   // Delete the role itself (member_roles cascade via schema)
-  db.delete(roles).where(eq(roles.id, roleId)).run();
+  await db.delete(roles).where(eq(roles.id, roleId));
 
   return NextResponse.json({ success: true });
 }

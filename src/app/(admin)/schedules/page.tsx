@@ -13,18 +13,18 @@ interface Schedule {
 }
 
 const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
 ];
 
 export default function SchedulesPage() {
@@ -83,7 +83,7 @@ export default function SchedulesPage() {
 
       if (!res.ok) {
         const err = await res.json();
-        alert(err.error || "Failed to generate schedule");
+        alert(err.error || "Error al generar cronograma");
         return;
       }
 
@@ -94,29 +94,29 @@ export default function SchedulesPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this schedule?")) return;
+    if (!confirm("¿Estás seguro de que deseas eliminar este cronograma?")) return;
     await fetch(`/api/schedules/${id}`, { method: "DELETE" });
     fetchSchedules();
   };
 
   if (loading) {
-    return <p className="text-muted-foreground">Loading...</p>;
+    return <p className="text-muted-foreground">Cargando...</p>;
   }
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold">Schedules</h1>
+        <h1 className="text-2xl font-bold">Cronogramas</h1>
         <p className="mt-1 text-muted-foreground">
-          Generate new schedules or view existing ones.
+          Genera nuevos cronogramas o consulta los existentes.
         </p>
       </div>
 
       {/* Generate form */}
       <div className="rounded-lg border border-border bg-card p-6 space-y-4">
-        <h2 className="text-lg font-semibold">Generate Schedule</h2>
+        <h2 className="text-lg font-semibold">Generar cronograma</h2>
         <p className="text-sm text-muted-foreground">
-          Select one or more months to generate schedules for.
+          Selecciona uno o más meses para generar cronogramas.
         </p>
 
         <div className="space-y-3">
@@ -150,7 +150,7 @@ export default function SchedulesPage() {
                   onClick={() => removeMonth(index)}
                   className="text-sm text-destructive hover:underline"
                 >
-                  Remove
+                  Eliminar
                 </button>
               )}
             </div>
@@ -162,24 +162,24 @@ export default function SchedulesPage() {
             onClick={addMonth}
             className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
           >
-            + Add Month
+            + Agregar mes
           </button>
           <button
             onClick={handleGenerate}
             disabled={generating}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
           >
-            {generating ? "Generating..." : "Generate"}
+            {generating ? "Generando..." : "Generar"}
           </button>
         </div>
       </div>
 
       {/* Schedules list */}
       <div className="space-y-3">
-        <h2 className="text-lg font-semibold">Existing Schedules</h2>
+        <h2 className="text-lg font-semibold">Cronogramas existentes</h2>
         {schedulesList.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No schedules generated yet.
+            Aún no se han generado cronogramas.
           </p>
         ) : (
           schedulesList.map((schedule) => (
@@ -199,7 +199,7 @@ export default function SchedulesPage() {
                         : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
                     }`}
                   >
-                    {schedule.status}
+                    {schedule.status === "committed" ? "Comprometido" : schedule.status === "draft" ? "Borrador" : schedule.status}
                   </span>
                 </div>
               </div>
@@ -208,21 +208,21 @@ export default function SchedulesPage() {
                   href={`/schedules/${schedule.id}`}
                   className="rounded-md border border-border px-3 py-1 text-sm hover:bg-muted transition-colors"
                 >
-                  View
+                  Ver
                 </Link>
                 {schedule.shareToken && (
                   <Link
                     href={`/shared/${schedule.shareToken}`}
                     className="rounded-md border border-primary text-primary px-3 py-1 text-sm hover:bg-accent transition-colors"
                   >
-                    Shared Link
+                    Enlace compartido
                   </Link>
                 )}
                 <button
                   onClick={() => handleDelete(schedule.id)}
                   className="rounded-md border border-destructive px-3 py-1 text-sm text-destructive hover:bg-destructive hover:text-white transition-colors"
                 >
-                  Delete
+                  Eliminar
                 </button>
               </div>
             </div>

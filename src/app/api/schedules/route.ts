@@ -19,17 +19,16 @@ import { getScheduleDates, getRehearsalDates } from "@/lib/dates";
 import { seedDefaults } from "@/lib/seed";
 
 export async function GET() {
-  const allSchedules = db
+  const allSchedules = await db
     .select()
     .from(schedules)
-    .orderBy(schedules.year, schedules.month)
-    .all();
+    .orderBy(schedules.year, schedules.month);
 
   return NextResponse.json(allSchedules);
 }
 
 export async function POST(request: NextRequest) {
-  seedDefaults();
+  await seedDefaults();
 
   const body = await request.json();
   const { months } = body; // Array of { month, year }
@@ -42,7 +41,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Get all schedule days
-  const allDayRows = db.select().from(scheduleDays).all();
+  const allDayRows = await db.select().from(scheduleDays);
   const activeDayRows = allDayRows.filter((d) => d.active);
   const activeDayNames = activeDayRows.map((d) => d.dayOfWeek);
   const rehearsalDayNames = allDayRows
@@ -57,7 +56,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Build day role priorities map
-  const allPriorities = db.select().from(dayRolePriorities).all();
+  const allPriorities = await db.select().from(dayRolePriorities);
   const dayRolePriorityMap: Record<string, Record<number, number>> = {};
   for (const p of allPriorities) {
     const day = allDayRows.find((d) => d.id === p.scheduleDayId);
@@ -70,7 +69,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Build role definitions (exclude dependent roles — they are manually assigned)
-  const allRoles = db.select().from(roles).all();
+  const allRoles = await db.select().from(roles);
   const roleDefinitions: RoleDefinition[] = allRoles
     .filter((r) => r.dependsOnRoleId == null)
     .map((r) => ({
@@ -81,21 +80,20 @@ export async function POST(request: NextRequest) {
     }));
 
   // Build member info
-  const allMembers = db.select().from(members).all();
-  const allHolidays = db.select().from(holidays).all();
+  const allMembers = await db.select().from(members);
+  const allHolidays = await db.select().from(holidays);
 
-  const memberInfos: MemberInfo[] = allMembers.map((m) => {
-    const mRoles = db
+  const memberInfos: MemberInfo[] = [];
+  for (const m of allMembers) {
+    const mRoles = await db
       .select()
       .from(memberRoles)
-      .where(eq(memberRoles.memberId, m.id))
-      .all();
+      .where(eq(memberRoles.memberId, m.id));
 
-    const mAvailability = db
+    const mAvailability = await db
       .select()
       .from(memberAvailability)
-      .where(eq(memberAvailability.memberId, m.id))
-      .all();
+      .where(eq(memberAvailability.memberId, m.id));
 
     // Map schedule day IDs to day-of-week names
     const availDayNames = mAvailability.map((a) => {
@@ -107,34 +105,36 @@ export async function POST(request: NextRequest) {
       .filter((h) => h.memberId === m.id)
       .map((h) => ({ startDate: h.startDate, endDate: h.endDate }));
 
-    return {
+    memberInfos.push({
       id: m.id,
       name: m.name,
       roleIds: mRoles.map((r) => r.roleId),
       availableDays: availDayNames,
       holidays: mHolidays,
-    };
-  });
+    });
+  }
 
   // Gather previous assignments from committed schedules for rotation continuity
-  const committedSchedules = db
+  const committedSchedules = await db
     .select()
     .from(schedules)
-    .where(eq(schedules.status, "committed"))
-    .all();
+    .where(eq(schedules.status, "committed"));
 
-  const previousAssignments = committedSchedules.flatMap((s) =>
-    db
+  const previousAssignments: { date: string; roleId: number; memberId: number }[] = [];
+  for (const s of committedSchedules) {
+    const entries = await db
       .select()
       .from(scheduleEntries)
-      .where(eq(scheduleEntries.scheduleId, s.id))
-      .all()
-      .map((e) => ({
+      .where(eq(scheduleEntries.scheduleId, s.id));
+
+    previousAssignments.push(
+      ...entries.map((e) => ({
         date: e.date,
         roleId: e.roleId,
         memberId: e.memberId,
       }))
-  );
+    );
+  }
 
   // Generate schedules for each requested month
   const createdSchedules = [];
@@ -157,28 +157,25 @@ export async function POST(request: NextRequest) {
     });
 
     // Save to database
-    const schedule = db
+    const schedule = (await db
       .insert(schedules)
       .values({ month, year, status: "draft" })
-      .returning()
-      .get();
+      .returning())[0];
 
     for (const assignment of result.assignments) {
-      db.insert(scheduleEntries)
+      await db.insert(scheduleEntries)
         .values({
           scheduleId: schedule.id,
           date: assignment.date,
           roleId: assignment.roleId,
           memberId: assignment.memberId,
-        })
-        .run();
+        });
     }
 
     // Save rehearsal dates
     for (const rehearsalDate of rehearsalDatesList) {
-      db.insert(scheduleRehearsalDates)
-        .values({ scheduleId: schedule.id, date: rehearsalDate })
-        .run();
+      await db.insert(scheduleRehearsalDates)
+        .values({ scheduleId: schedule.id, date: rehearsalDate });
     }
 
     // Add these assignments to previousAssignments for subsequent months

@@ -27,33 +27,32 @@ const DEFAULT_DAYS = [
  * Seeds the database with default roles and schedule days if they don't already exist.
  */
 export async function seedDefaults() {
-  const existingRoles = db.select().from(roles).all();
+  const existingRoles = await db.select().from(roles);
   if (existingRoles.length === 0) {
     for (const role of DEFAULT_ROLES) {
       const { dependsOn, exclusiveGroup, ...rest } = role as typeof role & { dependsOn?: string; exclusiveGroup?: string };
-      db.insert(roles).values({ ...rest, exclusiveGroup: exclusiveGroup ?? null }).run();
+      await db.insert(roles).values({ ...rest, exclusiveGroup: exclusiveGroup ?? null });
     }
     // Set up role dependencies after all roles are inserted
-    const insertedRoles = db.select().from(roles).all();
+    const insertedRoles = await db.select().from(roles);
     for (const roleDef of DEFAULT_ROLES) {
       const def = roleDef as typeof roleDef & { dependsOn?: string };
       if (def.dependsOn) {
         const dependentRole = insertedRoles.find((r) => r.name === def.name);
         const sourceRole = insertedRoles.find((r) => r.name === def.dependsOn);
         if (dependentRole && sourceRole) {
-          db.update(roles)
+          await db.update(roles)
             .set({ dependsOnRoleId: sourceRole.id })
-            .where(eq(roles.id, dependentRole.id))
-            .run();
+            .where(eq(roles.id, dependentRole.id));
         }
       }
     }
   }
 
-  const existingDays = db.select().from(scheduleDays).all();
+  const existingDays = await db.select().from(scheduleDays);
   if (existingDays.length === 0) {
     for (const day of DEFAULT_DAYS) {
-      db.insert(scheduleDays).values(day).run();
+      await db.insert(scheduleDays).values(day);
     }
   }
 }

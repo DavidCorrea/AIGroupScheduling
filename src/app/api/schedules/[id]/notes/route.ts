@@ -10,11 +10,10 @@ export async function GET(
   const { id } = await params;
   const scheduleId = parseInt(id, 10);
 
-  const notes = db
+  const notes = await db
     .select()
     .from(scheduleDateNotes)
-    .where(eq(scheduleDateNotes.scheduleId, scheduleId))
-    .all();
+    .where(eq(scheduleDateNotes.scheduleId, scheduleId));
 
   return NextResponse.json(notes);
 }
@@ -36,7 +35,7 @@ export async function POST(
   }
 
   // Check if a note already exists for this date
-  const existing = db
+  const existing = (await db
     .select()
     .from(scheduleDateNotes)
     .where(
@@ -44,25 +43,22 @@ export async function POST(
         eq(scheduleDateNotes.scheduleId, scheduleId),
         eq(scheduleDateNotes.date, date)
       )
-    )
-    .get();
+    ))[0];
 
   if (existing) {
     // Update existing note
-    db.update(scheduleDateNotes)
+    await db.update(scheduleDateNotes)
       .set({ description: description.trim() })
-      .where(eq(scheduleDateNotes.id, existing.id))
-      .run();
+      .where(eq(scheduleDateNotes.id, existing.id));
 
     return NextResponse.json({ ...existing, description: description.trim() });
   }
 
   // Create new note
-  const note = db
+  const note = (await db
     .insert(scheduleDateNotes)
     .values({ scheduleId, date, description: description.trim() })
-    .returning()
-    .get();
+    .returning())[0];
 
   return NextResponse.json(note, { status: 201 });
 }
@@ -83,14 +79,13 @@ export async function DELETE(
     );
   }
 
-  db.delete(scheduleDateNotes)
+  await db.delete(scheduleDateNotes)
     .where(
       and(
         eq(scheduleDateNotes.scheduleId, scheduleId),
         eq(scheduleDateNotes.date, date)
       )
-    )
-    .run();
+    );
 
   return NextResponse.json({ success: true });
 }

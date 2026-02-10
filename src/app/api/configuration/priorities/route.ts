@@ -7,9 +7,9 @@ import { seedDefaults } from "@/lib/seed";
 export async function GET() {
   seedDefaults();
 
-  const allPriorities = db.select().from(dayRolePriorities).all();
-  const allDays = db.select().from(scheduleDays).all();
-  const allRoles = db.select().from(roles).all();
+  const allPriorities = await db.select().from(dayRolePriorities);
+  const allDays = await db.select().from(scheduleDays);
+  const allRoles = await db.select().from(roles);
 
   // Enrich with names
   const enriched = allPriorities.map((p) => ({
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Check if priority already exists for this day+role combo
-  const existing = db
+  const existing = (await db
     .select()
     .from(dayRolePriorities)
     .where(
@@ -41,25 +41,22 @@ export async function POST(request: NextRequest) {
         eq(dayRolePriorities.scheduleDayId, scheduleDayId),
         eq(dayRolePriorities.roleId, roleId)
       )
-    )
-    .get();
+    ))[0];
 
   if (existing) {
     // Update
-    db.update(dayRolePriorities)
+    await db.update(dayRolePriorities)
       .set({ priority })
-      .where(eq(dayRolePriorities.id, existing.id))
-      .run();
+      .where(eq(dayRolePriorities.id, existing.id));
 
     return NextResponse.json({ ...existing, priority });
   }
 
   // Create
-  const created = db
+  const created = (await db
     .insert(dayRolePriorities)
     .values({ scheduleDayId, roleId, priority })
-    .returning()
-    .get();
+    .returning())[0];
 
   return NextResponse.json(created, { status: 201 });
 }
@@ -80,22 +77,19 @@ export async function PUT(request: NextRequest) {
   }
 
   // Delete all existing priorities for this day
-  db.delete(dayRolePriorities)
-    .where(eq(dayRolePriorities.scheduleDayId, scheduleDayId))
-    .run();
+  await db.delete(dayRolePriorities)
+    .where(eq(dayRolePriorities.scheduleDayId, scheduleDayId));
 
   // Insert new priorities
   for (const { roleId, priority } of priorities) {
-    db.insert(dayRolePriorities)
-      .values({ scheduleDayId, roleId, priority })
-      .run();
+    await db.insert(dayRolePriorities)
+      .values({ scheduleDayId, roleId, priority });
   }
 
-  const updated = db
+  const updated = await db
     .select()
     .from(dayRolePriorities)
-    .where(eq(dayRolePriorities.scheduleDayId, scheduleDayId))
-    .all();
+    .where(eq(dayRolePriorities.scheduleDayId, scheduleDayId));
 
   return NextResponse.json(updated);
 }
@@ -111,9 +105,8 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  db.delete(dayRolePriorities)
-    .where(eq(dayRolePriorities.scheduleDayId, parseInt(scheduleDayId, 10)))
-    .run();
+  await db.delete(dayRolePriorities)
+    .where(eq(dayRolePriorities.scheduleDayId, parseInt(scheduleDayId, 10)));
 
   return NextResponse.json({ success: true });
 }

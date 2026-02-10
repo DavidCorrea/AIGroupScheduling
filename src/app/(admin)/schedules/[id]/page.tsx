@@ -47,24 +47,24 @@ interface Member {
 }
 
 const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
 ];
 
 function formatDate(dateStr: string): string {
   const [year, month, day] = dateStr.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString("es-ES", {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -153,7 +153,7 @@ export default function SchedulePreviewPage() {
   };
 
   const handleCommit = async () => {
-    if (!confirm("Commit this schedule? It will be finalized and a share link will be generated."))
+    if (!confirm("¿Comprometer este cronograma? Se finalizará y se generará un enlace compartido."))
       return;
 
     const res = await fetch(`/api/schedules/${params.id}`, {
@@ -191,7 +191,7 @@ export default function SchedulePreviewPage() {
   };
 
   if (loading || !schedule) {
-    return <p className="text-muted-foreground">Loading...</p>;
+    return <p className="text-muted-foreground">Cargando...</p>;
   }
 
   // Group entries by date, also include rehearsal dates
@@ -224,18 +224,18 @@ export default function SchedulePreviewPage() {
           <p className="mt-1 text-muted-foreground">
             {schedule.status === "committed" ? (
               <>
-                Committed schedule.{" "}
+                Cronograma comprometido.{" "}
                 {schedule.shareToken && (
                   <a
                     href={`/shared/${schedule.shareToken}`}
                     className="text-primary hover:underline"
                   >
-                    View shared link
+                    Ver enlace compartido
                   </a>
                 )}
               </>
             ) : (
-              "Draft — review and edit before committing."
+              "Borrador — revisa y edita antes de comprometer."
             )}
           </p>
         </div>
@@ -244,7 +244,7 @@ export default function SchedulePreviewPage() {
             onClick={handleCommit}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
           >
-            Commit Schedule
+            Comprometer cronograma
           </button>
         )}
       </div>
@@ -255,7 +255,7 @@ export default function SchedulePreviewPage() {
           <thead>
             <tr>
               <th className="border border-border bg-muted px-4 py-2 text-left text-sm font-medium">
-                Date
+                Fecha
               </th>
               {roleOrder.map((role) => (
                 <th
@@ -285,7 +285,7 @@ export default function SchedulePreviewPage() {
                       {formatDate(date)}
                       {isRehearsal && (
                         <span className="ml-2 text-xs text-muted-foreground italic">
-                          Rehearsal
+                          Ensayo
                         </span>
                       )}
                     </div>
@@ -297,7 +297,7 @@ export default function SchedulePreviewPage() {
                           value={noteText}
                           onChange={(e) => setNoteText(e.target.value)}
                           className="flex-1 rounded border border-border bg-background px-2 py-0.5 text-xs"
-                          placeholder="Add a note..."
+                          placeholder="Agregar nota..."
                           autoFocus
                           onKeyDown={(e) => {
                             if (e.key === "Enter") saveNote(date);
@@ -308,7 +308,7 @@ export default function SchedulePreviewPage() {
                           onClick={() => saveNote(date)}
                           className="text-xs text-primary hover:underline"
                         >
-                          Save
+                          Guardar
                         </button>
                       </div>
                     ) : (
@@ -325,7 +325,7 @@ export default function SchedulePreviewPage() {
                             onClick={() => startEditNote(date)}
                             className="text-xs text-muted-foreground hover:text-primary hover:underline"
                           >
-                            + note
+                            + nota
                           </button>
                         )}
                       </div>
@@ -336,7 +336,7 @@ export default function SchedulePreviewPage() {
                       colSpan={roleOrder.length}
                       className="border border-border px-4 py-2 text-sm text-muted-foreground italic text-center"
                     >
-                      Rehearsal
+                      Ensayo
                     </td>
                   ) : (
                     roleOrder.map((role) => {
@@ -415,7 +415,7 @@ export default function SchedulePreviewPage() {
                                       }}
                                       onBlur={() => setSwapping(null)}
                                     >
-                                      <option value="">Select...</option>
+                                      <option value="">Seleccionar...</option>
                                       <option value="__remove__">— Vaciar —</option>
                                       {members
                                         .filter((m) =>
@@ -438,9 +438,9 @@ export default function SchedulePreviewPage() {
                                           })
                                         }
                                         className="text-xs text-primary hover:underline ml-1"
-                                        title="Swap member"
+                                        title="Cambiar miembro"
                                       >
-                                        swap
+                                        cambiar
                                       </button>
                                     </>
                                   )}
