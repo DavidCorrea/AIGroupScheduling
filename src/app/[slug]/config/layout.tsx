@@ -25,9 +25,9 @@ function AdminNav() {
 
   if (loading) {
     return (
-      <nav className="bg-card shadow-[0_1px_3px_var(--shadow-color)]">
+      <nav className="border-b border-border">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center">
+          <div className="flex h-14 items-center">
             <span className="text-muted-foreground text-sm">Cargando...</span>
           </div>
         </div>
@@ -37,9 +37,9 @@ function AdminNav() {
 
   if (error) {
     return (
-      <nav className="bg-card shadow-[0_1px_3px_var(--shadow-color)]">
+      <nav className="border-b border-border">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center">
+          <div className="flex h-14 items-center">
             <span className="text-destructive text-sm">Grupo no encontrado</span>
           </div>
         </div>
@@ -48,7 +48,7 @@ function AdminNav() {
   }
 
   return (
-    <nav className="bg-card shadow-[0_1px_3px_var(--shadow-color)] sticky top-0 z-40">
+    <nav className="border-b border-border sticky top-0 z-40 bg-background">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-14 items-center justify-between">
           {/* Breadcrumb */}
@@ -59,24 +59,24 @@ function AdminNav() {
             >
               ← Grupos
             </Link>
-            <span className="text-border">/</span>
-            <span className="text-base font-semibold text-foreground truncate">
+            <span className="text-muted-foreground">/</span>
+            <span className="text-sm font-medium text-foreground truncate uppercase tracking-wide">
               {groupName}
             </span>
           </div>
 
           {/* Desktop nav */}
-          <div className="hidden md:flex items-center gap-0.5">
+          <div className="hidden md:flex items-center gap-1">
             {navLinks.map((link) => {
               const active = isActive(link.href, link.exact);
               return (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                  className={`px-3 py-1.5 text-sm transition-colors ${
                     active
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      ? "text-foreground font-medium"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {link.label}
@@ -88,14 +88,14 @@ function AdminNav() {
           {/* Mobile menu button */}
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="md:hidden rounded-lg p-2.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="md:hidden p-2.5 text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Menú"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {mobileOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
               ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
               )}
             </svg>
           </button>
@@ -103,7 +103,7 @@ function AdminNav() {
 
         {/* Mobile nav */}
         {mobileOpen && (
-          <div className="md:hidden border-t border-border/50 py-2 pb-3">
+          <div className="md:hidden border-t border-border py-2 pb-3">
             {navLinks.map((link) => {
               const active = isActive(link.href, link.exact);
               return (
@@ -111,10 +111,10 @@ function AdminNav() {
                   key={link.href}
                   href={link.href}
                   onClick={() => setMobileOpen(false)}
-                  className={`block rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`block px-3 py-2.5 text-sm transition-colors ${
                     active
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      ? "text-foreground font-medium"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {link.label}
@@ -136,7 +136,7 @@ export default function AdminLayout({
   return (
     <GroupProvider>
       <AdminNav />
-      <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         {children}
       </main>
     </GroupProvider>

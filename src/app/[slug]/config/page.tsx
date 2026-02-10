@@ -38,25 +38,27 @@ export default function AdminHome() {
   ];
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-12">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Bienvenido a {groupName}</h1>
-        <p className="mt-2 text-muted-foreground">
-          Genera cronogramas justos y rotacionales para tu grupo. Configura miembros, roles y disponibilidad, luego genera cronogramas para cualquier mes.
+        <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl uppercase">
+          {groupName}
+        </h1>
+        <p className="mt-3 text-muted-foreground">
+          Genera cronogramas justos y rotacionales para tu grupo.
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-px sm:grid-cols-2 lg:grid-cols-3 border border-border rounded-md overflow-hidden">
         {cards.map((card) => (
           <Link
             key={card.href}
             href={card.href}
-            className="group rounded-xl border border-border/50 bg-card p-6 shadow-[0_1px_3px_var(--shadow-color)] hover:shadow-[0_4px_12px_var(--shadow-color)] hover:-translate-y-0.5 transition-all duration-200"
+            className="group p-6 border border-border -m-px bg-background hover:bg-muted transition-colors"
           >
-            <h2 className="text-base font-semibold group-hover:text-primary transition-colors">
+            <h2 className="text-sm font-medium group-hover:text-accent transition-colors">
               {card.label}
             </h2>
-            <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
               {card.description}
             </p>
           </Link>

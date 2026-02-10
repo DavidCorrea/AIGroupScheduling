@@ -75,100 +75,100 @@ export default function GroupsPage() {
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
         {/* Header */}
-        <div className="mb-10">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Cronogramas</h1>
-          <p className="mt-2 text-muted-foreground">
+        <div className="mb-12">
+          <h1 className="font-[family-name:var(--font-display)] text-4xl sm:text-5xl uppercase">Cronogramas</h1>
+          <p className="mt-3 text-muted-foreground">
             Selecciona un grupo para gestionar o crea uno nuevo.
           </p>
         </div>
 
         {/* Create group form */}
-        <form
-          onSubmit={handleSubmit}
-          className="mb-10 rounded-xl border border-border/50 bg-card p-6 shadow-[0_1px_3px_var(--shadow-color)]"
-        >
-          <h2 className="text-base font-semibold mb-4">Crear grupo</h2>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-                Nombre
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => handleNameChange(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
-                placeholder="Nombre del grupo"
-                required
-              />
+        <div className="mb-12 border-t border-border pt-8">
+          <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">Crear grupo</h2>
+          <form onSubmit={handleSubmit}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-sm text-muted-foreground mb-1.5">
+                  Nombre
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
+                  placeholder="Nombre del grupo"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-muted-foreground mb-1.5">
+                  Slug (URL)
+                </label>
+                <input
+                  type="text"
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value)}
+                  className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
+                  placeholder="slug-del-grupo"
+                  required
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-                Slug (URL)
-              </label>
-              <input
-                type="text"
-                value={slug}
-                onChange={(e) => setSlug(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
-                placeholder="slug-del-grupo"
-                required
-              />
-            </div>
-          </div>
 
-          {error && (
-            <p className="mt-3 text-sm text-destructive">{error}</p>
-          )}
+            {error && (
+              <p className="mt-3 text-sm text-destructive">{error}</p>
+            )}
 
-          <button
-            type="submit"
-            className="mt-4 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all"
-          >
-            Crear grupo
-          </button>
-        </form>
+            <button
+              type="submit"
+              className="mt-5 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+            >
+              Crear grupo
+            </button>
+          </form>
+        </div>
 
         {/* Groups list */}
-        <div className="space-y-3">
+        <div>
           {groups.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-muted/30 py-12 text-center">
+            <div className="border-t border-dashed border-border py-12 text-center">
               <p className="text-muted-foreground text-sm">
                 No hay grupos creados aún.
               </p>
-              <p className="text-muted-foreground/60 text-xs mt-1">
+              <p className="text-muted-foreground/50 text-xs mt-1">
                 Usa el formulario de arriba para crear el primero.
               </p>
             </div>
           ) : (
-            groups.map((group) => (
-              <div
-                key={group.id}
-                className="rounded-xl border border-border/50 bg-card p-4 sm:p-5 shadow-[0_1px_3px_var(--shadow-color)] hover:shadow-[0_4px_12px_var(--shadow-color)] hover:-translate-y-0.5 transition-all duration-200"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="font-semibold truncate">{group.name}</h3>
-                    <p className="text-sm text-muted-foreground mt-0.5">/{group.slug}</p>
-                  </div>
-                  <div className="flex gap-2 shrink-0">
-                    <Link
-                      href={`/${group.slug}/config`}
-                      className="flex-1 sm:flex-none text-center rounded-lg border border-border px-3.5 py-2 text-sm font-medium hover:bg-muted transition-colors"
-                    >
-                      Configurar
-                    </Link>
-                    <Link
-                      href={`/${group.slug}/cronograma`}
-                      className="flex-1 sm:flex-none text-center rounded-lg bg-primary/10 text-primary px-3.5 py-2 text-sm font-medium hover:bg-primary/20 transition-colors"
-                    >
-                      Ver cronograma
-                    </Link>
+            <div className="divide-y divide-border">
+              {groups.map((group) => (
+                <div
+                  key={group.id}
+                  className="py-5 first:pt-0"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="font-medium truncate">{group.name}</h3>
+                      <p className="text-sm text-muted-foreground mt-0.5">/{group.slug}</p>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <Link
+                        href={`/${group.slug}/config`}
+                        className="flex-1 sm:flex-none text-center rounded-md border border-border px-4 py-2 text-sm hover:border-foreground transition-colors"
+                      >
+                        Configurar
+                      </Link>
+                      <Link
+                        href={`/${group.slug}/cronograma`}
+                        className="flex-1 sm:flex-none text-center rounded-md border border-foreground px-4 py-2 text-sm font-medium hover:bg-foreground hover:text-background transition-colors"
+                      >
+                        Ver cronograma
+                      </Link>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
       </div>

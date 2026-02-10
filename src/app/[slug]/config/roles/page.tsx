@@ -187,24 +187,24 @@ export default function RolesPage() {
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Roles</h1>
-        <p className="mt-1.5 text-muted-foreground">
+        <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl uppercase">Roles</h1>
+        <p className="mt-3 text-muted-foreground">
           Define los roles necesarios para cada fecha de servicio, cuántas
           personas se requieren y sus grupos exclusivos.
         </p>
       </div>
 
       {/* ── Section 1: Roles ── */}
-      <section className="space-y-5">
-        <div>
-          <h2 className="text-lg font-semibold">Roles</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+      <section className="space-y-6">
+        <div className="border-t border-border pt-8">
+          <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">Roles</h2>
+          <p className="text-sm text-muted-foreground">
             Configura cada rol con la cantidad de personas requeridas,
             dependencias opcionales y grupo exclusivo.
           </p>
         </div>
 
-        <div className="rounded-xl border border-border/50 bg-muted/30 px-5 py-4 text-sm text-muted-foreground space-y-2">
+        <div className="border border-border rounded-md p-5 text-sm text-muted-foreground space-y-2">
           <p>
             <span className="font-medium text-foreground">Depende de:</span>{" "}
             El rol no se asigna automáticamente. Al generar el cronograma, se
@@ -224,13 +224,10 @@ export default function RolesPage() {
           </p>
         </div>
 
-        <div className="space-y-2">
+        <div className="divide-y divide-border">
           {roles.map((role) => (
-            <div
-              key={role.id}
-              className="rounded-xl border border-border/50 bg-card px-4 py-4 sm:px-5 shadow-[0_1px_2px_var(--shadow-color)] space-y-3"
-            >
-              {/* Role name + delete (always visible) */}
+            <div key={role.id} className="py-4 first:pt-0 space-y-3">
+              {/* Role name + delete */}
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   {editingRoleId === role.id ? (
@@ -244,11 +241,11 @@ export default function RolesPage() {
                       }}
                       onBlur={() => saveRoleName(role)}
                       autoFocus
-                      className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm font-medium focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 w-full max-w-[200px]"
+                      className="rounded-md border border-border bg-transparent px-2.5 py-1.5 text-sm font-medium focus:outline-none focus:border-foreground w-full max-w-[200px]"
                     />
                   ) : (
                     <span
-                      className="font-medium cursor-pointer hover:text-primary transition-colors truncate"
+                      className="font-medium cursor-pointer hover:text-accent transition-colors truncate"
                       onClick={() => {
                         setEditingRoleId(role.id);
                         setEditingRoleName(role.name);
@@ -261,14 +258,14 @@ export default function RolesPage() {
                 </div>
                 <button
                   onClick={() => deleteRole(role)}
-                  className="rounded-lg border border-destructive/30 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive hover:text-white transition-colors shrink-0"
+                  className="rounded-md border border-border px-3 py-1.5 text-xs text-destructive hover:border-destructive transition-colors shrink-0"
                   title="Eliminar rol"
                 >
                   Eliminar
                 </button>
               </div>
 
-              {/* Controls: stack on mobile, row on desktop */}
+              {/* Controls */}
               <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-3">
                 {/* Required count */}
                 <div className="flex items-center gap-2">
@@ -280,7 +277,7 @@ export default function RolesPage() {
                     onChange={(e) =>
                       updateRoleCount(role, parseInt(e.target.value, 10))
                     }
-                    className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm min-h-[36px]"
+                    className="rounded-md border border-border bg-transparent px-2 py-1.5 text-sm min-h-[36px]"
                   >
                     {[1, 2, 3, 4, 5, 6].map((n) => (
                       <option key={n} value={n}>
@@ -296,7 +293,7 @@ export default function RolesPage() {
                     type="checkbox"
                     checked={role.isRelevant}
                     onChange={() => toggleRelevant(role)}
-                    className="rounded border-border accent-primary w-4 h-4"
+                    className="rounded border-border w-4 h-4"
                   />
                   <span className="text-xs text-muted-foreground">Relevante</span>
                 </label>
@@ -318,7 +315,7 @@ export default function RolesPage() {
                           e.target.value ? parseInt(e.target.value, 10) : null
                         )
                       }
-                      className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm w-full sm:w-auto min-h-[36px]"
+                      className="rounded-md border border-border bg-transparent px-2 py-1.5 text-sm w-full sm:w-auto min-h-[36px]"
                     >
                       <option value="">Ninguno</option>
                       {roles
@@ -349,7 +346,7 @@ export default function RolesPage() {
                           e.target.value ? parseInt(e.target.value, 10) : null
                         )
                       }
-                      className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm w-full sm:w-auto min-h-[36px]"
+                      className="rounded-md border border-border bg-transparent px-2 py-1.5 text-sm w-full sm:w-auto min-h-[36px]"
                     >
                       <option value="">Ninguno</option>
                       {groups.map((g) => (
@@ -365,21 +362,21 @@ export default function RolesPage() {
           ))}
         </div>
 
-        <form onSubmit={addRole} className="space-y-3 sm:space-y-0 sm:flex sm:items-end sm:gap-3">
+        <form onSubmit={addRole} className="space-y-3 sm:space-y-0 sm:flex sm:items-end sm:gap-3 pt-4">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+            <label className="block text-sm text-muted-foreground mb-1.5">
               Nombre del nuevo rol
             </label>
             <input
               type="text"
               value={newRoleName}
               onChange={(e) => setNewRoleName(e.target.value)}
-              className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
               placeholder="ej. Saxofón"
             />
           </div>
           <div className="w-full sm:w-24">
-            <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+            <label className="block text-sm text-muted-foreground mb-1.5">
               Cantidad
             </label>
             <input
@@ -388,12 +385,12 @@ export default function RolesPage() {
               max={10}
               value={newRoleCount}
               onChange={(e) => setNewRoleCount(parseInt(e.target.value, 10))}
-              className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm focus:outline-none focus:border-foreground"
             />
           </div>
           <button
             type="submit"
-            className="w-full sm:w-auto rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all"
+            className="w-full sm:w-auto rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
           >
             Agregar rol
           </button>
@@ -401,32 +398,29 @@ export default function RolesPage() {
       </section>
 
       {/* ── Section 2: Grupos Exclusivos ── */}
-      <section className="space-y-5">
-        <div>
-          <h2 className="text-lg font-semibold">Grupos Exclusivos</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+      <section className="space-y-6">
+        <div className="border-t border-border pt-8">
+          <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">Grupos Exclusivos</h2>
+          <p className="text-sm text-muted-foreground">
             Los roles dentro del mismo grupo exclusivo no pueden asignarse al
             mismo miembro en la misma fecha.
           </p>
         </div>
 
         {groups.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border bg-muted/30 py-8 text-center">
+          <div className="border-t border-dashed border-border py-8 text-center">
             <p className="text-sm text-muted-foreground">
               No hay grupos exclusivos configurados.
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="divide-y divide-border">
             {groups.map((group) => (
-              <div
-                key={group.id}
-                className="flex items-center justify-between rounded-xl border border-border/50 bg-card px-5 py-3.5 shadow-[0_1px_2px_var(--shadow-color)]"
-              >
+              <div key={group.id} className="flex items-center justify-between py-3 first:pt-0">
                 <span className="font-medium">{group.name}</span>
                 <button
                   onClick={() => deleteGroup(group)}
-                  className="rounded-lg border border-destructive/30 px-3.5 py-1.5 text-sm font-medium text-destructive hover:bg-destructive hover:text-white transition-colors"
+                  className="rounded-md border border-border px-3.5 py-1.5 text-sm text-destructive hover:border-destructive transition-colors"
                 >
                   Eliminar
                 </button>
@@ -435,22 +429,22 @@ export default function RolesPage() {
           </div>
         )}
 
-        <form onSubmit={addGroup} className="space-y-3 sm:space-y-0 sm:flex sm:items-end sm:gap-3">
+        <form onSubmit={addGroup} className="space-y-3 sm:space-y-0 sm:flex sm:items-end sm:gap-3 pt-4">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+            <label className="block text-sm text-muted-foreground mb-1.5">
               Nombre del nuevo grupo
             </label>
             <input
               type="text"
               value={newGroupName}
               onChange={(e) => setNewGroupName(e.target.value)}
-              className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
               placeholder="ej. Instrumento"
             />
           </div>
           <button
             type="submit"
-            className="w-full sm:w-auto rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all"
+            className="w-full sm:w-auto rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
           >
             Agregar
           </button>

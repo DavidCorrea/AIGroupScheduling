@@ -136,7 +136,6 @@ export default function SchedulePreviewPage() {
 
   const handleAssign = async (date: string, roleId: number, memberId: number | null) => {
     if (memberId === null) {
-      // Unassign: find the existing entry for this dependent role on this date
       const entry = schedule?.entries.find(
         (e) => e.date === date && e.roleId === roleId
       );
@@ -203,8 +202,6 @@ export default function SchedulePreviewPage() {
   const entryDates = [...new Set(schedule.entries.map((e) => e.date))];
   const allDates = [...new Set([...entryDates, ...schedule.rehearsalDates])].sort();
 
-  // Get unique roles ordered by displayOrder
-  // Include both roles with entries AND dependent roles (which may have no entries yet)
   const entryRoleIds = new Set(schedule.entries.map((e) => e.roleId));
   const dependentRoleIds = new Set(
     (schedule.roles ?? [])
@@ -220,7 +217,7 @@ export default function SchedulePreviewPage() {
   const rehearsalSet = new Set(schedule.rehearsalDates);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -228,18 +225,18 @@ export default function SchedulePreviewPage() {
             {schedule.prevScheduleId && (
               <a
                 href={`/${slug}/config/schedules/${schedule.prevScheduleId}`}
-                className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors"
+                className="rounded-md border border-border px-3 py-2 text-sm hover:border-foreground transition-colors"
               >
                 ← Anterior
               </a>
             )}
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
+            <h1 className="font-[family-name:var(--font-display)] text-2xl sm:text-3xl uppercase">
               {MONTH_NAMES[schedule.month - 1]} {schedule.year}
             </h1>
             {schedule.nextScheduleId && (
               <a
                 href={`/${slug}/config/schedules/${schedule.nextScheduleId}`}
-                className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors"
+                className="rounded-md border border-border px-3 py-2 text-sm hover:border-foreground transition-colors"
               >
                 Siguiente →
               </a>
@@ -248,7 +245,7 @@ export default function SchedulePreviewPage() {
           {schedule.status === "draft" && (
             <button
               onClick={handleCommit}
-              className="w-full sm:w-auto rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all"
+              className="w-full sm:w-auto rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
             >
               Crear cronograma
             </button>
@@ -260,7 +257,7 @@ export default function SchedulePreviewPage() {
               Cronograma creado.{" "}
               <a
                 href={`/${slug}/cronograma/${schedule.year}/${schedule.month}`}
-                className="text-primary hover:text-primary/80 transition-colors"
+                className="text-accent hover:opacity-80 transition-opacity"
               >
                 Ver enlace compartido
               </a>
@@ -272,7 +269,7 @@ export default function SchedulePreviewPage() {
       </div>
 
       {/* Mobile card view */}
-      <div className="md:hidden space-y-3">
+      <div className="md:hidden space-y-px border border-border rounded-md overflow-hidden">
         {allDates.map((date) => {
           const isRehearsal = rehearsalSet.has(date);
           const entriesOnDate = schedule.entries.filter((e) => e.date === date);
@@ -281,12 +278,10 @@ export default function SchedulePreviewPage() {
           return (
             <div
               key={date}
-              className={`rounded-xl border border-border/50 bg-card shadow-[0_1px_2px_var(--shadow-color)] overflow-hidden ${
-                isRehearsal ? "bg-muted/20" : ""
-              }`}
+              className={`bg-background ${isRehearsal ? "bg-muted/30" : ""}`}
             >
               {/* Date header */}
-              <div className="px-4 py-3 bg-muted/40 border-b border-border/30">
+              <div className="px-4 py-3 border-b border-border">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-sm">{formatDate(date)}</span>
                   {isRehearsal && (
@@ -300,7 +295,7 @@ export default function SchedulePreviewPage() {
                       type="text"
                       value={noteText}
                       onChange={(e) => setNoteText(e.target.value)}
-                      className="flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-xs"
+                      className="flex-1 rounded-md border border-border bg-transparent px-3 py-1.5 text-xs"
                       placeholder="Agregar nota..."
                       autoFocus
                       onKeyDown={(e) => {
@@ -310,7 +305,7 @@ export default function SchedulePreviewPage() {
                     />
                     <button
                       onClick={() => saveNote(date)}
-                      className="text-xs text-primary px-2 py-1.5 hover:text-primary/80 transition-colors"
+                      className="text-xs text-accent px-2 py-1.5 hover:opacity-80 transition-opacity"
                     >
                       Guardar
                     </button>
@@ -319,7 +314,7 @@ export default function SchedulePreviewPage() {
                   <div className="mt-1">
                     {note ? (
                       <span
-                        className="text-xs text-primary cursor-pointer hover:text-primary/80 transition-colors"
+                        className="text-xs text-accent cursor-pointer hover:opacity-80 transition-opacity"
                         onClick={() => startEditNote(date)}
                       >
                         {note}
@@ -327,7 +322,7 @@ export default function SchedulePreviewPage() {
                     ) : (
                       <button
                         onClick={() => startEditNote(date)}
-                        className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                        className="text-xs text-muted-foreground hover:text-accent transition-colors"
                       >
                         + nota
                       </button>
@@ -338,11 +333,11 @@ export default function SchedulePreviewPage() {
 
               {/* Role entries */}
               {isRehearsal ? (
-                <div className="px-4 py-3 text-sm text-muted-foreground italic text-center">
+                <div className="px-4 py-3 text-sm text-muted-foreground italic text-center border-b border-border">
                   Ensayo
                 </div>
               ) : (
-                <div className="divide-y divide-border/30">
+                <div className="divide-y divide-border">
                   {roleOrder.map((role) => {
                     const roleEntries = entriesOnDate.filter((e) => e.roleId === role.id);
                     const isDependentRole = role.dependsOnRoleId != null;
@@ -359,7 +354,7 @@ export default function SchedulePreviewPage() {
                         <div key={role.id} className="px-4 py-3">
                           <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1.5">{role.name}</div>
                           <select
-                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm w-full min-h-[40px]"
+                            className="rounded-md border border-border bg-transparent px-3 py-2 text-sm w-full min-h-[40px]"
                             value={currentEntry?.memberId ?? ""}
                             onChange={(e) => {
                               const val = e.target.value;
@@ -387,7 +382,7 @@ export default function SchedulePreviewPage() {
                                 {swapping?.entryId === entry.id ? (
                                   <select
                                     autoFocus
-                                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm w-full min-h-[40px]"
+                                    className="rounded-md border border-border bg-transparent px-3 py-2 text-sm w-full min-h-[40px]"
                                     defaultValue=""
                                     onChange={(e) => {
                                       if (e.target.value === "__remove__") {
@@ -411,7 +406,7 @@ export default function SchedulePreviewPage() {
                                     <span className="text-sm">{entry.memberName}</span>
                                     <button
                                       onClick={() => setSwapping({ entryId: entry.id, roleId: role.id })}
-                                      className="text-xs text-primary hover:text-primary/80 px-2 py-1 transition-colors"
+                                      className="text-xs text-accent hover:opacity-80 px-2 py-1 transition-opacity"
                                       title="Cambiar miembro"
                                     >
                                       cambiar
@@ -433,17 +428,17 @@ export default function SchedulePreviewPage() {
       </div>
 
       {/* Desktop table view */}
-      <div className="hidden md:block overflow-x-auto rounded-xl border border-border/50 shadow-[0_1px_3px_var(--shadow-color)]">
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
-            <tr>
-              <th className="border-b border-r border-border/50 bg-muted/50 px-4 py-3 text-left text-sm font-semibold">
+            <tr className="border-b border-border">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-muted-foreground">
                 Fecha
               </th>
               {roleOrder.map((role) => (
                 <th
                   key={role.id}
-                  className="border-b border-r border-border/50 bg-muted/50 px-4 py-3 text-left text-sm font-semibold"
+                  className="px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-muted-foreground"
                 >
                   {role.name}
                 </th>
@@ -451,7 +446,7 @@ export default function SchedulePreviewPage() {
             </tr>
           </thead>
           <tbody>
-            {allDates.map((date, dateIndex) => {
+            {allDates.map((date) => {
               const isRehearsal = rehearsalSet.has(date);
               const entriesOnDate = schedule.entries.filter(
                 (e) => e.date === date
@@ -461,9 +456,9 @@ export default function SchedulePreviewPage() {
               return (
                 <tr
                   key={date}
-                  className={`${isRehearsal ? "bg-muted/30" : dateIndex % 2 === 0 ? "bg-card" : "bg-muted/10"} hover:bg-accent/30 transition-colors`}
+                  className={`border-b border-border ${isRehearsal ? "bg-muted/20" : "hover:bg-muted/30"} transition-colors`}
                 >
-                  <td className="border-b border-r border-border/30 px-4 py-3 text-sm font-medium whitespace-nowrap">
+                  <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">
                     <div>
                       {formatDate(date)}
                       {isRehearsal && (
@@ -478,7 +473,7 @@ export default function SchedulePreviewPage() {
                           type="text"
                           value={noteText}
                           onChange={(e) => setNoteText(e.target.value)}
-                          className="flex-1 rounded-lg border border-border bg-background px-2 py-1 text-xs"
+                          className="flex-1 rounded-md border border-border bg-transparent px-2 py-1 text-xs"
                           placeholder="Agregar nota..."
                           autoFocus
                           onKeyDown={(e) => {
@@ -488,7 +483,7 @@ export default function SchedulePreviewPage() {
                         />
                         <button
                           onClick={() => saveNote(date)}
-                          className="text-xs text-primary hover:text-primary/80 transition-colors"
+                          className="text-xs text-accent hover:opacity-80 transition-opacity"
                         >
                           Guardar
                         </button>
@@ -497,7 +492,7 @@ export default function SchedulePreviewPage() {
                       <div className="mt-0.5">
                         {note ? (
                           <span
-                            className="text-xs text-primary cursor-pointer hover:text-primary/80 transition-colors"
+                            className="text-xs text-accent cursor-pointer hover:opacity-80 transition-opacity"
                             onClick={() => startEditNote(date)}
                           >
                             {note}
@@ -505,7 +500,7 @@ export default function SchedulePreviewPage() {
                         ) : (
                           <button
                             onClick={() => startEditNote(date)}
-                            className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                            className="text-xs text-muted-foreground hover:text-accent transition-colors"
                           >
                             + nota
                           </button>
@@ -516,7 +511,7 @@ export default function SchedulePreviewPage() {
                   {isRehearsal ? (
                     <td
                       colSpan={roleOrder.length}
-                      className="border-b border-border/30 px-4 py-3 text-sm text-muted-foreground italic text-center"
+                      className="px-4 py-3 text-sm text-muted-foreground italic text-center"
                     >
                       Ensayo
                     </td>
@@ -536,12 +531,9 @@ export default function SchedulePreviewPage() {
                           });
                         const currentEntry = roleEntries[0] ?? null;
                         return (
-                          <td
-                            key={role.id}
-                            className="border-b border-r border-border/30 px-4 py-3 text-sm"
-                          >
+                          <td key={role.id} className="px-4 py-3 text-sm">
                             <select
-                              className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm w-full"
+                              className="rounded-md border border-border bg-transparent px-2.5 py-1.5 text-sm w-full"
                               value={currentEntry?.memberId ?? ""}
                               onChange={(e) => {
                                 const val = e.target.value;
@@ -564,10 +556,7 @@ export default function SchedulePreviewPage() {
                       }
 
                       return (
-                        <td
-                          key={role.id}
-                          className="border-b border-r border-border/30 px-4 py-3 text-sm"
-                        >
+                        <td key={role.id} className="px-4 py-3 text-sm">
                           {roleEntries.length === 0 ? (
                             <span className="text-muted-foreground/50">
                               —
@@ -582,7 +571,7 @@ export default function SchedulePreviewPage() {
                                   {swapping?.entryId === entry.id ? (
                                     <select
                                       autoFocus
-                                      className="rounded-lg border border-border bg-background px-2 py-1 text-sm"
+                                      className="rounded-md border border-border bg-transparent px-2 py-1 text-sm"
                                       defaultValue=""
                                       onChange={(e) => {
                                         if (e.target.value === "__remove__") {
@@ -618,7 +607,7 @@ export default function SchedulePreviewPage() {
                                             roleId: role.id,
                                           })
                                         }
-                                        className="text-xs text-primary hover:text-primary/80 ml-1 transition-colors"
+                                        className="text-xs text-accent hover:opacity-80 ml-1 transition-opacity"
                                         title="Cambiar miembro"
                                       >
                                         cambiar
