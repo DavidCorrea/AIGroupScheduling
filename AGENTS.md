@@ -8,6 +8,9 @@
 - All requests must be analyzed and split into units of work in such way that they can be done in parallel, if possible.
 - Parallel work should be tacked by as many subagents as it is fit.
 
+# UI
+- Any client-facing content must be in Spanish.
+
 # Code style guidelines
 - Ensure clean code practices are followed
 - Do not perform any changes without having explicit confirmation from the Prompter

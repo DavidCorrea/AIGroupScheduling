@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   const body = await request.json();
-  const { id, name, requiredCount, dependsOnRoleId, exclusiveGroup } = body;
+  const { id, name, requiredCount, dependsOnRoleId, exclusiveGroupId } = body;
 
   if (!id) {
     return NextResponse.json(
@@ -54,11 +54,11 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: "Role not found" }, { status: 404 });
   }
 
-  const updates: Partial<{ name: string; requiredCount: number; dependsOnRoleId: number | null; exclusiveGroup: string | null }> = {};
+  const updates: Partial<{ name: string; requiredCount: number; dependsOnRoleId: number | null; exclusiveGroupId: number | null }> = {};
   if (name !== undefined) updates.name = name.trim();
   if (requiredCount !== undefined) updates.requiredCount = requiredCount;
   if (dependsOnRoleId !== undefined) updates.dependsOnRoleId = dependsOnRoleId;
-  if (exclusiveGroup !== undefined) updates.exclusiveGroup = exclusiveGroup;
+  if (exclusiveGroupId !== undefined) updates.exclusiveGroupId = exclusiveGroupId;
 
   await db.update(roles).set(updates).where(eq(roles.id, id));
 

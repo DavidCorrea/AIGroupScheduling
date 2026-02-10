@@ -2,7 +2,7 @@ export interface RoleDefinition {
   id: number;
   name: string;
   requiredCount: number;
-  exclusiveGroup?: string | null;
+  exclusiveGroupId?: number | null;
 }
 
 export interface MemberInfo {

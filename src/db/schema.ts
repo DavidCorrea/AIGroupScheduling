@@ -5,13 +5,18 @@ export const members = pgTable("members", {
   name: text("name").notNull(),
 });
 
+export const exclusiveGroups = pgTable("exclusive_groups", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+});
+
 export const roles = pgTable("roles", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   requiredCount: integer("required_count").notNull().default(1),
   displayOrder: integer("display_order").notNull().default(0),
   dependsOnRoleId: integer("depends_on_role_id"),
-  exclusiveGroup: text("exclusive_group"),
+  exclusiveGroupId: integer("exclusive_group_id").references(() => exclusiveGroups.id, { onDelete: "set null" }),
 });
 
 export const memberRoles = pgTable("member_roles", {

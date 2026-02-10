@@ -1,9 +1,34 @@
 {
-  "id": "ecadd32c-3061-46c4-bc92-f515c0a18700",
-  "prevId": "31d698c9-a307-48e7-ba15-53c5778726e2",
+  "id": "79bf779e-66c8-4efd-9b95-82cc174e7988",
+  "prevId": "fc52326c-aeab-4d4b-bc50-41b36a7f6a3a",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.exclusive_groups": {
+      "name": "exclusive_groups",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.holidays": {
       "name": "holidays",
       "schema": "",
@@ -238,15 +263,29 @@
           "primaryKey": false,
           "notNull": false
         },
-        "exclusive_group": {
-          "name": "exclusive_group",
-          "type": "text",
+        "exclusive_group_id": {
+          "name": "exclusive_group_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "roles_exclusive_group_id_exclusive_groups_id_fk": {
+          "name": "roles_exclusive_group_id_exclusive_groups_id_fk",
+          "tableFrom": "roles",
+          "tableTo": "exclusive_groups",
+          "columnsFrom": [
+            "exclusive_group_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},

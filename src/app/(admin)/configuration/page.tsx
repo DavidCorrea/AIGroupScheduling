@@ -209,19 +209,11 @@ export default function ConfigurationPage() {
   const [priorities, setPriorities] = useState<DayRolePriority[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // New role form
-  const [newRoleName, setNewRoleName] = useState("");
-  const [newRoleCount, setNewRoleCount] = useState(1);
-
   // Holiday form
   const [holidayMemberId, setHolidayMemberId] = useState<number | "">("");
   const [holidayStart, setHolidayStart] = useState("");
   const [holidayEnd, setHolidayEnd] = useState("");
   const [holidayDescription, setHolidayDescription] = useState("");
-
-  // Role editing
-  const [editingRoleId, setEditingRoleId] = useState<number | null>(null);
-  const [editingRoleName, setEditingRoleName] = useState("");
 
   // Priority editing
   const [editingPriorityDay, setEditingPriorityDay] = useState<number | null>(
@@ -263,77 +255,6 @@ export default function ConfigurationPage() {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: day.id, isRehearsal: !day.isRehearsal }),
-    });
-    fetchData();
-  };
-
-  const addRole = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newRoleName.trim()) return;
-    await fetch("/api/configuration/roles", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: newRoleName.trim(),
-        requiredCount: newRoleCount,
-      }),
-    });
-    setNewRoleName("");
-    setNewRoleCount(1);
-    fetchData();
-  };
-
-  const updateRoleCount = async (role: Role, newCount: number) => {
-    await fetch("/api/configuration/roles", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: role.id, requiredCount: newCount }),
-    });
-    fetchData();
-  };
-
-  const saveRoleName = async (role: Role) => {
-    const trimmed = editingRoleName.trim();
-    if (!trimmed || trimmed === role.name) {
-      setEditingRoleId(null);
-      return;
-    }
-    await fetch("/api/configuration/roles", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: role.id, name: trimmed }),
-    });
-    setEditingRoleId(null);
-    fetchData();
-  };
-
-  const updateRoleDependency = async (role: Role, dependsOnRoleId: number | null) => {
-    await fetch("/api/configuration/roles", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: role.id, dependsOnRoleId }),
-    });
-    fetchData();
-  };
-
-  const updateRoleExclusiveGroup = async (role: Role, exclusiveGroup: string | null) => {
-    await fetch("/api/configuration/roles", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: role.id, exclusiveGroup }),
-    });
-    fetchData();
-  };
-
-  const deleteRole = async (role: Role) => {
-    if (
-      !confirm(
-        `¿Eliminar "${role.name}"? Esto también eliminará todas las entradas de cronograma para este rol de cada cronograma.`
-      )
-    )
-      return;
-    await fetch(`/api/configuration/roles?id=${role.id}`, {
-      method: "DELETE",
     });
     fetchData();
   };
@@ -395,7 +316,7 @@ export default function ConfigurationPage() {
       <div>
         <h1 className="text-2xl font-bold">Configuración</h1>
         <p className="mt-1 text-muted-foreground">
-          Configura roles, días activos y gestiona vacaciones de miembros.
+          Configura días activos, orden de columnas, prioridades de roles y gestiona vacaciones de miembros.
         </p>
       </div>
 
@@ -443,154 +364,6 @@ export default function ConfigurationPage() {
             </button>
           ))}
         </div>
-      </section>
-
-      {/* Roles */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Roles</h2>
-        <p className="text-sm text-muted-foreground">
-          Define los roles necesarios para cada fecha de servicio y cuántas personas se requieren por rol.
-        </p>
-
-        <div className="space-y-2">
-          {roles.map((role) => (
-            <div
-              key={role.id}
-              className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3"
-            >
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                {editingRoleId === role.id ? (
-                  <input
-                    type="text"
-                    value={editingRoleName}
-                    onChange={(e) => setEditingRoleName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") saveRoleName(role);
-                      if (e.key === "Escape") setEditingRoleId(null);
-                    }}
-                    onBlur={() => saveRoleName(role)}
-                    autoFocus
-                    className="rounded-md border border-border bg-background px-2 py-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary w-48"
-                  />
-                ) : (
-                  <span
-                    className="font-medium cursor-pointer hover:text-primary transition-colors"
-                    onClick={() => {
-                      setEditingRoleId(role.id);
-                      setEditingRoleName(role.name);
-                    }}
-                    title="Clic para renombrar"
-                  >
-                    {role.name}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <label className="text-sm text-muted-foreground">
-                    Requeridos:
-                  </label>
-                  <select
-                    value={role.requiredCount}
-                    onChange={(e) =>
-                      updateRoleCount(role, parseInt(e.target.value, 10))
-                    }
-                    className="rounded-md border border-border bg-background px-2 py-1 text-sm"
-                  >
-                    {[1, 2, 3, 4, 5, 6].map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-sm text-muted-foreground">
-                    Depende de:
-                  </label>
-                  <select
-                    value={role.dependsOnRoleId ?? ""}
-                    onChange={(e) =>
-                      updateRoleDependency(
-                        role,
-                        e.target.value ? parseInt(e.target.value, 10) : null
-                      )
-                    }
-                    className="rounded-md border border-border bg-background px-2 py-1 text-sm"
-                  >
-                    <option value="">Ninguno</option>
-                    {roles
-                      .filter((r) => r.id !== role.id)
-                      .map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-sm text-muted-foreground">
-                    Grupo exclusivo:
-                  </label>
-                  <input
-                    type="text"
-                    defaultValue={role.exclusiveGroup ?? ""}
-                    onBlur={(e) => {
-                      const val = e.target.value.trim() || null;
-                      if (val !== (role.exclusiveGroup ?? null)) {
-                        updateRoleExclusiveGroup(role, val);
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                    }}
-                    placeholder="Ninguno"
-                    className="rounded-md border border-border bg-background px-2 py-1 text-sm w-32"
-                  />
-                </div>
-                <button
-                  onClick={() => deleteRole(role)}
-                  className="rounded-md border border-destructive px-2 py-1 text-xs text-destructive hover:bg-destructive hover:text-white transition-colors"
-                  title="Delete role"
-                >
-                  Eliminar
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <form onSubmit={addRole} className="flex items-end gap-3">
-          <div className="flex-1">
-            <label className="block text-sm font-medium mb-1">
-              Nombre del nuevo rol
-            </label>
-            <input
-              type="text"
-              value={newRoleName}
-              onChange={(e) => setNewRoleName(e.target.value)}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="ej. Saxofón"
-            />
-          </div>
-          <div className="w-24">
-            <label className="block text-sm font-medium mb-1">Cantidad</label>
-            <input
-              type="number"
-              min={1}
-              max={10}
-              value={newRoleCount}
-              onChange={(e) => setNewRoleCount(parseInt(e.target.value, 10))}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-          <button
-            type="submit"
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
-          >
-            Agregar rol
-          </button>
-        </form>
       </section>
 
       {/* Column Order */}

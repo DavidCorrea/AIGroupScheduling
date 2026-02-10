@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       id: r.id,
       name: r.name,
       requiredCount: r.requiredCount,
-      exclusiveGroup: r.exclusiveGroup,
+      exclusiveGroupId: r.exclusiveGroupId,
     }));
 
   // Build member info

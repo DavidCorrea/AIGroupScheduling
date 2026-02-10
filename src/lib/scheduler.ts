@@ -155,7 +155,7 @@ export function generateSchedule(input: SchedulerInput): SchedulerOutput {
   for (const date of dates) {
     const dayOfWeek = getDayOfWeek(date);
     // Track which exclusive groups each member is already filling on this date
-    const memberGroupsOnDate = new Map<number, Set<string>>();
+    const memberGroupsOnDate = new Map<number, Set<number>>();
     // Track which role IDs each member is already assigned on this date (to prevent duplicates)
     const memberRolesOnDate = new Map<number, Set<number>>();
 
@@ -179,8 +179,8 @@ export function generateSchedule(input: SchedulerInput): SchedulerOutput {
           if (!m.availableDays.includes(dayOfWeek)) return false;
           if (isOnHoliday(m, date)) return false;
           if (memberRolesOnDate.get(m.id)?.has(role.id)) return false;
-          if (role.exclusiveGroup) {
-            if (memberGroupsOnDate.get(m.id)?.has(role.exclusiveGroup)) return false;
+          if (role.exclusiveGroupId) {
+            if (memberGroupsOnDate.get(m.id)?.has(role.exclusiveGroupId)) return false;
           }
           return true;
         };
@@ -197,11 +197,11 @@ export function generateSchedule(input: SchedulerInput): SchedulerOutput {
         dayPointers.set(dayOfWeek, result.newPointer);
 
         // Track exclusive group membership
-        if (role.exclusiveGroup) {
+        if (role.exclusiveGroupId != null) {
           if (!memberGroupsOnDate.has(chosen.id)) {
             memberGroupsOnDate.set(chosen.id, new Set());
           }
-          memberGroupsOnDate.get(chosen.id)!.add(role.exclusiveGroup);
+          memberGroupsOnDate.get(chosen.id)!.add(role.exclusiveGroupId);
         }
         // Track assigned role IDs to prevent duplicates
         if (!memberRolesOnDate.has(chosen.id)) {

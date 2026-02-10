@@ -4,7 +4,7 @@
 - Next.js 16 with App Router, TypeScript, Tailwind CSS
 - Drizzle ORM with PostgreSQL (postgres-js driver, Neon-hosted) for data persistence
 - Jest with ts-jest for testing (TDD)
-- Database schema with tables: members, roles, member_roles, schedule_days, member_availability, holidays, schedules, schedule_entries, schedule_date_notes, schedule_rehearsal_dates, day_role_priorities
+- Database schema with tables: members, exclusive_groups, roles, member_roles, schedule_days, member_availability, holidays, schedules, schedule_entries, schedule_date_notes, schedule_rehearsal_dates, day_role_priorities
 
 ### Scripts
 - `npm run dev` — Start the dev server
@@ -22,7 +22,7 @@
 - Previous assignments can be passed in to initialise each role's per-day pointer to the position after the last assigned member on that day of the week, ensuring seamless rotation continuity across months
 - **Configurable role dependencies (manual selection)**: Any role can be configured to depend on another via the `dependsOnRoleId` column (nullable FK on the `roles` table). Dependent roles (e.g., Leader depends on Voice) are **not** auto-assigned by the scheduler. Instead, they are left empty during schedule generation and the user manually picks the member from a dropdown in the schedule detail UI. The dropdown is populated with members already assigned to the source role on that date. The API supports `assign` and `unassign` actions for dependent role entries with validation (the member must be assigned to the source role on that date). By default, Leader depends on Voice (configured in the seed and the Configuration UI via a "Depends on" dropdown)
 - **Per-day-of-week rotation for all roles**: All roles use per-day-of-week round-robin pointers, ensuring fair rotation within each day independently (e.g., playing drums on Wednesday does not affect the Sunday drummer rotation)
-- **Exclusive role groups**: Roles can be assigned an optional `exclusiveGroup` string (e.g., `"Instrumento"`). Two roles sharing the same group cannot be assigned to the same member on the same date. Roles with no group or different groups can coexist freely on the same member. This prevents, for example, a member from being assigned both Keyboard and Electric Guitar on the same date while still allowing them to sing (Voice) and play an instrument simultaneously
+- **Exclusive role groups**: Roles can be assigned to an exclusive group via the `exclusive_groups` table (FK `exclusive_group_id` on `roles`). Two roles sharing the same group cannot be assigned to the same member on the same date. Roles with no group or different groups can coexist freely on the same member. This prevents, for example, a member from being assigned both Keyboard and Electric Guitar on the same date while still allowing them to sing (Voice) and play an instrument simultaneously. Groups are managed from the `/roles` page via CRUD API at `/api/configuration/exclusive-groups`
 - **Day role priorities**: When `dayRolePriorities` is provided, roles are sorted by day-specific priority before filling (lower priority number = filled first)
 
 ## Member Management
@@ -31,14 +31,19 @@
 - Each member can set which active days of the week they are available
 - API routes: `GET/POST /api/members`, `GET/PUT/DELETE /api/members/[id]`
 
+## Role Management
+- Dedicated `/roles` page for managing roles and exclusive groups
+- **Roles**: View, add, rename, delete, and configure roles with required person counts, optional dependencies (e.g., Leader depends on Voice), and optional exclusive groups via dropdown. Deleting a role cascade-deletes all schedule entries and member associations for that role
+- **Exclusive Groups**: CRUD management of exclusive groups (e.g., "Instrumento"). Deleting a group sets referencing roles' `exclusiveGroupId` to null
+- API routes: `/api/configuration/roles`, `/api/configuration/exclusive-groups`
+
 ## Configuration
 - **Active Days**: Toggle which days of the week are included in schedules (defaults: Wednesday, Friday, Sunday)
 - **Rehearsal Days**: Toggle which days of the week are rehearsal days; these appear in the schedule without member assignments
-- **Roles**: View, add, rename, delete, and configure roles with required person counts (e.g., Keyboard needs 2, Voice needs 4), optional dependencies (e.g., Leader depends on Voice), and optional exclusive groups (e.g., all instrument roles share the `"Instrumento"` group to prevent a member from playing two instruments on the same date). Deleting a role cascade-deletes all schedule entries and member associations for that role
 - **Column Order**: Configurable display order for role columns in all schedule views (admin preview, shared link, current month). Uses up/down arrows in the configuration page with a save button. New roles are appended at the end. The `displayOrder` column on the `roles` table controls ordering; the API supports batch reorder via `PATCH /api/configuration/roles`
 - **Role Priorities by Day**: Set the fill order of roles per day of the week (e.g., prioritise Acoustic Guitar over Electric Guitar on Wednesdays)
 - **Holidays**: Set date ranges when specific members are unavailable
-- API routes: `/api/configuration/roles`, `/api/configuration/days`, `/api/configuration/holidays`, `/api/configuration/priorities`
+- API routes: `/api/configuration/days`, `/api/configuration/holidays`, `/api/configuration/priorities`
 
 ## Schedule Generation & Preview
 - Generate schedules for one or more months at a time via `/schedules`
@@ -80,7 +85,6 @@
 - Set credentials as environment variables on your hosting provider
 - `.env.example` documents the required variables for local development (copy to `.env.local`)
 
-## Default Seed Roles
-- Leader (1, depends on Voice), Teclado Principal (1, Instrumento), Teclado Auxiliar (1, Instrumento), Electric Guitar (1, Instrumento), Acoustic Guitar (1, Instrumento), Bass (1, Instrumento), Drums (1, Instrumento), Voice (4)
-- All instrument roles share the `"Instrumento"` exclusive group by default
-- Existing databases keep their current roles; the seed only applies to empty databases
+## Default Seeds
+- Schedule days are seeded on first access if the `schedule_days` table is empty (defaults: Wednesday, Friday, Sunday active)
+- No default roles are seeded; roles and exclusive groups are configured by the user via the `/roles` page

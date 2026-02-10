@@ -1,6 +1,6 @@
 {
-  "id": "a1983b3c-0655-4bb8-9369-b85cc97dfe76",
-  "prevId": "403ccca3-c9ee-4561-86ec-31f78a54db7c",
+  "id": "f0c20617-273f-4977-bb9d-fdd582a5f936",
+  "prevId": "f93f70cc-38f3-4c89-82c5-00e04e1392ed",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -63,6 +63,31 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.exclusive_groups": {
+      "name": "exclusive_groups",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -303,15 +328,29 @@
           "primaryKey": false,
           "notNull": false
         },
-        "exclusive_group": {
-          "name": "exclusive_group",
-          "type": "text",
+        "exclusive_group_id": {
+          "name": "exclusive_group_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "roles_exclusive_group_id_exclusive_groups_id_fk": {
+          "name": "roles_exclusive_group_id_exclusive_groups_id_fk",
+          "tableFrom": "roles",
+          "tableTo": "exclusive_groups",
+          "columnsFrom": [
+            "exclusive_group_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},

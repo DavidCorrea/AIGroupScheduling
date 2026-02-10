@@ -22,6 +22,16 @@ export default function Home() {
         </Link>
 
         <Link
+          href="/roles"
+          className="rounded-lg border border-border bg-card p-6 hover:border-primary transition-colors"
+        >
+          <h2 className="text-lg font-semibold">Roles</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Define roles, cantidades requeridas y grupos exclusivos.
+          </p>
+        </Link>
+
+        <Link
           href="/configuration"
           className="rounded-lg border border-border bg-card p-6 hover:border-primary transition-colors"
         >

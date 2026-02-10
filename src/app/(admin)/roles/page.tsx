@@ -1,0 +1,382 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+
+interface Role {
+  id: number;
+  name: string;
+  requiredCount: number;
+  displayOrder: number;
+  dependsOnRoleId: number | null;
+  exclusiveGroupId: number | null;
+}
+
+interface ExclusiveGroup {
+  id: number;
+  name: string;
+}
+
+export default function RolesPage() {
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [groups, setGroups] = useState<ExclusiveGroup[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // New group form
+  const [newGroupName, setNewGroupName] = useState("");
+
+  // New role form
+  const [newRoleName, setNewRoleName] = useState("");
+  const [newRoleCount, setNewRoleCount] = useState(1);
+
+  // Role name editing
+  const [editingRoleId, setEditingRoleId] = useState<number | null>(null);
+  const [editingRoleName, setEditingRoleName] = useState("");
+
+  const fetchData = useCallback(async () => {
+    const [rolesRes, groupsRes] = await Promise.all([
+      fetch("/api/configuration/roles"),
+      fetch("/api/configuration/exclusive-groups"),
+    ]);
+    setRoles(await rolesRes.json());
+    setGroups(await groupsRes.json());
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // ── Exclusive Groups ──
+
+  const addGroup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newGroupName.trim()) return;
+    await fetch("/api/configuration/exclusive-groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newGroupName.trim() }),
+    });
+    setNewGroupName("");
+    fetchData();
+  };
+
+  const deleteGroup = async (group: ExclusiveGroup) => {
+    if (
+      !confirm(
+        "¿Eliminar este grupo exclusivo? Los roles asociados perderán su grupo."
+      )
+    )
+      return;
+    await fetch(`/api/configuration/exclusive-groups?id=${group.id}`, {
+      method: "DELETE",
+    });
+    fetchData();
+  };
+
+  // ── Roles ──
+
+  const addRole = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRoleName.trim()) return;
+    await fetch("/api/configuration/roles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: newRoleName.trim(),
+        requiredCount: newRoleCount,
+      }),
+    });
+    setNewRoleName("");
+    setNewRoleCount(1);
+    fetchData();
+  };
+
+  const saveRoleName = async (role: Role) => {
+    const trimmed = editingRoleName.trim();
+    if (!trimmed || trimmed === role.name) {
+      setEditingRoleId(null);
+      return;
+    }
+    await fetch("/api/configuration/roles", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: role.id, name: trimmed }),
+    });
+    setEditingRoleId(null);
+    fetchData();
+  };
+
+  const updateRoleCount = async (role: Role, newCount: number) => {
+    await fetch("/api/configuration/roles", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: role.id, requiredCount: newCount }),
+    });
+    fetchData();
+  };
+
+  const updateRoleDependency = async (
+    role: Role,
+    dependsOnRoleId: number | null
+  ) => {
+    await fetch("/api/configuration/roles", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: role.id, dependsOnRoleId }),
+    });
+    fetchData();
+  };
+
+  const updateRoleExclusiveGroup = async (
+    role: Role,
+    exclusiveGroupId: number | null
+  ) => {
+    await fetch("/api/configuration/roles", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: role.id, exclusiveGroupId }),
+    });
+    fetchData();
+  };
+
+  const deleteRole = async (role: Role) => {
+    if (
+      !confirm(
+        `¿Eliminar "${role.name}"? Esto también eliminará todas las entradas de cronograma para este rol.`
+      )
+    )
+      return;
+    await fetch(`/api/configuration/roles?id=${role.id}`, {
+      method: "DELETE",
+    });
+    fetchData();
+  };
+
+  if (loading) {
+    return <p className="text-muted-foreground">Cargando...</p>;
+  }
+
+  return (
+    <div className="space-y-10">
+      <div>
+        <h1 className="text-2xl font-bold">Roles</h1>
+        <p className="mt-1 text-muted-foreground">
+          Define los roles necesarios para cada fecha de servicio, cuántas
+          personas se requieren y sus grupos exclusivos.
+        </p>
+      </div>
+
+      {/* ── Section 1: Grupos Exclusivos ── */}
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold">Grupos Exclusivos</h2>
+        <p className="text-sm text-muted-foreground">
+          Los roles dentro del mismo grupo exclusivo no pueden asignarse al
+          mismo miembro en la misma fecha.
+        </p>
+
+        {groups.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No hay grupos exclusivos configurados.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {groups.map((group) => (
+              <div
+                key={group.id}
+                className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3"
+              >
+                <span className="font-medium">{group.name}</span>
+                <button
+                  onClick={() => deleteGroup(group)}
+                  className="rounded-md border border-destructive px-3 py-1 text-sm text-destructive hover:bg-destructive hover:text-white transition-colors"
+                >
+                  Eliminar
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <form onSubmit={addGroup} className="flex items-end gap-3">
+          <div className="flex-1">
+            <label className="block text-sm font-medium mb-1">
+              Nombre del nuevo grupo
+            </label>
+            <input
+              type="text"
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="ej. Instrumento"
+            />
+          </div>
+          <button
+            type="submit"
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+          >
+            Agregar
+          </button>
+        </form>
+      </section>
+
+      {/* ── Section 2: Roles ── */}
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold">Roles</h2>
+        <p className="text-sm text-muted-foreground">
+          Configura cada rol con la cantidad de personas requeridas,
+          dependencias opcionales y grupo exclusivo.
+        </p>
+
+        <div className="space-y-2">
+          {roles.map((role) => (
+            <div
+              key={role.id}
+              className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3"
+            >
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                {editingRoleId === role.id ? (
+                  <input
+                    type="text"
+                    value={editingRoleName}
+                    onChange={(e) => setEditingRoleName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveRoleName(role);
+                      if (e.key === "Escape") setEditingRoleId(null);
+                    }}
+                    onBlur={() => saveRoleName(role)}
+                    autoFocus
+                    className="rounded-md border border-border bg-background px-2 py-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary w-48"
+                  />
+                ) : (
+                  <span
+                    className="font-medium cursor-pointer hover:text-primary transition-colors"
+                    onClick={() => {
+                      setEditingRoleId(role.id);
+                      setEditingRoleName(role.name);
+                    }}
+                    title="Clic para renombrar"
+                  >
+                    {role.name}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* Required count */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-muted-foreground">
+                    Requeridos:
+                  </label>
+                  <select
+                    value={role.requiredCount}
+                    onChange={(e) =>
+                      updateRoleCount(role, parseInt(e.target.value, 10))
+                    }
+                    className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+                  >
+                    {[1, 2, 3, 4, 5, 6].map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Dependency */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-muted-foreground">
+                    Depende de:
+                  </label>
+                  <select
+                    value={role.dependsOnRoleId ?? ""}
+                    onChange={(e) =>
+                      updateRoleDependency(
+                        role,
+                        e.target.value ? parseInt(e.target.value, 10) : null
+                      )
+                    }
+                    className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+                  >
+                    <option value="">Ninguno</option>
+                    {roles
+                      .filter((r) => r.id !== role.id)
+                      .map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                {/* Exclusive Group */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-muted-foreground">
+                    Grupo exclusivo:
+                  </label>
+                  <select
+                    value={role.exclusiveGroupId ?? ""}
+                    onChange={(e) =>
+                      updateRoleExclusiveGroup(
+                        role,
+                        e.target.value ? parseInt(e.target.value, 10) : null
+                      )
+                    }
+                    className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+                  >
+                    <option value="">Ninguno</option>
+                    {groups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Delete */}
+                <button
+                  onClick={() => deleteRole(role)}
+                  className="rounded-md border border-destructive px-2 py-1 text-xs text-destructive hover:bg-destructive hover:text-white transition-colors"
+                  title="Eliminar rol"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <form onSubmit={addRole} className="flex items-end gap-3">
+          <div className="flex-1">
+            <label className="block text-sm font-medium mb-1">
+              Nombre del nuevo rol
+            </label>
+            <input
+              type="text"
+              value={newRoleName}
+              onChange={(e) => setNewRoleName(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="ej. Saxofón"
+            />
+          </div>
+          <div className="w-24">
+            <label className="block text-sm font-medium mb-1">Cantidad</label>
+            <input
+              type="number"
+              min={1}
+              max={10}
+              value={newRoleCount}
+              onChange={(e) => setNewRoleCount(parseInt(e.target.value, 10))}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+          <button
+            type="submit"
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+          >
+            Agregar rol
+          </button>
+        </form>
+      </section>
+    </div>
+  );
+}

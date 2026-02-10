@@ -79,8 +79,8 @@ describe("Schedule generation", () => {
 
     it("does not assign the same person to two roles in the same exclusive group on the same date", () => {
       const roles: RoleDefinition[] = [
-        { id: 1, name: "Keyboard", requiredCount: 1, exclusiveGroup: "Instrumento" },
-        { id: 2, name: "Guitar", requiredCount: 1, exclusiveGroup: "Instrumento" },
+        { id: 1, name: "Keyboard", requiredCount: 1, exclusiveGroupId: 1 },
+        { id: 2, name: "Guitar", requiredCount: 1, exclusiveGroupId: 1 },
       ];
       const members = [
         makeMember(1, "Alice", [1, 2]),
@@ -394,8 +394,8 @@ describe("Schedule generation", () => {
   describe("when members can play multiple roles", () => {
     it("assigns a multi-role member to only one role per date when roles share an exclusive group", () => {
       const roles: RoleDefinition[] = [
-        { id: 1, name: "Keyboard", requiredCount: 1, exclusiveGroup: "Instrumento" },
-        { id: 3, name: "Electric Guitar", requiredCount: 1, exclusiveGroup: "Instrumento" },
+        { id: 1, name: "Keyboard", requiredCount: 1, exclusiveGroupId: 1 },
+        { id: 3, name: "Electric Guitar", requiredCount: 1, exclusiveGroupId: 1 },
       ];
       const members = [
         makeMember(1, "Alice", [1, 3]), // Can play keyboard and guitar
@@ -427,8 +427,8 @@ describe("Schedule generation", () => {
       // Electric Guitar (priority 1). This matters when a member can play both
       // and roles are in the same exclusive group.
       const roles: RoleDefinition[] = [
-        { id: 3, name: "Electric Guitar", requiredCount: 1, exclusiveGroup: "Instrumento" },
-        { id: 4, name: "Acoustic Guitar", requiredCount: 1, exclusiveGroup: "Instrumento" },
+        { id: 3, name: "Electric Guitar", requiredCount: 1, exclusiveGroupId: 1 },
+        { id: 4, name: "Acoustic Guitar", requiredCount: 1, exclusiveGroupId: 1 },
       ];
       const members = [
         makeMember(1, "Alice", [3, 4]), // Can play both guitars
@@ -488,7 +488,7 @@ describe("Schedule generation", () => {
       // Voice has no exclusive group, Keyboard has "Instrumento"
       const roles: RoleDefinition[] = [
         { id: 1, name: "Voice", requiredCount: 1 },
-        { id: 2, name: "Keyboard", requiredCount: 1, exclusiveGroup: "Instrumento" },
+        { id: 2, name: "Keyboard", requiredCount: 1, exclusiveGroupId: 1 },
       ];
       const members = [makeMember(1, "David", [1, 2])];
 
@@ -512,8 +512,8 @@ describe("Schedule generation", () => {
     it("prevents a member from filling two roles in the same exclusive group on the same date", () => {
       // Both Keyboard and Electric Guitar are in "Instrumento" group
       const roles: RoleDefinition[] = [
-        { id: 1, name: "Keyboard", requiredCount: 1, exclusiveGroup: "Instrumento" },
-        { id: 2, name: "Electric Guitar", requiredCount: 1, exclusiveGroup: "Instrumento" },
+        { id: 1, name: "Keyboard", requiredCount: 1, exclusiveGroupId: 1 },
+        { id: 2, name: "Electric Guitar", requiredCount: 1, exclusiveGroupId: 1 },
       ];
       // David can play both but should only get one
       const members = [
@@ -566,8 +566,8 @@ describe("Schedule generation", () => {
     it("reports unfilled slot when exclusive group blocks the only candidate", () => {
       // Both roles in "Instrumento" group, only one member
       const roles: RoleDefinition[] = [
-        { id: 1, name: "Keyboard", requiredCount: 1, exclusiveGroup: "Instrumento" },
-        { id: 2, name: "Electric Guitar", requiredCount: 1, exclusiveGroup: "Instrumento" },
+        { id: 1, name: "Keyboard", requiredCount: 1, exclusiveGroupId: 1 },
+        { id: 2, name: "Electric Guitar", requiredCount: 1, exclusiveGroupId: 1 },
       ];
       const members = [makeMember(1, "David", [1, 2])];
 
