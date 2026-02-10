@@ -120,14 +120,14 @@ export default function MembersPage() {
   const activeDays = days.filter((d) => d.active);
 
   if (groupLoading || loading) {
-    return <p className="text-muted-foreground">Cargando...</p>;
+    return <p className="text-sm text-muted-foreground">Cargando...</p>;
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <div>
-        <h1 className="text-2xl font-bold">Miembros</h1>
-        <p className="mt-1 text-muted-foreground">
+        <h1 className="text-2xl font-bold tracking-tight">Miembros</h1>
+        <p className="mt-1.5 text-muted-foreground">
           Agrega y gestiona los miembros del grupo. Asigna roles y configura disponibilidad.
         </p>
       </div>
@@ -135,36 +135,40 @@ export default function MembersPage() {
       {/* Add / Edit form */}
       <form
         onSubmit={handleSubmit}
-        className="space-y-4 rounded-lg border border-border bg-card p-6"
+        className="space-y-5 rounded-xl border border-border/50 bg-card p-6 shadow-[0_1px_3px_var(--shadow-color)]"
       >
-        <h2 className="text-lg font-semibold">
+        <h2 className="text-base font-semibold">
           {editingId ? "Editar miembro" : "Agregar miembro"}
         </h2>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Nombre</label>
+          <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+            Nombre
+          </label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
             placeholder="Nombre del miembro"
             required
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">Roles</label>
+          <label className="block text-sm font-medium text-muted-foreground mb-2">
+            Roles
+          </label>
           <div className="flex flex-wrap gap-2">
             {roles.map((role) => (
               <button
                 key={role.id}
                 type="button"
                 onClick={() => toggleRole(role.id)}
-                className={`rounded-full px-3 py-1 text-sm border transition-colors ${
+                className={`rounded-full px-3.5 py-1.5 text-sm font-medium border transition-all duration-150 ${
                   selectedRoles.includes(role.id)
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-muted text-muted-foreground border-border hover:border-primary"
+                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                    : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
                 }`}
               >
                 {role.name}
@@ -174,7 +178,7 @@ export default function MembersPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">
+          <label className="block text-sm font-medium text-muted-foreground mb-2">
             Días disponibles
           </label>
           <div className="flex flex-wrap gap-2">
@@ -183,10 +187,10 @@ export default function MembersPage() {
                 key={day.id}
                 type="button"
                 onClick={() => toggleDay(day.id)}
-                className={`rounded-full px-3 py-1 text-sm border transition-colors ${
+                className={`rounded-full px-3.5 py-1.5 text-sm font-medium border transition-all duration-150 ${
                   selectedDays.includes(day.id)
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-muted text-muted-foreground border-border hover:border-primary"
+                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                    : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
                 }`}
               >
                 {day.dayOfWeek}
@@ -195,10 +199,10 @@ export default function MembersPage() {
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 pt-1">
           <button
             type="submit"
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+            className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all"
           >
             {editingId ? "Actualizar" : "Agregar miembro"}
           </button>
@@ -206,7 +210,7 @@ export default function MembersPage() {
             <button
               type="button"
               onClick={resetForm}
-              className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
+              className="rounded-lg border border-border px-5 py-2.5 text-sm font-medium hover:bg-muted transition-colors"
             >
               Cancelar
             </button>
@@ -217,37 +221,42 @@ export default function MembersPage() {
       {/* Members list */}
       <div className="space-y-3">
         {members.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            Aún no se han agregado miembros. Usa el formulario de arriba para agregar el primer miembro.
-          </p>
+          <div className="rounded-xl border border-dashed border-border bg-muted/30 py-10 text-center">
+            <p className="text-sm text-muted-foreground">
+              Aún no se han agregado miembros.
+            </p>
+            <p className="text-xs text-muted-foreground/60 mt-1">
+              Usa el formulario de arriba para agregar el primer miembro.
+            </p>
+          </div>
         ) : (
           members.map((member) => (
             <div
               key={member.id}
-              className="flex items-start justify-between rounded-lg border border-border bg-card p-4"
+              className="flex items-start justify-between rounded-xl border border-border/50 bg-card p-5 shadow-[0_1px_3px_var(--shadow-color)] hover:shadow-[0_2px_6px_var(--shadow-color)] transition-shadow"
             >
-              <div className="space-y-2">
+              <div className="space-y-2.5 min-w-0">
                 <h3 className="font-semibold">{member.name}</h3>
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap gap-1.5">
                   {member.roleIds.map((roleId) => {
                     const role = roles.find((r) => r.id === roleId);
                     return (
                       <span
                         key={roleId}
-                        className="rounded-full bg-accent px-2 py-0.5 text-xs font-medium"
+                        className="rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium"
                       >
                         {role?.name ?? "Unknown"}
                       </span>
                     );
                   })}
                 </div>
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap gap-1.5">
                   {member.availableDayIds.map((dayId) => {
                     const day = days.find((d) => d.id === dayId);
                     return (
                       <span
                         key={dayId}
-                        className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                        className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground"
                       >
                         {day?.dayOfWeek ?? "Unknown"}
                       </span>
@@ -255,16 +264,16 @@ export default function MembersPage() {
                   })}
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 shrink-0 ml-4">
                 <button
                   onClick={() => startEdit(member)}
-                  className="rounded-md border border-border px-3 py-1 text-sm hover:bg-muted transition-colors"
+                  className="rounded-lg border border-border px-3.5 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
                 >
                   Editar
                 </button>
                 <button
                   onClick={() => handleDelete(member.id)}
-                  className="rounded-md border border-destructive px-3 py-1 text-sm text-destructive hover:bg-destructive hover:text-white transition-colors"
+                  className="rounded-lg border border-destructive/30 px-3.5 py-1.5 text-sm font-medium text-destructive hover:bg-destructive hover:text-white transition-colors"
                 >
                   Eliminar
                 </button>

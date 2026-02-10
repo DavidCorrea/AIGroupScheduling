@@ -196,7 +196,7 @@ export default function SchedulePreviewPage() {
   };
 
   if (groupLoading || loading || !schedule) {
-    return <p className="text-muted-foreground">Cargando...</p>;
+    return <p className="text-sm text-muted-foreground">Cargando...</p>;
   }
 
   // Group entries by date, also include rehearsal dates
@@ -220,41 +220,42 @@ export default function SchedulePreviewPage() {
   const rehearsalSet = new Set(schedule.rehearsalDates);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           {schedule.prevScheduleId && (
             <a
               href={`/${slug}/config/schedules/${schedule.prevScheduleId}`}
-              className="rounded-md border border-border px-2 py-1 text-sm hover:bg-muted transition-colors"
+              className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
             >
               ← Anterior
             </a>
           )}
           <div>
-            <h1 className="text-2xl font-bold">
+            <h1 className="text-2xl font-bold tracking-tight">
               {MONTH_NAMES[schedule.month - 1]} {schedule.year}
             </h1>
-          <p className="mt-1 text-muted-foreground">
-            {schedule.status === "committed" ? (
-              <>
-                Cronograma creado.{" "}
-                <a
-                  href={`/${slug}/cronograma/${schedule.year}/${schedule.month}`}
-                  className="text-primary hover:underline"
-                >
-                  Ver enlace compartido
-                </a>
-              </>
-            ) : (
-              "Borrador — revisa y edita antes de crear."
-            )}
-          </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {schedule.status === "committed" ? (
+                <>
+                  Cronograma creado.{" "}
+                  <a
+                    href={`/${slug}/cronograma/${schedule.year}/${schedule.month}`}
+                    className="text-primary hover:text-primary/80 transition-colors"
+                  >
+                    Ver enlace compartido
+                  </a>
+                </>
+              ) : (
+                "Borrador — revisa y edita antes de crear."
+              )}
+            </p>
           </div>
           {schedule.nextScheduleId && (
             <a
               href={`/${slug}/config/schedules/${schedule.nextScheduleId}`}
-              className="rounded-md border border-border px-2 py-1 text-sm hover:bg-muted transition-colors"
+              className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
             >
               Siguiente →
             </a>
@@ -263,7 +264,7 @@ export default function SchedulePreviewPage() {
         {schedule.status === "draft" && (
           <button
             onClick={handleCommit}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+            className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all"
           >
             Crear cronograma
           </button>
@@ -271,17 +272,17 @@ export default function SchedulePreviewPage() {
       </div>
 
       {/* Schedule grid */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto rounded-xl border border-border/50 shadow-[0_1px_3px_var(--shadow-color)]">
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              <th className="border border-border bg-muted px-4 py-2 text-left text-sm font-medium">
+              <th className="border-b border-r border-border/50 bg-muted/50 px-4 py-3 text-left text-sm font-semibold">
                 Fecha
               </th>
               {roleOrder.map((role) => (
                 <th
                   key={role.id}
-                  className="border border-border bg-muted px-4 py-2 text-left text-sm font-medium"
+                  className="border-b border-r border-border/50 bg-muted/50 px-4 py-3 text-left text-sm font-semibold"
                 >
                   {role.name}
                 </th>
@@ -289,7 +290,7 @@ export default function SchedulePreviewPage() {
             </tr>
           </thead>
           <tbody>
-            {allDates.map((date) => {
+            {allDates.map((date, dateIndex) => {
               const isRehearsal = rehearsalSet.has(date);
               const entriesOnDate = schedule.entries.filter(
                 (e) => e.date === date
@@ -299,9 +300,9 @@ export default function SchedulePreviewPage() {
               return (
                 <tr
                   key={date}
-                  className={isRehearsal ? "bg-muted/50" : ""}
+                  className={`${isRehearsal ? "bg-muted/30" : dateIndex % 2 === 0 ? "bg-card" : "bg-muted/10"} hover:bg-accent/30 transition-colors`}
                 >
-                  <td className="border border-border px-4 py-2 text-sm font-medium whitespace-nowrap">
+                  <td className="border-b border-r border-border/30 px-4 py-3 text-sm font-medium whitespace-nowrap">
                     <div>
                       {formatDate(date)}
                       {isRehearsal && (
@@ -312,12 +313,12 @@ export default function SchedulePreviewPage() {
                     </div>
                     {/* Date note */}
                     {editingNote === date ? (
-                      <div className="mt-1 flex gap-1">
+                      <div className="mt-1.5 flex gap-1">
                         <input
                           type="text"
                           value={noteText}
                           onChange={(e) => setNoteText(e.target.value)}
-                          className="flex-1 rounded border border-border bg-background px-2 py-0.5 text-xs"
+                          className="flex-1 rounded-lg border border-border bg-background px-2 py-1 text-xs"
                           placeholder="Agregar nota..."
                           autoFocus
                           onKeyDown={(e) => {
@@ -327,7 +328,7 @@ export default function SchedulePreviewPage() {
                         />
                         <button
                           onClick={() => saveNote(date)}
-                          className="text-xs text-primary hover:underline"
+                          className="text-xs text-primary hover:text-primary/80 transition-colors"
                         >
                           Guardar
                         </button>
@@ -336,7 +337,7 @@ export default function SchedulePreviewPage() {
                       <div className="mt-0.5">
                         {note ? (
                           <span
-                            className="text-xs text-primary cursor-pointer hover:underline"
+                            className="text-xs text-primary cursor-pointer hover:text-primary/80 transition-colors"
                             onClick={() => startEditNote(date)}
                           >
                             {note}
@@ -344,7 +345,7 @@ export default function SchedulePreviewPage() {
                         ) : (
                           <button
                             onClick={() => startEditNote(date)}
-                            className="text-xs text-muted-foreground hover:text-primary hover:underline"
+                            className="text-xs text-muted-foreground hover:text-primary transition-colors"
                           >
                             + nota
                           </button>
@@ -355,7 +356,7 @@ export default function SchedulePreviewPage() {
                   {isRehearsal ? (
                     <td
                       colSpan={roleOrder.length}
-                      className="border border-border px-4 py-2 text-sm text-muted-foreground italic text-center"
+                      className="border-b border-border/30 px-4 py-3 text-sm text-muted-foreground italic text-center"
                     >
                       Ensayo
                     </td>
@@ -378,10 +379,10 @@ export default function SchedulePreviewPage() {
                         return (
                           <td
                             key={role.id}
-                            className="border border-border px-4 py-2 text-sm"
+                            className="border-b border-r border-border/30 px-4 py-3 text-sm"
                           >
                             <select
-                              className="rounded border border-border bg-background px-2 py-0.5 text-sm w-full"
+                              className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm w-full"
                               value={currentEntry?.memberId ?? ""}
                               onChange={(e) => {
                                 const val = e.target.value;
@@ -406,10 +407,10 @@ export default function SchedulePreviewPage() {
                       return (
                         <td
                           key={role.id}
-                          className="border border-border px-4 py-2 text-sm"
+                          className="border-b border-r border-border/30 px-4 py-3 text-sm"
                         >
                           {roleEntries.length === 0 ? (
-                            <span className="text-muted-foreground italic">
+                            <span className="text-muted-foreground/50">
                               —
                             </span>
                           ) : (
@@ -422,7 +423,7 @@ export default function SchedulePreviewPage() {
                                   {swapping?.entryId === entry.id ? (
                                     <select
                                       autoFocus
-                                      className="rounded border border-border bg-background px-2 py-0.5 text-sm"
+                                      className="rounded-lg border border-border bg-background px-2 py-1 text-sm"
                                       defaultValue=""
                                       onChange={(e) => {
                                         if (e.target.value === "__remove__") {
@@ -458,7 +459,7 @@ export default function SchedulePreviewPage() {
                                             roleId: role.id,
                                           })
                                         }
-                                        className="text-xs text-primary hover:underline ml-1"
+                                        className="text-xs text-primary hover:text-primary/80 ml-1 transition-colors"
                                         title="Cambiar miembro"
                                       >
                                         cambiar

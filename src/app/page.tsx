@@ -66,16 +66,17 @@ export default function GroupsPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
-        <p className="text-muted-foreground">Cargando...</p>
+        <p className="text-sm text-muted-foreground">Cargando...</p>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Cronogramas</h1>
+      <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
+        {/* Header */}
+        <div className="mb-10">
+          <h1 className="text-3xl font-bold tracking-tight">Cronogramas</h1>
           <p className="mt-2 text-muted-foreground">
             Selecciona un grupo para gestionar o crea uno nuevo.
           </p>
@@ -84,29 +85,33 @@ export default function GroupsPage() {
         {/* Create group form */}
         <form
           onSubmit={handleSubmit}
-          className="mb-8 space-y-4 rounded-lg border border-border bg-card p-6"
+          className="mb-10 rounded-xl border border-border/50 bg-card p-6 shadow-[0_1px_3px_var(--shadow-color)]"
         >
-          <h2 className="text-lg font-semibold">Crear grupo</h2>
+          <h2 className="text-base font-semibold mb-4">Crear grupo</h2>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium mb-1">Nombre</label>
+              <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+                Nombre
+              </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => handleNameChange(e.target.value)}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
                 placeholder="Nombre del grupo"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Slug (URL)</label>
+              <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+                Slug (URL)
+              </label>
               <input
                 type="text"
                 value={slug}
                 onChange={(e) => setSlug(e.target.value)}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
                 placeholder="slug-del-grupo"
                 required
               />
@@ -114,12 +119,12 @@ export default function GroupsPage() {
           </div>
 
           {error && (
-            <p className="text-sm text-destructive">{error}</p>
+            <p className="mt-3 text-sm text-destructive">{error}</p>
           )}
 
           <button
             type="submit"
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+            className="mt-4 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all"
           >
             Crear grupo
           </button>
@@ -128,29 +133,34 @@ export default function GroupsPage() {
         {/* Groups list */}
         <div className="space-y-3">
           {groups.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              No hay grupos creados. Usa el formulario de arriba para crear el primero.
-            </p>
+            <div className="rounded-xl border border-dashed border-border bg-muted/30 py-12 text-center">
+              <p className="text-muted-foreground text-sm">
+                No hay grupos creados aún.
+              </p>
+              <p className="text-muted-foreground/60 text-xs mt-1">
+                Usa el formulario de arriba para crear el primero.
+              </p>
+            </div>
           ) : (
             groups.map((group) => (
               <div
                 key={group.id}
-                className="flex items-center justify-between rounded-lg border border-border bg-card p-4"
+                className="flex items-center justify-between rounded-xl border border-border/50 bg-card p-5 shadow-[0_1px_3px_var(--shadow-color)] hover:shadow-[0_4px_12px_var(--shadow-color)] hover:-translate-y-0.5 transition-all duration-200"
               >
-                <div>
-                  <h3 className="font-semibold">{group.name}</h3>
-                  <p className="text-sm text-muted-foreground">/{group.slug}</p>
+                <div className="min-w-0">
+                  <h3 className="font-semibold truncate">{group.name}</h3>
+                  <p className="text-sm text-muted-foreground mt-0.5">/{group.slug}</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 shrink-0 ml-4">
                   <Link
                     href={`/${group.slug}/config`}
-                    className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted transition-colors"
+                    className="rounded-lg border border-border px-3.5 py-2 text-sm font-medium hover:bg-muted transition-colors"
                   >
                     Configurar
                   </Link>
                   <Link
                     href={`/${group.slug}/cronograma`}
-                    className="rounded-md border border-primary text-primary px-3 py-1.5 text-sm hover:bg-accent transition-colors"
+                    className="rounded-lg bg-primary/10 text-primary px-3.5 py-2 text-sm font-medium hover:bg-primary/20 transition-colors"
                   >
                     Ver cronograma
                   </Link>

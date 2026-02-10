@@ -55,23 +55,23 @@ function PriorityEditor({
       {orderedRoles.map((role, index) => (
         <div
           key={role.id}
-          className="flex items-center gap-2 rounded border border-border bg-background px-3 py-1.5 text-sm"
+          className="flex items-center gap-2 rounded-lg border border-border/50 bg-background px-3.5 py-2 text-sm"
         >
-          <span className="text-muted-foreground w-6 text-right">
+          <span className="text-muted-foreground w-6 text-right text-xs">
             {index + 1}.
           </span>
           <span className="flex-1">{role.name}</span>
           <button
             onClick={() => moveUp(index)}
             disabled={index === 0}
-            className="px-1 text-muted-foreground hover:text-foreground disabled:opacity-30"
+            className="px-1.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
           >
             ↑
           </button>
           <button
             onClick={() => moveDown(index)}
             disabled={index === orderedRoles.length - 1}
-            className="px-1 text-muted-foreground hover:text-foreground disabled:opacity-30"
+            className="px-1.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
           >
             ↓
           </button>
@@ -81,7 +81,7 @@ function PriorityEditor({
         onClick={() =>
           onSave(orderedRoles.map((r, i) => ({ roleId: r.id, priority: i })))
         }
-        className="mt-2 rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+        className="mt-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all"
       >
         Guardar orden
       </button>
@@ -130,23 +130,23 @@ function ColumnOrderEditor({
       {orderedRoles.map((role, index) => (
         <div
           key={role.id}
-          className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm"
+          className="flex items-center gap-2 rounded-xl border border-border/50 bg-card px-4 py-3 text-sm shadow-[0_1px_2px_var(--shadow-color)]"
         >
-          <span className="text-muted-foreground w-6 text-right">
+          <span className="text-muted-foreground w-6 text-right text-xs">
             {index + 1}.
           </span>
           <span className="flex-1 font-medium">{role.name}</span>
           <button
             onClick={() => moveUp(index)}
             disabled={index === 0}
-            className="px-1.5 py-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
+            className="px-1.5 py-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
           >
             ↑
           </button>
           <button
             onClick={() => moveDown(index)}
             disabled={index === orderedRoles.length - 1}
-            className="px-1.5 py-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
+            className="px-1.5 py-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
           >
             ↓
           </button>
@@ -156,7 +156,7 @@ function ColumnOrderEditor({
         onClick={() =>
           onSave(orderedRoles.map((r, i) => ({ id: r.id, displayOrder: i })))
         }
-        className="mt-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+        className="mt-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all"
       >
         Guardar orden
       </button>
@@ -311,33 +311,35 @@ export default function ConfigurationPage() {
   };
 
   if (groupLoading || loading) {
-    return <p className="text-muted-foreground">Cargando...</p>;
+    return <p className="text-sm text-muted-foreground">Cargando...</p>;
   }
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-12">
       <div>
-        <h1 className="text-2xl font-bold">Configuración</h1>
-        <p className="mt-1 text-muted-foreground">
+        <h1 className="text-2xl font-bold tracking-tight">Configuración</h1>
+        <p className="mt-1.5 text-muted-foreground">
           Configura días activos, orden de columnas, prioridades de roles y gestiona vacaciones de miembros.
         </p>
       </div>
 
       {/* Schedule Days */}
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Días activos</h2>
-        <p className="text-sm text-muted-foreground">
-          Selecciona qué días de la semana se incluyen en el cronograma.
-        </p>
+        <div>
+          <h2 className="text-lg font-semibold">Días activos</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Selecciona qué días de la semana se incluyen en el cronograma.
+          </p>
+        </div>
         <div className="flex flex-wrap gap-2">
           {days.map((day) => (
             <button
               key={day.id}
               onClick={() => toggleDay(day)}
-              className={`rounded-full px-4 py-2 text-sm font-medium border transition-colors ${
+              className={`rounded-full px-4 py-2 text-sm font-medium border transition-all duration-150 ${
                 day.active
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-muted text-muted-foreground border-border hover:border-primary"
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
               }`}
             >
               {day.dayOfWeek}
@@ -348,19 +350,21 @@ export default function ConfigurationPage() {
 
       {/* Rehearsal Days */}
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Días de ensayo</h2>
-        <p className="text-sm text-muted-foreground">
-          Selecciona qué días de la semana son días de ensayo. Las fechas de ensayo aparecen en el cronograma pero no tienen asignaciones de miembros.
-        </p>
+        <div>
+          <h2 className="text-lg font-semibold">Días de ensayo</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Selecciona qué días de la semana son días de ensayo. Las fechas de ensayo aparecen en el cronograma pero no tienen asignaciones de miembros.
+          </p>
+        </div>
         <div className="flex flex-wrap gap-2">
           {days.map((day) => (
             <button
               key={day.id}
               onClick={() => toggleRehearsal(day)}
-              className={`rounded-full px-4 py-2 text-sm font-medium border transition-colors ${
+              className={`rounded-full px-4 py-2 text-sm font-medium border transition-all duration-150 ${
                 day.isRehearsal
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-muted text-muted-foreground border-border hover:border-primary"
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
               }`}
             >
               {day.dayOfWeek}
@@ -371,10 +375,12 @@ export default function ConfigurationPage() {
 
       {/* Column Order */}
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Orden de columnas</h2>
-        <p className="text-sm text-muted-foreground">
-          Configura el orden de visualización de las columnas de roles en todas las vistas de cronogramas. Usa las flechas para reordenar, luego haz clic en &quot;Guardar orden&quot; para aplicar.
-        </p>
+        <div>
+          <h2 className="text-lg font-semibold">Orden de columnas</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Configura el orden de visualización de las columnas de roles en todas las vistas de cronogramas. Usa las flechas para reordenar, luego haz clic en &quot;Guardar orden&quot; para aplicar.
+          </p>
+        </div>
         <ColumnOrderEditor
           roles={roles}
           onSave={async (order) => {
@@ -390,10 +396,12 @@ export default function ConfigurationPage() {
 
       {/* Role Priorities per Day */}
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Prioridades de roles por día</h2>
-        <p className="text-sm text-muted-foreground">
-          Configura el orden de prioridad de roles para cada día activo. Los roles con números de prioridad más bajos se llenan primero. Esto es útil cuando un miembro puede tocar múltiples roles y quieres asegurar que un rol específico se llene primero en ciertos días.
-        </p>
+        <div>
+          <h2 className="text-lg font-semibold">Prioridades de roles por día</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Configura el orden de prioridad de roles para cada día activo. Los roles con números de prioridad más bajos se llenan primero. Esto es útil cuando un miembro puede tocar múltiples roles y quieres asegurar que un rol específico se llene primero en ciertos días.
+          </p>
+        </div>
 
         <div className="space-y-3">
           {days
@@ -407,15 +415,15 @@ export default function ConfigurationPage() {
               return (
                 <div
                   key={day.id}
-                  className="rounded-lg border border-border bg-card p-4"
+                  className="rounded-xl border border-border/50 bg-card p-5 shadow-[0_1px_2px_var(--shadow-color)]"
                 >
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-3">
                     <h3 className="font-medium">{day.dayOfWeek}</h3>
-                    <div className="flex gap-2">
+                    <div className="flex gap-3">
                       {isEditing ? (
                         <button
                           onClick={() => setEditingPriorityDay(null)}
-                          className="text-sm text-muted-foreground hover:underline"
+                          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                         >
                           Cancelar
                         </button>
@@ -423,14 +431,14 @@ export default function ConfigurationPage() {
                         <>
                           <button
                             onClick={() => setEditingPriorityDay(day.id)}
-                            className="text-sm text-primary hover:underline"
+                            className="text-sm text-primary hover:text-primary/80 transition-colors"
                           >
                             {dayPriorities.length > 0 ? "Editar" : "Establecer prioridades"}
                           </button>
                           {dayPriorities.length > 0 && (
                             <button
                               onClick={() => clearPriorities(day.id)}
-                              className="text-sm text-destructive hover:underline"
+                              className="text-sm text-destructive hover:text-destructive/80 transition-colors"
                             >
                               Limpiar
                             </button>
@@ -453,7 +461,7 @@ export default function ConfigurationPage() {
                         .map((p) => (
                           <span
                             key={p.id}
-                            className="rounded-full bg-accent px-3 py-1 text-xs font-medium"
+                            className="rounded-full bg-primary/10 text-primary px-3 py-1 text-xs font-medium"
                           >
                             {p.priority + 1}. {p.roleName}
                           </span>
@@ -471,19 +479,23 @@ export default function ConfigurationPage() {
       </section>
 
       {/* Holidays */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Vacaciones</h2>
-        <p className="text-sm text-muted-foreground">
-          Configura rangos de fechas cuando los miembros no están disponibles. Se omitirán durante la generación de cronogramas.
-        </p>
+      <section className="space-y-5">
+        <div>
+          <h2 className="text-lg font-semibold">Vacaciones</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Configura rangos de fechas cuando los miembros no están disponibles. Se omitirán durante la generación de cronogramas.
+          </p>
+        </div>
 
         <form
           onSubmit={addHoliday}
-          className="rounded-lg border border-border bg-card p-4 space-y-3"
+          className="rounded-xl border border-border/50 bg-card p-5 space-y-4 shadow-[0_1px_2px_var(--shadow-color)]"
         >
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Miembro</label>
+              <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+                Miembro
+              </label>
               <select
                 value={holidayMemberId}
                 onChange={(e) =>
@@ -491,7 +503,7 @@ export default function ConfigurationPage() {
                     e.target.value ? parseInt(e.target.value, 10) : ""
                   )
                 }
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm"
                 required
               >
                 <option value="">Seleccionar miembro...</option>
@@ -503,54 +515,56 @@ export default function ConfigurationPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">
+              <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                 Fecha inicio
               </label>
               <input
                 type="date"
                 value={holidayStart}
                 onChange={(e) => setHolidayStart(e.target.value)}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">
+              <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                 Fecha fin
               </label>
               <input
                 type="date"
                 value={holidayEnd}
                 onChange={(e) => setHolidayEnd(e.target.value)}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">
+              <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                 Descripción
               </label>
               <input
                 type="text"
                 value={holidayDescription}
                 onChange={(e) => setHolidayDescription(e.target.value)}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground/60"
                 placeholder="Nota opcional"
               />
             </div>
           </div>
           <button
             type="submit"
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+            className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all"
           >
             Agregar vacación
           </button>
         </form>
 
         {holidays.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No hay vacaciones configuradas.
-          </p>
+          <div className="rounded-xl border border-dashed border-border bg-muted/30 py-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              No hay vacaciones configuradas.
+            </p>
+          </div>
         ) : (
           <div className="space-y-2">
             {holidays.map((holiday) => {
@@ -558,13 +572,13 @@ export default function ConfigurationPage() {
               return (
                 <div
                   key={holiday.id}
-                  className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3"
+                  className="flex items-center justify-between rounded-xl border border-border/50 bg-card px-5 py-3.5 shadow-[0_1px_2px_var(--shadow-color)]"
                 >
                   <div>
                     <span className="font-medium">
                       {member?.name ?? "Unknown"}
                     </span>
-                    <span className="mx-2 text-muted-foreground">—</span>
+                    <span className="mx-2 text-muted-foreground/50">—</span>
                     <span className="text-sm text-muted-foreground">
                       {holiday.startDate} to {holiday.endDate}
                     </span>
@@ -576,7 +590,7 @@ export default function ConfigurationPage() {
                   </div>
                   <button
                     onClick={() => deleteHoliday(holiday.id)}
-                    className="rounded-md border border-destructive px-3 py-1 text-sm text-destructive hover:bg-destructive hover:text-white transition-colors"
+                    className="rounded-lg border border-destructive/30 px-3.5 py-1.5 text-sm font-medium text-destructive hover:bg-destructive hover:text-white transition-colors"
                   >
                     Eliminar
                   </button>

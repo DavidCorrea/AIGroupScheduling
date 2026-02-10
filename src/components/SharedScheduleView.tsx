@@ -281,7 +281,7 @@ export default function SharedScheduleView({
   };
 
   // Helper: get non-dependent roles for the filtered member on a date
-  // (used in the upcoming assignment section to avoid duplicating dependent roles shown with ★)
+  // (used in the upcoming assignment section to avoid duplicating dependent roles shown with star)
   const getNonDependentRolesForDate = (date: string): string => {
     const dateEntries = filteredEntries.filter(
       (e) => e.date === date && !dependentRoleIdSet.has(e.roleId)
@@ -327,29 +327,29 @@ export default function SharedScheduleView({
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
-      <header className="border-b border-border bg-card sticky top-0 z-10">
+      <header className="bg-card shadow-[0_1px_3px_var(--shadow-color)] sticky top-0 z-10">
         <div className="mx-auto max-w-4xl px-4 py-4 sm:px-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-3">
               {schedule.prevSchedule && (
                 <a
                   href={`${basePath}/${schedule.prevSchedule.year}/${schedule.prevSchedule.month}`}
-                  className="rounded-md border border-border px-2 py-1 text-sm hover:bg-muted transition-colors"
+                  className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
                   title={`${MONTH_NAMES[schedule.prevSchedule.month - 1]} ${schedule.prevSchedule.year}`}
                 >
                   ← Anterior
                 </a>
               )}
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
                   {MONTH_NAMES[schedule.month - 1]} {schedule.year}
                 </h1>
-                <p className="text-sm text-muted-foreground">Agenda del Grupo</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Agenda del Grupo</p>
               </div>
               {schedule.nextSchedule && (
                 <a
                   href={`${basePath}/${schedule.nextSchedule.year}/${schedule.nextSchedule.month}`}
-                  className="rounded-md border border-border px-2 py-1 text-sm hover:bg-muted transition-colors"
+                  className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
                   title={`${MONTH_NAMES[schedule.nextSchedule.month - 1]} ${schedule.nextSchedule.year}`}
                 >
                   Siguiente →
@@ -358,10 +358,11 @@ export default function SharedScheduleView({
             </div>
             <button
               onClick={() => setDarkMode(!darkMode)}
-              className="self-start sm:self-auto rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted transition-colors"
+              className="self-start sm:self-auto rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors flex items-center gap-1.5"
               aria-label="Cambiar modo"
             >
-              {darkMode ? "Modo Claro" : "Modo Oscuro"}
+              <span className="text-base leading-none">{darkMode ? "☀️" : "🌙"}</span>
+              <span>{darkMode ? "Claro" : "Oscuro"}</span>
             </button>
           </div>
 
@@ -374,7 +375,7 @@ export default function SharedScheduleView({
                   e.target.value ? parseInt(e.target.value, 10) : null
                 )
               }
-              className="w-full sm:w-auto rounded-md border border-border bg-background px-3 py-2 text-sm"
+              className="w-full sm:w-auto rounded-lg border border-border bg-background px-3.5 py-2 text-sm"
             >
               <option value="">Todas las personas</option>
               {schedule.members.map((m) => (
@@ -386,7 +387,7 @@ export default function SharedScheduleView({
             <select
               value={dayFilter}
               onChange={(e) => setDayFilter(e.target.value)}
-              className="w-full sm:w-auto rounded-md border border-border bg-background px-3 py-2 text-sm capitalize"
+              className="w-full sm:w-auto rounded-lg border border-border bg-background px-3.5 py-2 text-sm capitalize"
             >
               <option value="">Todos los días</option>
               {availableWeekdays.map((day) => (
@@ -400,7 +401,7 @@ export default function SharedScheduleView({
                 type="checkbox"
                 checked={showPastDates}
                 onChange={(e) => setShowPastDates(e.target.checked)}
-                className="rounded border-border"
+                className="rounded border-border accent-primary"
               />
               <span className="text-muted-foreground">Mostrar fechas pasadas</span>
             </label>
@@ -411,7 +412,7 @@ export default function SharedScheduleView({
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
         {/* Filtered member view header */}
         {filteredMemberId && selectedMember && (
-          <div className="mb-6 rounded-lg border border-primary bg-accent p-4">
+          <div className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-5 shadow-[0_1px_3px_var(--shadow-color)]">
             <h2 className="text-lg font-semibold">
               Agenda de {selectedMember.name}
             </h2>
@@ -426,12 +427,12 @@ export default function SharedScheduleView({
 
         {/* Upcoming assignment for filtered member */}
         {filteredMemberId && selectedMember && upcomingDate && (
-          <div className="mb-6 rounded-lg border-2 border-primary/60 bg-primary/5 p-4">
-            <h3 className="text-sm font-semibold text-primary uppercase tracking-wide mb-2">
+          <div className="mb-6 rounded-xl border border-primary/40 bg-primary/5 p-5 shadow-[0_2px_8px_var(--shadow-color)]">
+            <h3 className="text-xs font-semibold text-primary uppercase tracking-widest mb-3">
               Próxima asignación
             </h3>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-              <span className="font-medium">
+              <span className="font-semibold">
                 {formatDateLong(upcomingDate)}
                 {today && (
                   <span className="ml-2 text-sm text-muted-foreground font-normal">
@@ -449,7 +450,7 @@ export default function SharedScheduleView({
               </span>
             </div>
             {noteMap.get(upcomingDate) && (
-              <p className="text-xs text-primary mt-1">
+              <p className="text-xs text-primary mt-2">
                 {noteMap.get(upcomingDate)}
               </p>
             )}
@@ -457,7 +458,7 @@ export default function SharedScheduleView({
         )}
 
         {/* Mobile card view */}
-        <div className="block lg:hidden space-y-4">
+        <div className="block lg:hidden space-y-3">
           {displayDates.map((date, index) => {
             const isRehearsal = rehearsalSet.has(date);
             const entriesOnDate = filteredEntries.filter(
@@ -473,33 +474,35 @@ export default function SharedScheduleView({
             return (
               <div key={date}>
                 {weekBreak && (
-                  <div className="border-t-2 border-border/60 my-2" />
+                  <div className="border-t border-border/40 my-4" />
                 )}
                 <div
-                  className={`rounded-lg border overflow-hidden ${
+                  className={`rounded-xl overflow-hidden shadow-[0_1px_3px_var(--shadow-color)] transition-all ${
                     isPast(date) ? "opacity-50" : ""
                   } ${
                     isRehearsal
-                      ? "border-border/50 bg-muted/30"
+                      ? "border border-border/30 bg-muted/20"
                       : highlighted
-                        ? "border-primary bg-accent/40 ring-2 ring-primary/30"
-                        : "border-border bg-card"
+                        ? "border border-primary/50 bg-primary/5 ring-1 ring-primary/20"
+                        : "border border-border/40 bg-card"
                   }`}
                 >
                   <div
-                    className={`px-4 py-2 font-medium text-sm cursor-pointer select-none ${
+                    className={`px-4 py-3 text-sm cursor-pointer select-none ${
                       highlighted
                         ? "bg-primary/10"
-                        : "bg-muted"
+                        : isRehearsal
+                          ? "bg-muted/30"
+                          : "bg-muted/40"
                     }`}
                     onClick={() => toggleCollapsed(date)}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">
-                          {collapsedDates.has(date) ? "▶" : "▼"}
+                        <span className="text-xs text-muted-foreground/60">
+                          {collapsedDates.has(date) ? "▸" : "▾"}
                         </span>
-                        <span>{formatDateLong(date)}</span>
+                        <span className="font-medium">{formatDateLong(date)}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         {isRehearsal && (
@@ -515,7 +518,7 @@ export default function SharedScheduleView({
                       </div>
                     </div>
                     {note && (
-                      <p className="text-xs text-primary mt-0.5">{note}</p>
+                      <p className="text-xs text-primary mt-1 ml-5">{note}</p>
                     )}
                   </div>
                   {!collapsedDates.has(date) && (
@@ -525,10 +528,10 @@ export default function SharedScheduleView({
                           Ensayo
                         </div>
                       ) : (
-                        <div className="divide-y divide-border">
+                        <div className="divide-y divide-border/30">
                           {filteredMemberId ? (
                             // Grouped roles for filtered member
-                            <div className="px-4 py-2.5 text-sm">
+                            <div className="px-4 py-3 text-sm">
                               <span className="text-muted-foreground">
                                 {getRolesForDate(date)}
                               </span>
@@ -542,9 +545,9 @@ export default function SharedScheduleView({
                               return (
                                 <div
                                   key={role.id}
-                                  className="flex justify-between px-4 py-2.5 text-sm"
+                                  className="flex justify-between px-4 py-3 text-sm"
                                 >
-                                  <span className="text-muted-foreground">
+                                  <span className="text-muted-foreground text-xs uppercase tracking-wide">
                                     {role.name}
                                   </span>
                                   <span className="font-medium text-right">
@@ -570,171 +573,185 @@ export default function SharedScheduleView({
         <div className="hidden lg:block overflow-x-auto">
           {filteredMemberId ? (
             // Simplified table for individual member
-            <table className="w-full border-collapse">
-              <thead>
-                <tr>
-                  <th className="border border-border bg-muted px-4 py-2 text-left text-sm font-medium">
-                    Fecha
-                  </th>
-                  <th className="border border-border bg-muted px-4 py-2 text-left text-sm font-medium">
-                    Rol
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayDates.map((date, index) => {
-                  const isRehearsal = rehearsalSet.has(date);
-                  const note = noteMap.get(date);
-                  const depRoleDate = hasDependentRoleOnDate(date);
-                  const relevantRoleDate = hasRelevantRoleOnDate(date);
-                  const highlighted = depRoleDate || relevantRoleDate;
-                  const prevDate = index > 0 ? displayDates[index - 1] : null;
-                  const weekBreak = isNewWeek(date, prevDate);
+            <div className="rounded-xl border border-border/50 overflow-hidden shadow-[0_1px_3px_var(--shadow-color)]">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr>
+                    <th className="border-b border-border/50 bg-muted/50 px-4 py-3 text-left text-sm font-semibold">
+                      Fecha
+                    </th>
+                    <th className="border-b border-border/50 bg-muted/50 px-4 py-3 text-left text-sm font-semibold">
+                      Rol
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayDates.map((date, index) => {
+                    const isRehearsal = rehearsalSet.has(date);
+                    const note = noteMap.get(date);
+                    const depRoleDate = hasDependentRoleOnDate(date);
+                    const relevantRoleDate = hasRelevantRoleOnDate(date);
+                    const highlighted = depRoleDate || relevantRoleDate;
+                    const prevDate = index > 0 ? displayDates[index - 1] : null;
+                    const weekBreak = isNewWeek(date, prevDate);
 
-                  return (
-                    <tr
-                      key={date}
-                      className={[
-                        isRehearsal
-                          ? "bg-muted/30"
-                          : highlighted
-                            ? "bg-accent/40 font-semibold"
-                            : "",
-                        isPast(date) ? "opacity-50" : "",
-                        weekBreak ? "border-t-4 border-t-border/60" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                    >
-                      <td
-                        className={`border border-border px-4 py-2 text-sm ${
-                          highlighted ? "border-l-4 border-l-primary" : ""
-                        }`}
+                    return (
+                      <tr
+                        key={date}
+                        className={[
+                          isRehearsal
+                            ? "bg-muted/20"
+                            : highlighted
+                              ? "bg-primary/5"
+                              : index % 2 === 0
+                                ? "bg-card"
+                                : "bg-muted/10",
+                          isPast(date) ? "opacity-50" : "",
+                          weekBreak ? "border-t-2 border-t-border/40" : "",
+                          "hover:bg-accent/30 transition-colors",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
                       >
-                        <div className="flex items-center gap-2">
-                          <span>{formatDateLong(date)}</span>
-                          {isRehearsal && (
-                            <span className="text-xs text-muted-foreground italic">
+                        <td
+                          className={`border-b border-border/30 px-4 py-3 text-sm ${
+                            highlighted ? "border-l-4 border-l-primary" : ""
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{formatDateLong(date)}</span>
+                            {isRehearsal && (
+                              <span className="text-xs text-muted-foreground italic">
+                                Ensayo
+                              </span>
+                            )}
+                            {depRoleDate && (
+                              <span className="text-xs font-semibold text-primary">
+                                ★ {getDependentRoleNamesOnDate(date).join(", ")}
+                              </span>
+                            )}
+                          </div>
+                          {note && (
+                            <div className="text-xs text-primary font-normal mt-0.5">
+                              {note}
+                            </div>
+                          )}
+                        </td>
+                        <td className="border-b border-border/30 px-4 py-3 text-sm">
+                          {isRehearsal ? (
+                            <span className="text-muted-foreground italic">
                               Ensayo
                             </span>
+                          ) : (
+                            getRolesForDate(date)
                           )}
-                          {depRoleDate && (
-                            <span className="text-xs font-semibold text-primary">
-                              ★ {getDependentRoleNamesOnDate(date).join(", ")}
-                            </span>
-                          )}
-                        </div>
-                        {note && (
-                          <div className="text-xs text-primary font-normal">
-                            {note}
-                          </div>
-                        )}
-                      </td>
-                      <td className="border border-border px-4 py-2 text-sm">
-                        {isRehearsal ? (
-                          <span className="text-muted-foreground italic">
-                            Ensayo
-                          </span>
-                        ) : (
-                          getRolesForDate(date)
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           ) : (
             // Full schedule table
-            <table className="w-full border-collapse">
-              <thead>
-                <tr>
-                  <th className="border border-border bg-muted px-4 py-2 text-left text-sm font-medium">
-                    Fecha
-                  </th>
-                  {roleOrder.map((role) => (
-                    <th
-                      key={role.id}
-                      className="border border-border bg-muted px-4 py-2 text-left text-sm font-medium"
-                    >
-                      {role.name}
+            <div className="rounded-xl border border-border/50 overflow-hidden shadow-[0_1px_3px_var(--shadow-color)]">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr>
+                    <th className="border-b border-r border-border/50 bg-muted/50 px-4 py-3 text-left text-sm font-semibold">
+                      Fecha
                     </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {allDates.map((date, index) => {
-                  const isRehearsal = rehearsalSet.has(date);
-                  const entriesOnDate = schedule.entries.filter(
-                    (e) => e.date === date
-                  );
-                  const note = noteMap.get(date);
-                  const prevDate = index > 0 ? allDates[index - 1] : null;
-                  const weekBreak = isNewWeek(date, prevDate);
+                    {roleOrder.map((role) => (
+                      <th
+                        key={role.id}
+                        className="border-b border-r border-border/50 bg-muted/50 px-4 py-3 text-left text-sm font-semibold"
+                      >
+                        {role.name}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {allDates.map((date, index) => {
+                    const isRehearsal = rehearsalSet.has(date);
+                    const entriesOnDate = schedule.entries.filter(
+                      (e) => e.date === date
+                    );
+                    const note = noteMap.get(date);
+                    const prevDate = index > 0 ? allDates[index - 1] : null;
+                    const weekBreak = isNewWeek(date, prevDate);
 
-                  return (
-                    <tr
-                      key={date}
-                      className={[
-                        isRehearsal ? "bg-muted/30" : "",
-                        isPast(date) ? "opacity-50" : "",
-                        weekBreak ? "border-t-4 border-t-border/60" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                    >
-                      <td className="border border-border px-4 py-2 text-sm font-medium whitespace-nowrap">
-                        <div>{formatDateShort(date)}</div>
-                        {note && (
-                          <div className="text-xs text-primary font-normal">
-                            {note}
-                          </div>
-                        )}
-                      </td>
-                      {isRehearsal ? (
-                        <td
-                          colSpan={roleOrder.length}
-                          className="border border-border px-4 py-2 text-sm text-muted-foreground italic text-center"
-                        >
-                          Ensayo
+                    return (
+                      <tr
+                        key={date}
+                        className={[
+                          isRehearsal
+                            ? "bg-muted/20"
+                            : index % 2 === 0
+                              ? "bg-card"
+                              : "bg-muted/10",
+                          isPast(date) ? "opacity-50" : "",
+                          weekBreak ? "border-t-2 border-t-border/40" : "",
+                          "hover:bg-accent/30 transition-colors",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                      >
+                        <td className="border-b border-r border-border/30 px-4 py-3 text-sm font-medium whitespace-nowrap">
+                          <div>{formatDateShort(date)}</div>
+                          {note && (
+                            <div className="text-xs text-primary font-normal mt-0.5">
+                              {note}
+                            </div>
+                          )}
                         </td>
-                      ) : (
-                        roleOrder.map((role) => {
-                          const roleEntries = entriesOnDate.filter(
-                            (e) => e.roleId === role.id
-                          );
-                          return (
-                            <td
-                              key={role.id}
-                              className="border border-border px-4 py-2 text-sm"
-                            >
-                              {roleEntries.length === 0 ? (
-                                <span className="text-muted-foreground">
-                                  —
-                                </span>
-                              ) : (
-                                roleEntries
-                                  .map((e) => e.memberName)
-                                  .join(", ")
-                              )}
-                            </td>
-                          );
-                        })
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        {isRehearsal ? (
+                          <td
+                            colSpan={roleOrder.length}
+                            className="border-b border-border/30 px-4 py-3 text-sm text-muted-foreground italic text-center"
+                          >
+                            Ensayo
+                          </td>
+                        ) : (
+                          roleOrder.map((role) => {
+                            const roleEntries = entriesOnDate.filter(
+                              (e) => e.roleId === role.id
+                            );
+                            return (
+                              <td
+                                key={role.id}
+                                className="border-b border-r border-border/30 px-4 py-3 text-sm"
+                              >
+                                {roleEntries.length === 0 ? (
+                                  <span className="text-muted-foreground/40">
+                                    —
+                                  </span>
+                                ) : (
+                                  roleEntries
+                                    .map((e) => e.memberName)
+                                    .join(", ")
+                                )}
+                              </td>
+                            );
+                          })
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 
         {displayDates.length === 0 && !upcomingDate && (
-          <p className="text-center text-muted-foreground py-8">
-            {filteredMemberId
-              ? "Este miembro no tiene asignaciones este mes."
-              : "No se encontraron entradas."}
-          </p>
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">
+              {filteredMemberId
+                ? "Este miembro no tiene asignaciones este mes."
+                : "No se encontraron entradas."}
+            </p>
+          </div>
         )}
       </main>
     </div>

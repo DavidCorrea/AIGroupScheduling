@@ -181,28 +181,30 @@ export default function RolesPage() {
   };
 
   if (groupLoading || loading) {
-    return <p className="text-muted-foreground">Cargando...</p>;
+    return <p className="text-sm text-muted-foreground">Cargando...</p>;
   }
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-12">
       <div>
-        <h1 className="text-2xl font-bold">Roles</h1>
-        <p className="mt-1 text-muted-foreground">
+        <h1 className="text-2xl font-bold tracking-tight">Roles</h1>
+        <p className="mt-1.5 text-muted-foreground">
           Define los roles necesarios para cada fecha de servicio, cuántas
           personas se requieren y sus grupos exclusivos.
         </p>
       </div>
 
       {/* ── Section 1: Roles ── */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Roles</h2>
-        <p className="text-sm text-muted-foreground">
-          Configura cada rol con la cantidad de personas requeridas,
-          dependencias opcionales y grupo exclusivo.
-        </p>
+      <section className="space-y-5">
+        <div>
+          <h2 className="text-lg font-semibold">Roles</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Configura cada rol con la cantidad de personas requeridas,
+            dependencias opcionales y grupo exclusivo.
+          </p>
+        </div>
 
-        <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground space-y-1">
+        <div className="rounded-xl border border-border/50 bg-muted/30 px-5 py-4 text-sm text-muted-foreground space-y-2">
           <p>
             <span className="font-medium text-foreground">Depende de:</span>{" "}
             El rol no se asigna automáticamente. Al generar el cronograma, se
@@ -226,7 +228,7 @@ export default function RolesPage() {
           {roles.map((role) => (
             <div
               key={role.id}
-              className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3"
+              className="flex items-center justify-between rounded-xl border border-border/50 bg-card px-5 py-3.5 shadow-[0_1px_2px_var(--shadow-color)]"
             >
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 {editingRoleId === role.id ? (
@@ -240,7 +242,7 @@ export default function RolesPage() {
                     }}
                     onBlur={() => saveRoleName(role)}
                     autoFocus
-                    className="rounded-md border border-border bg-background px-2 py-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary w-48"
+                    className="rounded-lg border border-border bg-background px-2.5 py-1 text-sm font-medium focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 w-48"
                   />
                 ) : (
                   <span
@@ -256,10 +258,10 @@ export default function RolesPage() {
                 )}
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 {/* Required count */}
                 <div className="flex items-center gap-2">
-                  <label className="text-sm text-muted-foreground">
+                  <label className="text-xs text-muted-foreground">
                     Requeridos:
                   </label>
                   <select
@@ -267,7 +269,7 @@ export default function RolesPage() {
                     onChange={(e) =>
                       updateRoleCount(role, parseInt(e.target.value, 10))
                     }
-                    className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+                    className="rounded-lg border border-border bg-background px-2 py-1 text-sm"
                   >
                     {[1, 2, 3, 4, 5, 6].map((n) => (
                       <option key={n} value={n}>
@@ -279,7 +281,7 @@ export default function RolesPage() {
 
                 {/* Dependency */}
                 <div className="flex items-center gap-2">
-                  <label className="text-sm text-muted-foreground">
+                  <label className="text-xs text-muted-foreground">
                     Depende de:
                   </label>
                   <select
@@ -290,7 +292,7 @@ export default function RolesPage() {
                         e.target.value ? parseInt(e.target.value, 10) : null
                       )
                     }
-                    className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+                    className="rounded-lg border border-border bg-background px-2 py-1 text-sm"
                   >
                     <option value="">Ninguno</option>
                     {roles
@@ -305,7 +307,7 @@ export default function RolesPage() {
 
                 {/* Exclusive Group */}
                 <div className="flex items-center gap-2">
-                  <label className="text-sm text-muted-foreground">
+                  <label className="text-xs text-muted-foreground">
                     Grupo exclusivo:
                   </label>
                   <select
@@ -316,7 +318,7 @@ export default function RolesPage() {
                         e.target.value ? parseInt(e.target.value, 10) : null
                       )
                     }
-                    className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+                    className="rounded-lg border border-border bg-background px-2 py-1 text-sm"
                   >
                     <option value="">Ninguno</option>
                     {groups.map((g) => (
@@ -333,15 +335,15 @@ export default function RolesPage() {
                     type="checkbox"
                     checked={role.isRelevant}
                     onChange={() => toggleRelevant(role)}
-                    className="rounded border-border"
+                    className="rounded border-border accent-primary"
                   />
-                  <span className="text-sm text-muted-foreground">Relevante</span>
+                  <span className="text-xs text-muted-foreground">Relevante</span>
                 </label>
 
                 {/* Delete */}
                 <button
                   onClick={() => deleteRole(role)}
-                  className="rounded-md border border-destructive px-2 py-1 text-xs text-destructive hover:bg-destructive hover:text-white transition-colors"
+                  className="rounded-lg border border-destructive/30 px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive hover:text-white transition-colors"
                   title="Eliminar rol"
                 >
                   Eliminar
@@ -353,31 +355,33 @@ export default function RolesPage() {
 
         <form onSubmit={addRole} className="flex items-end gap-3">
           <div className="flex-1">
-            <label className="block text-sm font-medium mb-1">
+            <label className="block text-sm font-medium text-muted-foreground mb-1.5">
               Nombre del nuevo rol
             </label>
             <input
               type="text"
               value={newRoleName}
               onChange={(e) => setNewRoleName(e.target.value)}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
               placeholder="ej. Saxofón"
             />
           </div>
           <div className="w-24">
-            <label className="block text-sm font-medium mb-1">Cantidad</label>
+            <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+              Cantidad
+            </label>
             <input
               type="number"
               min={1}
               max={10}
               value={newRoleCount}
               onChange={(e) => setNewRoleCount(parseInt(e.target.value, 10))}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
             />
           </div>
           <button
             type="submit"
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+            className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all"
           >
             Agregar rol
           </button>
@@ -385,28 +389,32 @@ export default function RolesPage() {
       </section>
 
       {/* ── Section 2: Grupos Exclusivos ── */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Grupos Exclusivos</h2>
-        <p className="text-sm text-muted-foreground">
-          Los roles dentro del mismo grupo exclusivo no pueden asignarse al
-          mismo miembro en la misma fecha.
-        </p>
+      <section className="space-y-5">
+        <div>
+          <h2 className="text-lg font-semibold">Grupos Exclusivos</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Los roles dentro del mismo grupo exclusivo no pueden asignarse al
+            mismo miembro en la misma fecha.
+          </p>
+        </div>
 
         {groups.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No hay grupos exclusivos configurados.
-          </p>
+          <div className="rounded-xl border border-dashed border-border bg-muted/30 py-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              No hay grupos exclusivos configurados.
+            </p>
+          </div>
         ) : (
           <div className="space-y-2">
             {groups.map((group) => (
               <div
                 key={group.id}
-                className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3"
+                className="flex items-center justify-between rounded-xl border border-border/50 bg-card px-5 py-3.5 shadow-[0_1px_2px_var(--shadow-color)]"
               >
                 <span className="font-medium">{group.name}</span>
                 <button
                   onClick={() => deleteGroup(group)}
-                  className="rounded-md border border-destructive px-3 py-1 text-sm text-destructive hover:bg-destructive hover:text-white transition-colors"
+                  className="rounded-lg border border-destructive/30 px-3.5 py-1.5 text-sm font-medium text-destructive hover:bg-destructive hover:text-white transition-colors"
                 >
                   Eliminar
                 </button>
@@ -417,20 +425,20 @@ export default function RolesPage() {
 
         <form onSubmit={addGroup} className="flex items-end gap-3">
           <div className="flex-1">
-            <label className="block text-sm font-medium mb-1">
+            <label className="block text-sm font-medium text-muted-foreground mb-1.5">
               Nombre del nuevo grupo
             </label>
             <input
               type="text"
               value={newGroupName}
               onChange={(e) => setNewGroupName(e.target.value)}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
               placeholder="ej. Instrumento"
             />
           </div>
           <button
             type="submit"
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+            className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-110 transition-all"
           >
             Agregar
           </button>
