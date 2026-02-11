@@ -46,6 +46,15 @@ interface Member {
   id: number;
   name: string;
   roleIds: number[];
+  availableDayIds: number[];
+}
+
+interface ScheduleDay {
+  id: number;
+  dayOfWeek: string;
+  active: boolean;
+  isRehearsal: boolean;
+  groupId: number;
 }
 
 const MONTH_NAMES = [
@@ -74,6 +83,17 @@ function formatDate(dateStr: string): string {
   });
 }
 
+/** Get the Spanish weekday name (capitalized, e.g. "Lunes") for a date string. */
+function getDayOfWeek(dateStr: string): string {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const raw = date.toLocaleDateString("es-ES", {
+    weekday: "long",
+    timeZone: "UTC",
+  });
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
 // Key for the edit state map: "date|roleId|slotIndex"
 function slotKey(date: string, roleId: number, slotIndex: number): string {
   return `${date}|${roleId}|${slotIndex}`;
@@ -85,6 +105,7 @@ export default function SchedulePreviewPage() {
   const { groupId, slug, loading: groupLoading } = useGroup();
   const [schedule, setSchedule] = useState<ScheduleDetail | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
+  const [scheduleDays, setScheduleDays] = useState<ScheduleDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingNote, setEditingNote] = useState<string | null>(null);
@@ -102,9 +123,10 @@ export default function SchedulePreviewPage() {
   const fetchData = useCallback(async () => {
     if (!groupId) return;
 
-    const [scheduleRes, membersRes] = await Promise.all([
+    const [scheduleRes, membersRes, daysRes] = await Promise.all([
       fetch(`/api/schedules/${params.id}`),
       fetch(`/api/members?groupId=${groupId}`),
+      fetch(`/api/configuration/days?groupId=${groupId}`),
     ]);
 
     if (!scheduleRes.ok) {
@@ -115,6 +137,7 @@ export default function SchedulePreviewPage() {
     const scheduleData: ScheduleDetail = await scheduleRes.json();
     setSchedule(scheduleData);
     setMembers(await membersRes.json());
+    setScheduleDays(await daysRes.json());
     setLoading(false);
   }, [params.id, router, groupId]);
 
@@ -149,6 +172,15 @@ export default function SchedulePreviewPage() {
     const entryDates = [...new Set(schedule.entries.map((e) => e.date))];
     return [...new Set([...entryDates, ...schedule.rehearsalDates])].sort();
   }, [schedule]);
+
+  // Map dayOfWeek name -> scheduleDayId for availability lookups
+  const dayOfWeekToId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const d of scheduleDays) {
+      map.set(d.dayOfWeek, d.id);
+    }
+    return map;
+  }, [scheduleDays]);
 
   // Build edit state from schedule whenever schedule changes
   useEffect(() => {
@@ -260,6 +292,16 @@ export default function SchedulePreviewPage() {
     return <p className="text-sm text-muted-foreground">Cargando...</p>;
   }
 
+  // Helper: check if a member is available on a given date
+  const isMemberAvailable = (member: Member, date: string): boolean => {
+    // If the member has no availability configured at all, consider them available everywhere
+    if (member.availableDayIds.length === 0) return true;
+    const dayName = getDayOfWeek(date);
+    const scheduleDayId = dayOfWeekToId.get(dayName);
+    if (scheduleDayId == null) return true; // day not configured, allow
+    return member.availableDayIds.includes(scheduleDayId);
+  };
+
   // Helper: get eligible members for a role slot
   const getEligibleMembers = (date: string, role: RoleInfo): Member[] => {
     if (role.dependsOnRoleId != null) {
@@ -286,19 +328,35 @@ export default function SchedulePreviewPage() {
           m.roleIds.includes(role.id)
       );
     }
-    // Regular role: all members that have this role
-    return members.filter((m) => m.roleIds.includes(role.id));
+    // Regular role: members that have this role AND are available on this day
+    return members.filter(
+      (m) => m.roleIds.includes(role.id) && isMemberAvailable(m, date)
+    );
   };
 
   // Render a single select for a slot
   const renderSlotSelect = (
     date: string,
     role: RoleInfo,
-    slotIndex: number
+    slotIndex: number,
+    totalSlots?: number
   ) => {
     const key = slotKey(date, role.id, slotIndex);
     const currentMemberId = editState.get(key) ?? null;
     const eligible = getEligibleMembers(date, role);
+
+    // Collect member IDs already selected in OTHER slots of the same role on the same date
+    const takenByOtherSlots = new Set<number>();
+    const slots = totalSlots ?? role.requiredCount;
+    for (let i = 0; i < slots; i++) {
+      if (i === slotIndex) continue;
+      const otherId = editState.get(slotKey(date, role.id, i));
+      if (otherId != null) takenByOtherSlots.add(otherId);
+    }
+
+    const options = eligible.filter(
+      (m) => !takenByOtherSlots.has(m.id) || m.id === currentMemberId
+    );
 
     return (
       <select
@@ -311,7 +369,7 @@ export default function SchedulePreviewPage() {
         }}
       >
         <option value="">— Vacío —</option>
-        {eligible.map((m) => (
+        {options.map((m) => (
           <option key={m.id} value={m.id}>
             {m.name}
           </option>
@@ -393,7 +451,7 @@ export default function SchedulePreviewPage() {
       )}
 
       {/* Mobile card view */}
-      <div className="md:hidden space-y-px border border-border rounded-md overflow-hidden">
+      <div className="md:hidden space-y-4">
         {allDates.map((date) => {
           const isRehearsal = rehearsalSet.has(date);
           const note = noteMap.get(date);
@@ -401,7 +459,7 @@ export default function SchedulePreviewPage() {
           return (
             <div
               key={date}
-              className={`bg-background ${isRehearsal ? "bg-muted/30" : ""}`}
+              className={`border border-border rounded-md overflow-hidden ${isRehearsal ? "bg-muted/30" : "bg-background"}`}
             >
               {/* Date header */}
               <div className="px-4 py-3 border-b border-border">
@@ -456,11 +514,11 @@ export default function SchedulePreviewPage() {
 
               {/* Role entries */}
               {isRehearsal ? (
-                <div className="px-4 py-3 text-sm text-muted-foreground italic text-center border-b border-border">
+                <div className="px-4 py-3 text-sm text-muted-foreground italic text-center">
                   Ensayo
                 </div>
               ) : (
-                <div className="divide-y divide-border">
+                <div className="divide-y divide-border/50">
                   {roleOrder.map((role) => {
                     const existingEntries = schedule.entries.filter(
                       (e) => e.date === date && e.roleId === role.id
@@ -472,9 +530,9 @@ export default function SchedulePreviewPage() {
                         <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1.5">
                           {role.name}
                         </div>
-                        <div className="space-y-2">
+                        <div className={slotCount > 1 ? "grid grid-cols-2 gap-2" : ""}>
                           {Array.from({ length: slotCount }).map((_, i) =>
-                            renderSlotSelect(date, role, i)
+                            renderSlotSelect(date, role, i, slotCount)
                           )}
                         </div>
                       </div>
@@ -581,9 +639,9 @@ export default function SchedulePreviewPage() {
 
                       return (
                         <td key={role.id} className="px-4 py-3 text-sm">
-                          <div className="space-y-1.5">
+                          <div className={slotCount > 1 ? "grid grid-cols-2 gap-1.5" : ""}>
                             {Array.from({ length: slotCount }).map((_, i) =>
-                              renderSlotSelect(date, role, i)
+                              renderSlotSelect(date, role, i, slotCount)
                             )}
                           </div>
                         </td>
