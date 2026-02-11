@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 
 export interface ScheduleEntry {
@@ -147,12 +148,16 @@ export default function SharedScheduleView({
   schedule: SharedScheduleData;
   basePath?: string;
 }) {
+  const { data: session } = useSession();
   const [filteredMemberId, setFilteredMemberId] = useState<number | null>(null);
+  const [filteredRoleId, setFilteredRoleId] = useState<number | null>(null);
   const [darkMode, setDarkMode] = useState(true);
   const [today, setToday] = useState("");
-  const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
+  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
   const [dayFilter, setDayFilter] = useState("");
   const [showPastDates, setShowPastDates] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [calendarSelectedDate, setCalendarSelectedDate] = useState<string | null>(null);
 
   // Initialise dark mode from system preference or localStorage
   useEffect(() => {
@@ -177,6 +182,12 @@ export default function SharedScheduleView({
     }
     localStorage.setItem("band-scheduler-theme", darkMode ? "dark" : "light");
   }, [darkMode]);
+
+  // Reset view mode when member filter changes
+  useEffect(() => {
+    setViewMode("list");
+    setCalendarSelectedDate(null);
+  }, [filteredMemberId]);
 
   // Support both old leaderRoleId (single) and new dependentRoleIds (array)
   const dependentRoleIds: number[] = schedule.dependentRoleIds
@@ -209,12 +220,16 @@ export default function SharedScheduleView({
     .sort()
     .filter(isDateVisible);
 
-  // Filter entries if a member is selected
-  const filteredEntries = filteredMemberId
-    ? schedule.entries.filter((e) => e.memberId === filteredMemberId)
-    : schedule.entries;
+  // Filter entries by member and/or role
+  const filteredEntries = schedule.entries.filter((e) => {
+    if (filteredMemberId && e.memberId !== filteredMemberId) return false;
+    if (filteredRoleId && e.roleId !== filteredRoleId) return false;
+    return true;
+  });
 
-  const filteredDates = filteredMemberId
+  const hasActiveFilter = filteredMemberId || filteredRoleId;
+
+  const filteredDates = hasActiveFilter
     ? [...new Set(filteredEntries.map((e) => e.date))].sort().filter(isDateVisible)
     : allDates;
 
@@ -294,9 +309,9 @@ export default function SharedScheduleView({
     ? filteredDates.filter((d) => !rehearsalSet.has(d)).length
     : 0;
 
-  // Helper: toggle collapsed state for a date (mobile cards)
-  const toggleCollapsed = (date: string) => {
-    setCollapsedDates((prev) => {
+  // Helper: toggle expanded state for a date (mobile cards)
+  const toggleExpanded = (date: string) => {
+    setExpandedDates((prev) => {
       const next = new Set(prev);
       if (next.has(date)) {
         next.delete(date);
@@ -323,6 +338,20 @@ export default function SharedScheduleView({
   const displayDates = upcomingDate
     ? filteredDates.filter((d) => d !== upcomingDate)
     : filteredDates;
+
+  // The first non-rehearsal date is auto-expanded on mobile
+  const autoExpandedDate = displayDates.find((d) => !rehearsalSet.has(d)) ?? null;
+
+  // A date is expanded if:
+  //  - it's the auto-expanded first date and NOT manually toggled off, OR
+  //  - it's been manually toggled on
+  const isDateExpanded = (date: string): boolean => {
+    const isAutoOpen = date === autoExpandedDate;
+    const isManuallyToggled = expandedDates.has(date);
+    // XOR: auto-open dates start expanded; toggling flips them.
+    // Non-auto dates start collapsed; toggling flips them.
+    return isAutoOpen ? !isManuallyToggled : isManuallyToggled;
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -365,12 +394,21 @@ export default function SharedScheduleView({
                 <span className="text-base leading-none">{darkMode ? "☀️" : "🌙"}</span>
                 <span>{darkMode ? "Claro" : "Oscuro"}</span>
               </button>
-              <Link
-                href="/login"
-                className="rounded-md border border-border px-3 py-1.5 text-sm hover:border-foreground transition-colors"
-              >
-                Iniciar sesión
-              </Link>
+              {session ? (
+                <Link
+                  href="/"
+                  className="rounded-md border border-border px-3 py-1.5 text-sm hover:border-foreground transition-colors"
+                >
+                  Inicio
+                </Link>
+              ) : (
+                <Link
+                  href="/login"
+                  className="rounded-md border border-border px-3 py-1.5 text-sm hover:border-foreground transition-colors"
+                >
+                  Iniciar sesión
+                </Link>
+              )}
             </div>
           </div>
 
@@ -389,6 +427,22 @@ export default function SharedScheduleView({
               {schedule.members.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filteredRoleId ?? ""}
+              onChange={(e) =>
+                setFilteredRoleId(
+                  e.target.value ? parseInt(e.target.value, 10) : null
+                )
+              }
+              className="w-full sm:w-auto rounded-md border border-border bg-transparent px-3.5 py-2 text-sm"
+            >
+              <option value="">Todos los roles</option>
+              {roleOrder.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
                 </option>
               ))}
             </select>
@@ -418,55 +472,124 @@ export default function SharedScheduleView({
       </header>
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-        {/* Filtered member view header */}
+        {/* Mobile: merged summary card (Agenda + upcoming) */}
         {filteredMemberId && selectedMember && (
-          <div className="mb-8 border-b border-border pb-6">
+          <div className="mb-8 border border-foreground/20 rounded-md p-5 lg:hidden">
             <h2 className="text-lg font-medium">
               Agenda de {selectedMember.name}
             </h2>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-muted-foreground mt-0.5">
               {assignedDateCount}{" "}
               {assignedDateCount === 1
                 ? "fecha asignada"
                 : "fechas asignadas"}
             </p>
-          </div>
-        )}
-
-        {/* Upcoming assignment for filtered member */}
-        {filteredMemberId && selectedMember && upcomingDate && (
-          <div className="mb-8 border border-foreground/20 rounded-md p-5">
-            <h3 className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-3">
-              Próxima asignación
-            </h3>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-              <span className="font-medium">
-                {formatDateLong(upcomingDate)}
-                {today && (
-                  <span className="ml-2 text-sm text-muted-foreground font-normal">
-                    — {getRelativeLabel(upcomingDate, today)}
-                  </span>
+            {upcomingDate && (
+              <div className="mt-4 pt-4 border-t border-border/50">
+                <h3 className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">
+                  Próxima asignación
+                </h3>
+                <p className="font-medium">
+                  {formatDateLong(upcomingDate)}
+                  {today && (
+                    <span className="ml-2 text-sm text-muted-foreground font-normal">
+                      — {getRelativeLabel(upcomingDate, today)}
+                    </span>
+                  )}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {getNonDependentRolesForDate(upcomingDate)}
+                  {hasDependentRoleOnDate(upcomingDate) && (
+                    <span className="ml-2 text-foreground font-medium">
+                      ★ {getDependentRoleNamesOnDate(upcomingDate).join(", ")}
+                    </span>
+                  )}
+                </p>
+                {noteMap.get(upcomingDate) && (
+                  <p className="text-xs text-accent mt-2">
+                    {noteMap.get(upcomingDate)}
+                  </p>
                 )}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                {getNonDependentRolesForDate(upcomingDate)}
-                {hasDependentRoleOnDate(upcomingDate) && (
-                  <span className="ml-2 text-foreground font-medium">
-                    ★ {getDependentRoleNamesOnDate(upcomingDate).join(", ")}
-                  </span>
-                )}
-              </span>
-            </div>
-            {noteMap.get(upcomingDate) && (
-              <p className="text-xs text-accent mt-2">
-                {noteMap.get(upcomingDate)}
-              </p>
+              </div>
             )}
           </div>
         )}
 
-        {/* Mobile card view */}
-        <div className="block lg:hidden">
+        {/* Desktop: separate header + upcoming card */}
+        {filteredMemberId && selectedMember && (
+          <div className="hidden lg:block">
+            <div className="mb-8 border-b border-border pb-6">
+              <h2 className="text-lg font-medium">
+                Agenda de {selectedMember.name}
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {assignedDateCount}{" "}
+                {assignedDateCount === 1
+                  ? "fecha asignada"
+                  : "fechas asignadas"}
+              </p>
+            </div>
+            {upcomingDate && (
+              <div className="mb-8 border border-foreground/20 rounded-md p-5">
+                <h3 className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-3">
+                  Próxima asignación
+                </h3>
+                <div className="flex items-center justify-between gap-1">
+                  <span className="font-medium">
+                    {formatDateLong(upcomingDate)}
+                    {today && (
+                      <span className="ml-2 text-sm text-muted-foreground font-normal">
+                        — {getRelativeLabel(upcomingDate, today)}
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {getNonDependentRolesForDate(upcomingDate)}
+                    {hasDependentRoleOnDate(upcomingDate) && (
+                      <span className="ml-2 text-foreground font-medium">
+                        ★ {getDependentRoleNamesOnDate(upcomingDate).join(", ")}
+                      </span>
+                    )}
+                  </span>
+                </div>
+                {noteMap.get(upcomingDate) && (
+                  <p className="text-xs text-accent mt-2">
+                    {noteMap.get(upcomingDate)}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* View mode tabs (when member is selected) */}
+        {filteredMemberId && (
+          <div className="flex border-b border-border mb-6">
+            <button
+              onClick={() => setViewMode("list")}
+              className={`px-4 py-2.5 text-sm transition-colors ${
+                viewMode === "list"
+                  ? "border-b-2 border-foreground font-medium"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Lista
+            </button>
+            <button
+              onClick={() => setViewMode("calendar")}
+              className={`px-4 py-2.5 text-sm transition-colors ${
+                viewMode === "calendar"
+                  ? "border-b-2 border-foreground font-medium"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Calendario
+            </button>
+          </div>
+        )}
+
+        {/* Mobile card view (list mode) */}
+        <div className={`lg:hidden ${filteredMemberId && viewMode !== "list" ? "hidden" : "block"}`}>
           {displayDates.map((date, index) => {
             const isRehearsal = rehearsalSet.has(date);
             const entriesOnDate = filteredEntries.filter(
@@ -482,100 +605,202 @@ export default function SharedScheduleView({
             return (
               <div key={date}>
                 {weekBreak && (
-                  <div className="border-t border-border my-6" />
+                  <div className="my-5" />
                 )}
-                <div
-                  className={`border-b border-border transition-all ${
-                    isPast(date) ? "opacity-50" : ""
-                  } ${highlighted ? "bg-muted/30" : ""}`}
-                >
+                {isRehearsal ? (
+                  /* Rehearsal: simple non-collapsible row */
                   <div
-                    className="px-4 py-3.5 text-sm cursor-pointer select-none"
-                    onClick={() => toggleCollapsed(date)}
+                    className={`border-b border-border px-4 py-3.5 text-sm ${
+                      isPast(date) ? "opacity-50" : ""
+                    }`}
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">
-                          {collapsedDates.has(date) ? "▸" : "▾"}
-                        </span>
-                        <span className="font-medium">{formatDateLong(date)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {isRehearsal && (
-                          <span className="text-xs text-muted-foreground italic">
-                            Ensayo
-                          </span>
-                        )}
-                        {depRoleDate && filteredMemberId && (
-                          <span className="text-xs font-medium">
-                            ★ {getDependentRoleNamesOnDate(date).join(", ")}
-                          </span>
-                        )}
-                      </div>
+                      <span className="font-medium">{formatDateLong(date)}</span>
+                      <span className="text-xs text-muted-foreground italic">
+                        Ensayo
+                      </span>
                     </div>
                     {note && (
-                      <p className="text-xs text-accent mt-1 ml-5">{note}</p>
+                      <p className="text-xs text-accent mt-1">{note}</p>
                     )}
                   </div>
-                  {!collapsedDates.has(date) && (
-                    <>
-                      {isRehearsal ? (
-                        <div className="px-4 py-3 text-sm text-muted-foreground italic text-center">
-                          Ensayo
+                ) : (
+                  /* Normal date: collapsible card */
+                  <div
+                    className={`border-b border-border transition-all ${
+                      isPast(date) ? "opacity-50" : ""
+                    } ${highlighted ? "bg-muted/30" : ""}`}
+                  >
+                    <div
+                      className="px-4 py-3.5 text-sm cursor-pointer select-none"
+                      onClick={() => toggleExpanded(date)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">
+                            {isDateExpanded(date) ? "▾" : "▸"}
+                          </span>
+                          <span className="font-medium">{formatDateLong(date)}</span>
                         </div>
-                      ) : (
-                        <div>
-                          {filteredMemberId ? (
-                            // Grouped roles for filtered member
-                            <div className="px-4 py-3 text-sm border-t border-border/50">
-                              <span className="text-muted-foreground">
-                                {getRolesForDate(date)}
-                              </span>
-                            </div>
-                          ) : (
-                            roleOrder.map((role) => {
-                              const roleEntries = entriesOnDate.filter(
-                                (e) => e.roleId === role.id
-                              );
-                              if (roleEntries.length === 0) return null;
-                              return (
-                                <div
-                                  key={role.id}
-                                  className="flex justify-between px-4 py-2.5 text-sm border-t border-border/30"
-                                >
-                                  <span className="text-muted-foreground text-xs uppercase tracking-wide">
-                                    {role.name}
-                                  </span>
-                                  <span className="font-medium text-right">
-                                    {roleEntries
-                                      .map((e) => e.memberName)
-                                      .join(", ")}
-                                  </span>
-                                </div>
-                              );
-                            })
+                        <div className="flex items-center gap-2">
+                          {depRoleDate && filteredMemberId && (
+                            <span className="text-xs font-medium">
+                              ★ {getDependentRoleNamesOnDate(date).join(", ")}
+                            </span>
                           )}
                         </div>
+                      </div>
+                      {note && (
+                        <p className="text-xs text-accent mt-1 ml-5">{note}</p>
                       )}
-                    </>
-                  )}
-                </div>
+                    </div>
+                    {isDateExpanded(date) && (
+                      <div>
+                        {filteredMemberId ? (
+                          // Grouped roles for filtered member
+                          <div className="px-4 py-3 text-sm border-t border-border/50">
+                            <span className="text-muted-foreground">
+                              {getRolesForDate(date)}
+                            </span>
+                          </div>
+                        ) : (
+                          roleOrder.map((role) => {
+                            const roleEntries = entriesOnDate.filter(
+                              (e) => e.roleId === role.id
+                            );
+                            if (roleEntries.length === 0) return null;
+                            return (
+                              <div
+                                key={role.id}
+                                className="flex justify-between px-4 py-2.5 text-sm border-t border-border/30"
+                              >
+                                <span className="text-muted-foreground text-xs uppercase tracking-wide">
+                                  {role.name}
+                                </span>
+                                <span className="font-medium text-right">
+                                  {roleEntries
+                                    .map((e) => e.memberName)
+                                    .join(", ")}
+                                </span>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
 
+        {/* Calendar grid view (when member is selected and calendar tab active) */}
+        {filteredMemberId && viewMode === "calendar" && (
+          <div className="max-w-md mx-auto">
+            {(() => {
+              // Build the full month grid
+              const year = schedule.year;
+              const month = schedule.month; // 1-based
+              const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+              // Day of week for the 1st (0=Sun..6=Sat) -> convert to Mon-based (0=Mon..6=Sun)
+              const firstDayDow = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+              const leadingBlanks = firstDayDow === 0 ? 6 : firstDayDow - 1;
+
+              // Build a set of dates that have assignments for the filtered member
+              const assignmentDateSet = new Set(
+                filteredEntries.map((e) => e.date)
+              );
+              // Set of dates with relevant or dependent roles
+              const highlightedDateSet = new Set<string>();
+              for (const d of assignmentDateSet) {
+                if (hasDependentRoleOnDate(d) || hasRelevantRoleOnDate(d)) {
+                  highlightedDateSet.add(d);
+                }
+              }
+
+              const dayHeaders = ["L", "M", "X", "J", "V", "S", "D"];
+
+              return (
+                <div>
+                  {/* Weekday headers */}
+                  <div className="grid grid-cols-7 gap-1 mb-1">
+                    {dayHeaders.map((d) => (
+                      <div
+                        key={d}
+                        className="text-center text-xs font-medium text-muted-foreground py-1"
+                      >
+                        {d}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Day cells */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {/* Leading blanks */}
+                    {Array.from({ length: leadingBlanks }).map((_, i) => (
+                      <div key={`blank-${i}`} />
+                    ))}
+
+                    {/* Actual days */}
+                    {Array.from({ length: daysInMonth }).map((_, i) => {
+                      const dayNum = i + 1;
+                      const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+                      const hasAssignment = assignmentDateSet.has(dateStr);
+                      const isHighlighted = highlightedDateSet.has(dateStr);
+                      const isRehearsalDay = rehearsalSet.has(dateStr);
+                      const isToday = dateStr === today;
+                      const past = isPast(dateStr);
+                      const hasContent = hasAssignment || isRehearsalDay;
+
+                      return (
+                        <button
+                          key={dayNum}
+                          onClick={() => {
+                            if (hasContent) setCalendarSelectedDate(dateStr);
+                          }}
+                          disabled={!hasContent}
+                          className={[
+                            "aspect-square rounded-md flex items-center justify-center text-sm transition-colors relative",
+                            past ? "opacity-50" : "",
+                            isToday ? "ring-1 ring-foreground" : "",
+                            isHighlighted
+                              ? "bg-foreground/15 font-semibold"
+                              : hasAssignment
+                                ? "bg-muted/50 font-medium"
+                                : isRehearsalDay
+                                  ? "border border-dashed border-border"
+                                  : "text-muted-foreground",
+                            hasContent ? "cursor-pointer hover:bg-muted/70 active:bg-muted" : "cursor-default",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
+                          {dayNum}
+                          {isHighlighted && (
+                            <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-foreground" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
         {/* Desktop table view */}
-        <div className="hidden lg:block overflow-x-auto">
+        <div className={`hidden lg:block overflow-x-auto ${filteredMemberId && viewMode === "calendar" ? "!hidden" : ""}`}>
           {filteredMemberId ? (
             // Simplified table for individual member
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  <th className="px-4 py-4 text-left text-xs font-medium uppercase tracking-widest text-muted-foreground">
                     Fecha
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  <th className="px-4 py-4 text-left text-xs font-medium uppercase tracking-widest text-muted-foreground">
                     Rol
                   </th>
                 </tr>
@@ -591,140 +816,158 @@ export default function SharedScheduleView({
                   const weekBreak = isNewWeek(date, prevDate);
 
                   return (
-                    <tr
-                      key={date}
-                      className={[
-                        "border-b border-border",
-                        isRehearsal ? "bg-muted/20" : highlighted ? "bg-muted/30" : "",
-                        isPast(date) ? "opacity-50" : "",
-                        weekBreak ? "border-t-2 border-t-border" : "",
-                        "hover:bg-muted/20 transition-colors",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                    >
-                      <td
-                        className={`px-4 py-3 text-sm ${
-                          highlighted ? "border-l-2 border-l-foreground" : ""
-                        }`}
+                    <React.Fragment key={date}>
+                      {weekBreak && (
+                        <tr aria-hidden="true">
+                          <td colSpan={2} className="h-5" />
+                        </tr>
+                      )}
+                      <tr
+                        className={[
+                          "border-b border-border",
+                          isRehearsal ? "bg-muted/20" : highlighted ? "bg-muted/30" : "",
+                          isPast(date) ? "opacity-50" : "",
+                          "hover:bg-muted/20 transition-colors",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{formatDateLong(date)}</span>
-                          {isRehearsal && (
-                            <span className="text-xs text-muted-foreground italic">
+                        <td
+                          className={`px-4 py-4 text-sm ${
+                            highlighted ? "border-l-2 border-l-foreground" : ""
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{formatDateLong(date)}</span>
+                            {isRehearsal && (
+                              <span className="text-xs text-muted-foreground italic">
+                                Ensayo
+                              </span>
+                            )}
+                            {depRoleDate && (
+                              <span className="text-xs font-medium">
+                                ★ {getDependentRoleNamesOnDate(date).join(", ")}
+                              </span>
+                            )}
+                          </div>
+                          {note && (
+                            <div className="text-xs text-accent font-normal mt-0.5">
+                              {note}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-4 text-sm">
+                          {isRehearsal ? (
+                            <span className="text-muted-foreground italic">
                               Ensayo
                             </span>
+                          ) : (
+                            getRolesForDate(date)
                           )}
-                          {depRoleDate && (
-                            <span className="text-xs font-medium">
-                              ★ {getDependentRoleNamesOnDate(date).join(", ")}
-                            </span>
-                          )}
-                        </div>
-                        {note && (
-                          <div className="text-xs text-accent font-normal mt-0.5">
-                            {note}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        {isRehearsal ? (
-                          <span className="text-muted-foreground italic">
-                            Ensayo
-                          </span>
-                        ) : (
-                          getRolesForDate(date)
-                        )}
-                      </td>
-                    </tr>
+                        </td>
+                      </tr>
+                    </React.Fragment>
                   );
                 })}
               </tbody>
             </table>
           ) : (
             // Full schedule table
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                    Fecha
-                  </th>
-                  {roleOrder.map((role) => (
-                    <th
-                      key={role.id}
-                      className="px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-muted-foreground"
-                    >
-                      {role.name}
+            (() => {
+              const visibleRoles = filteredRoleId
+                ? roleOrder.filter((r) => r.id === filteredRoleId)
+                : roleOrder;
+              const tableDates = filteredRoleId ? filteredDates : allDates;
+              return (
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="px-4 py-4 text-left text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                      Fecha
                     </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {allDates.map((date, index) => {
-                  const isRehearsal = rehearsalSet.has(date);
-                  const entriesOnDate = schedule.entries.filter(
-                    (e) => e.date === date
-                  );
-                  const note = noteMap.get(date);
-                  const prevDate = index > 0 ? allDates[index - 1] : null;
-                  const weekBreak = isNewWeek(date, prevDate);
+                    {visibleRoles.map((role) => (
+                      <th
+                        key={role.id}
+                        className="px-4 py-4 text-left text-xs font-medium uppercase tracking-widest text-muted-foreground"
+                      >
+                        {role.name}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {tableDates.map((date, index) => {
+                    const isRehearsal = rehearsalSet.has(date);
+                    const entriesOnDate = filteredEntries.filter(
+                      (e) => e.date === date
+                    );
+                    const note = noteMap.get(date);
+                    const prevDate = index > 0 ? tableDates[index - 1] : null;
+                    const weekBreak = isNewWeek(date, prevDate);
 
-                  return (
-                    <tr
-                      key={date}
-                      className={[
-                        "border-b border-border",
-                        isRehearsal ? "bg-muted/20" : "",
-                        isPast(date) ? "opacity-50" : "",
-                        weekBreak ? "border-t-2 border-t-border" : "",
-                        "hover:bg-muted/20 transition-colors",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                    >
-                      <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">
-                        <div>{formatDateShort(date)}</div>
-                        {note && (
-                          <div className="text-xs text-accent font-normal mt-0.5">
-                            {note}
-                          </div>
+                    return (
+                      <React.Fragment key={date}>
+                        {weekBreak && (
+                          <tr aria-hidden="true">
+                            <td colSpan={visibleRoles.length + 1} className="h-5" />
+                          </tr>
                         )}
-                      </td>
-                      {isRehearsal ? (
-                        <td
-                          colSpan={roleOrder.length}
-                          className="px-4 py-3 text-sm text-muted-foreground italic text-center"
+                        <tr
+                          className={[
+                            "border-b border-border",
+                            isRehearsal ? "bg-muted/20" : "",
+                            isPast(date) ? "opacity-50" : "",
+                            "hover:bg-muted/20 transition-colors",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
                         >
-                          Ensayo
-                        </td>
-                      ) : (
-                        roleOrder.map((role) => {
-                          const roleEntries = entriesOnDate.filter(
-                            (e) => e.roleId === role.id
-                          );
-                          return (
+                          <td className="px-4 py-4 text-sm font-medium whitespace-nowrap">
+                            <div>{formatDateShort(date)}</div>
+                            {note && (
+                              <div className="text-xs text-accent font-normal mt-0.5">
+                                {note}
+                              </div>
+                            )}
+                          </td>
+                          {isRehearsal ? (
                             <td
-                              key={role.id}
-                              className="px-4 py-3 text-sm"
+                              colSpan={visibleRoles.length}
+                              className="px-4 py-4 text-sm text-muted-foreground italic text-center"
                             >
-                              {roleEntries.length === 0 ? (
-                                <span className="text-muted-foreground/40">
-                                  —
-                                </span>
-                              ) : (
-                                roleEntries
-                                  .map((e) => e.memberName)
-                                  .join(", ")
-                              )}
+                              Ensayo
                             </td>
-                          );
-                        })
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                          ) : (
+                            visibleRoles.map((role) => {
+                              const roleEntries = entriesOnDate.filter(
+                                (e) => e.roleId === role.id
+                              );
+                              return (
+                                <td
+                                  key={role.id}
+                                  className="px-4 py-4 text-sm"
+                                >
+                                  {roleEntries.length === 0 ? (
+                                    <span className="text-muted-foreground/40">
+                                      —
+                                    </span>
+                                  ) : (
+                                    roleEntries
+                                      .map((e) => e.memberName)
+                                      .join(", ")
+                                  )}
+                                </td>
+                              );
+                            })
+                          )}
+                        </tr>
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+              );
+            })()
           )}
         </div>
 
@@ -733,11 +976,70 @@ export default function SharedScheduleView({
             <p className="text-muted-foreground">
               {filteredMemberId
                 ? "Este miembro no tiene asignaciones este mes."
-                : "No se encontraron entradas."}
+                : hasActiveFilter
+                  ? "No se encontraron asignaciones con los filtros seleccionados."
+                  : "No se encontraron entradas."}
             </p>
           </div>
         )}
       </main>
+
+      {/* Calendar day detail dialog */}
+      {calendarSelectedDate && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={() => setCalendarSelectedDate(null)}
+        >
+          <div
+            className="bg-background border border-border rounded-lg w-full max-w-sm p-5 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-4">
+              <h3 className="font-medium capitalize">
+                {formatDateLong(calendarSelectedDate)}
+              </h3>
+              <button
+                onClick={() => setCalendarSelectedDate(null)}
+                className="text-muted-foreground hover:text-foreground transition-colors text-lg leading-none ml-3"
+                aria-label="Cerrar"
+              >
+                &times;
+              </button>
+            </div>
+
+            {rehearsalSet.has(calendarSelectedDate) ? (
+              <p className="text-sm text-muted-foreground italic">Ensayo</p>
+            ) : (
+              <div className="space-y-2">
+                {filteredEntries
+                  .filter((e) => e.date === calendarSelectedDate)
+                  .map((e) => (
+                    <div
+                      key={e.id}
+                      className="flex items-center justify-between text-sm"
+                    >
+                      <span className="text-muted-foreground text-xs uppercase tracking-wide">
+                        {e.roleName}
+                      </span>
+                      {dependentRoleIdSet.has(e.roleId) && (
+                        <span className="text-xs font-medium">★</span>
+                      )}
+                    </div>
+                  ))}
+                {filteredEntries.filter((e) => e.date === calendarSelectedDate).length === 0 && (
+                  <p className="text-sm text-muted-foreground">Sin asignaciones</p>
+                )}
+              </div>
+            )}
+
+            {noteMap.get(calendarSelectedDate) && (
+              <p className="text-xs text-accent mt-3 pt-3 border-t border-border/50">
+                {noteMap.get(calendarSelectedDate)}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

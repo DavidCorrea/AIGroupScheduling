@@ -117,7 +117,35 @@ export default function HomePage() {
     );
   }
 
-  const conflictDates = new Set(dashboard?.conflicts.map((c) => c.date) ?? []);
+  // Compute the closest upcoming assignment per group
+  const closestByGroup = (() => {
+    if (!dashboard || dashboard.assignments.length === 0) return [];
+
+    const grouped = new Map<
+      number,
+      { groupName: string; groupSlug: string; date: string; roles: string[] }
+    >();
+
+    // Assignments are already sorted by date from the API
+    for (const a of dashboard.assignments) {
+      const existing = grouped.get(a.groupId);
+      if (!existing) {
+        // First (closest) date for this group
+        grouped.set(a.groupId, {
+          groupName: a.groupName,
+          groupSlug: a.groupSlug,
+          date: a.date,
+          roles: [a.roleName],
+        });
+      } else if (existing.date === a.date) {
+        // Same closest date, additional role
+        existing.roles.push(a.roleName);
+      }
+      // Skip later dates — we only want the closest
+    }
+
+    return [...grouped.values()].sort((a, b) => a.date.localeCompare(b.date));
+  })();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -140,55 +168,62 @@ export default function HomePage() {
           </Link>
         </div>
 
-        {/* Create group form */}
-        {canCreate ? (
-          <div className="mb-12 border-t border-border pt-8">
+        {/* Closest upcoming assignments */}
+        {closestByGroup.length > 0 && (
+          <div className="mb-12">
             <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">
-              Crear grupo
+              Próxima asignación
             </h2>
-            <form onSubmit={handleSubmit}>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-sm text-muted-foreground mb-1.5">
-                    Nombre
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => handleNameChange(e.target.value)}
-                    className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
-                    placeholder="Nombre del grupo"
-                    required
-                  />
+            <div className="divide-y divide-border">
+              {closestByGroup.map((item) => (
+                <div key={item.groupSlug} className="py-4 first:pt-0">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">
+                        {formatDate(item.date)}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        {item.roles.join(", ")}
+                      </p>
+                    </div>
+                    <Link
+                      href={`/${item.groupSlug}/cronograma`}
+                      className="shrink-0 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {item.groupName} &rarr;
+                    </Link>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm text-muted-foreground mb-1.5">
-                    Slug (URL)
-                  </label>
-                  <input
-                    type="text"
-                    value={slug}
-                    onChange={(e) => setSlug(e.target.value)}
-                    className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
-                    placeholder="slug-del-grupo"
-                    required
-                  />
-                </div>
-              </div>
-
-              {error && (
-                <p className="mt-3 text-sm text-destructive">{error}</p>
-              )}
-
-              <button
-                type="submit"
-                className="mt-5 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
-              >
-                Crear grupo
-              </button>
-            </form>
+              ))}
+            </div>
           </div>
-        ) : null}
+        )}
+
+        {/* Conflicts */}
+        {dashboard && dashboard.conflicts.length > 0 && (
+          <div className="mb-12">
+            <h2 className="uppercase tracking-widest text-xs font-medium text-destructive mb-6">
+              Conflictos
+            </h2>
+            <div className="border border-destructive/30 rounded-md p-4">
+              <ul className="space-y-2">
+                {dashboard.conflicts.map((conflict) => (
+                  <li
+                    key={conflict.date}
+                    className="text-sm"
+                  >
+                    <span className="font-medium">
+                      {formatDate(conflict.date)}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {" "}— {conflict.groups.join(", ")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
 
         {/* Groups list */}
         <div className="mb-12">
@@ -240,58 +275,55 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* Upcoming assignments */}
-        {dashboard && dashboard.assignments.length > 0 && (
-          <div>
+        {/* Create group form */}
+        {canCreate ? (
+          <div className="mb-12 border-t border-border pt-8">
             <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">
-              Próximas asignaciones
+              Crear grupo
             </h2>
-
-            {dashboard.conflicts.length > 0 && (
-              <div className="mb-6 border border-destructive/30 rounded-md p-4">
-                <p className="text-sm font-medium text-destructive mb-2">
-                  Conflictos detectados
-                </p>
-                <ul className="space-y-1">
-                  {dashboard.conflicts.map((conflict) => (
-                    <li
-                      key={conflict.date}
-                      className="text-sm text-muted-foreground"
-                    >
-                      <span className="font-medium text-foreground">
-                        {formatDate(conflict.date)}
-                      </span>{" "}
-                      — {conflict.groups.join(", ")}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <div className="divide-y divide-border">
-              {dashboard.assignments.slice(0, 20).map((assignment, idx) => (
-                <div
-                  key={`${assignment.date}-${assignment.roleName}-${idx}`}
-                  className={`py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 ${
-                    conflictDates.has(assignment.date) ? "text-destructive" : ""
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium min-w-[120px]">
-                      {formatDate(assignment.date)}
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      {assignment.roleName}
-                    </span>
-                  </div>
-                  <span className="text-sm text-muted-foreground">
-                    {assignment.groupName}
-                  </span>
+            <form onSubmit={handleSubmit}>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm text-muted-foreground mb-1.5">
+                    Nombre
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => handleNameChange(e.target.value)}
+                    className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
+                    placeholder="Nombre del grupo"
+                    required
+                  />
                 </div>
-              ))}
-            </div>
+                <div>
+                  <label className="block text-sm text-muted-foreground mb-1.5">
+                    Slug (URL)
+                  </label>
+                  <input
+                    type="text"
+                    value={slug}
+                    onChange={(e) => setSlug(e.target.value)}
+                    className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
+                    placeholder="slug-del-grupo"
+                    required
+                  />
+                </div>
+              </div>
+
+              {error && (
+                <p className="mt-3 text-sm text-destructive">{error}</p>
+              )}
+
+              <button
+                type="submit"
+                className="mt-5 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+              >
+                Crear grupo
+              </button>
+            </form>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
