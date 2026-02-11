@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useGroup } from "@/lib/group-context";
 
@@ -74,6 +74,11 @@ function formatDate(dateStr: string): string {
   });
 }
 
+// Key for the edit state map: "date|roleId|slotIndex"
+function slotKey(date: string, roleId: number, slotIndex: number): string {
+  return `${date}|${roleId}|${slotIndex}`;
+}
+
 export default function SchedulePreviewPage() {
   const params = useParams();
   const router = useRouter();
@@ -81,12 +86,18 @@ export default function SchedulePreviewPage() {
   const [schedule, setSchedule] = useState<ScheduleDetail | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
-  const [swapping, setSwapping] = useState<{
-    entryId: number;
-    roleId: number;
-  } | null>(null);
+  const [saving, setSaving] = useState(false);
   const [editingNote, setEditingNote] = useState<string | null>(null);
   const [noteText, setNoteText] = useState("");
+
+  // Local editable state: slotKey -> memberId | null
+  const [editState, setEditState] = useState<Map<string, number | null>>(
+    new Map()
+  );
+  // Snapshot of the initial state from the server (to detect dirty)
+  const [initialState, setInitialState] = useState<Map<string, number | null>>(
+    new Map()
+  );
 
   const fetchData = useCallback(async () => {
     if (!groupId) return;
@@ -101,7 +112,8 @@ export default function SchedulePreviewPage() {
       return;
     }
 
-    setSchedule(await scheduleRes.json());
+    const scheduleData: ScheduleDetail = await scheduleRes.json();
+    setSchedule(scheduleData);
     setMembers(await membersRes.json());
     setLoading(false);
   }, [params.id, router, groupId]);
@@ -110,49 +122,99 @@ export default function SchedulePreviewPage() {
     if (groupId) fetchData();
   }, [groupId, fetchData]);
 
-  const handleSwap = async (entryId: number, newMemberId: number) => {
-    await fetch(`/api/schedules/${params.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "swap",
-        entryId,
-        newMemberId,
-      }),
-    });
-    setSwapping(null);
-    fetchData();
-  };
+  // Derive roleOrder from schedule
+  const roleOrder = useMemo(() => {
+    if (!schedule) return [];
+    const entryRoleIds = new Set(schedule.entries.map((e) => e.roleId));
+    const dependentRoleIds = new Set(
+      schedule.roles
+        .filter((r) => r.dependsOnRoleId != null)
+        .map((r) => r.id)
+    );
+    return schedule.roles
+      .filter((r) => entryRoleIds.has(r.id) || dependentRoleIds.has(r.id))
+      .sort((a, b) => a.displayOrder - b.displayOrder);
+  }, [schedule]);
 
-  const handleRemove = async (entryId: number) => {
-    await fetch(`/api/schedules/${params.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "remove", entryId }),
-    });
-    setSwapping(null);
-    fetchData();
-  };
+  const rehearsalSet = useMemo(
+    () => new Set(schedule?.rehearsalDates ?? []),
+    [schedule]
+  );
+  const noteMap = useMemo(
+    () => new Map((schedule?.notes ?? []).map((n) => [n.date, n.description])),
+    [schedule]
+  );
+  const allDates = useMemo(() => {
+    if (!schedule) return [];
+    const entryDates = [...new Set(schedule.entries.map((e) => e.date))];
+    return [...new Set([...entryDates, ...schedule.rehearsalDates])].sort();
+  }, [schedule]);
 
-  const handleAssign = async (date: string, roleId: number, memberId: number | null) => {
-    if (memberId === null) {
-      const entry = schedule?.entries.find(
-        (e) => e.date === date && e.roleId === roleId
-      );
-      if (entry) {
-        await fetch(`/api/schedules/${params.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "unassign", entryId: entry.id }),
-        });
+  // Build edit state from schedule whenever schedule changes
+  useEffect(() => {
+    if (!schedule || roleOrder.length === 0) return;
+
+    const state = new Map<string, number | null>();
+
+    for (const date of allDates) {
+      if (rehearsalSet.has(date)) continue;
+
+      for (const role of roleOrder) {
+        const roleEntries = schedule.entries
+          .filter((e) => e.date === date && e.roleId === role.id)
+          .sort((a, b) => a.id - b.id); // stable order by id
+
+        const slotCount = Math.max(role.requiredCount, roleEntries.length);
+        for (let i = 0; i < slotCount; i++) {
+          const key = slotKey(date, role.id, i);
+          state.set(key, roleEntries[i]?.memberId ?? null);
+        }
       }
-    } else {
-      await fetch(`/api/schedules/${params.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "assign", date, roleId, memberId }),
+    }
+
+    setEditState(new Map(state));
+    setInitialState(new Map(state));
+  }, [schedule, roleOrder, allDates, rehearsalSet]);
+
+  // Check if there are unsaved changes
+  const isDirty = useMemo(() => {
+    if (editState.size !== initialState.size) return true;
+    for (const [key, value] of editState) {
+      if (initialState.get(key) !== value) return true;
+    }
+    return false;
+  }, [editState, initialState]);
+
+  const updateSlot = (date: string, roleId: number, slotIndex: number, memberId: number | null) => {
+    setEditState((prev) => {
+      const next = new Map(prev);
+      next.set(slotKey(date, roleId, slotIndex), memberId);
+      return next;
+    });
+  };
+
+  const handleSave = async () => {
+    if (!schedule) return;
+    setSaving(true);
+
+    // Build entries array from editState
+    const entries: Array<{ date: string; roleId: number; memberId: number | null }> = [];
+    for (const [key, memberId] of editState) {
+      const [date, roleIdStr] = key.split("|");
+      entries.push({
+        date,
+        roleId: parseInt(roleIdStr, 10),
+        memberId,
       });
     }
+
+    await fetch(`/api/schedules/${params.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "bulk_update", entries }),
+    });
+
+    setSaving(false);
     fetchData();
   };
 
@@ -198,23 +260,65 @@ export default function SchedulePreviewPage() {
     return <p className="text-sm text-muted-foreground">Cargando...</p>;
   }
 
-  // Group entries by date, also include rehearsal dates
-  const entryDates = [...new Set(schedule.entries.map((e) => e.date))];
-  const allDates = [...new Set([...entryDates, ...schedule.rehearsalDates])].sort();
+  // Helper: get eligible members for a role slot
+  const getEligibleMembers = (date: string, role: RoleInfo): Member[] => {
+    if (role.dependsOnRoleId != null) {
+      // Dependent role: only members assigned to the source role on this date
+      // who also have this dependent role in their roleIds
+      const sourceEntryMemberIds: number[] = [];
+      for (const sourceRole of roleOrder) {
+        if (sourceRole.id === role.dependsOnRoleId) {
+          const slotCount = Math.max(
+            sourceRole.requiredCount,
+            schedule.entries.filter(
+              (e) => e.date === date && e.roleId === sourceRole.id
+            ).length
+          );
+          for (let i = 0; i < slotCount; i++) {
+            const mid = editState.get(slotKey(date, sourceRole.id, i));
+            if (mid != null) sourceEntryMemberIds.push(mid);
+          }
+        }
+      }
+      return members.filter(
+        (m) =>
+          sourceEntryMemberIds.includes(m.id) &&
+          m.roleIds.includes(role.id)
+      );
+    }
+    // Regular role: all members that have this role
+    return members.filter((m) => m.roleIds.includes(role.id));
+  };
 
-  const entryRoleIds = new Set(schedule.entries.map((e) => e.roleId));
-  const dependentRoleIds = new Set(
-    (schedule.roles ?? [])
-      .filter((r) => r.dependsOnRoleId != null)
-      .map((r) => r.id)
-  );
-  const roleOrder = (schedule.roles ?? [])
-    .filter((r) => entryRoleIds.has(r.id) || dependentRoleIds.has(r.id))
-    .sort((a, b) => a.displayOrder - b.displayOrder)
-    .map((r) => ({ id: r.id, name: r.name, dependsOnRoleId: r.dependsOnRoleId }));
+  // Render a single select for a slot
+  const renderSlotSelect = (
+    date: string,
+    role: RoleInfo,
+    slotIndex: number
+  ) => {
+    const key = slotKey(date, role.id, slotIndex);
+    const currentMemberId = editState.get(key) ?? null;
+    const eligible = getEligibleMembers(date, role);
 
-  const noteMap = new Map(schedule.notes.map((n) => [n.date, n.description]));
-  const rehearsalSet = new Set(schedule.rehearsalDates);
+    return (
+      <select
+        key={key}
+        className="rounded-md border border-border bg-transparent px-3 py-2 text-sm w-full"
+        value={currentMemberId ?? ""}
+        onChange={(e) => {
+          const val = e.target.value;
+          updateSlot(date, role.id, slotIndex, val ? parseInt(val, 10) : null);
+        }}
+      >
+        <option value="">— Vacío —</option>
+        {eligible.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.name}
+          </option>
+        ))}
+      </select>
+    );
+  };
 
   return (
     <div className="space-y-8">
@@ -242,14 +346,18 @@ export default function SchedulePreviewPage() {
               </a>
             )}
           </div>
-          {schedule.status === "draft" && (
-            <button
-              onClick={handleCommit}
-              className="w-full sm:w-auto rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
-            >
-              Crear cronograma
-            </button>
-          )}
+          <div className="flex gap-2 w-full sm:w-auto">
+            {schedule.status === "draft" && (
+              <button
+                onClick={handleCommit}
+                disabled={isDirty}
+                className="flex-1 sm:flex-none rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+                title={isDirty ? "Guarda los cambios primero" : undefined}
+              >
+                Crear cronograma
+              </button>
+            )}
+          </div>
         </div>
         <p className="text-sm text-muted-foreground">
           {schedule.status === "committed" ? (
@@ -268,11 +376,26 @@ export default function SchedulePreviewPage() {
         </p>
       </div>
 
+      {/* Sticky save bar */}
+      {isDirty && (
+        <div className="sticky top-0 z-20 bg-background border-b border-border py-3 -mx-4 px-4 sm:-mx-6 sm:px-6 flex items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">
+            Hay cambios sin guardar.
+          </p>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50 shrink-0"
+          >
+            {saving ? "Guardando..." : "Guardar cambios"}
+          </button>
+        </div>
+      )}
+
       {/* Mobile card view */}
       <div className="md:hidden space-y-px border border-border rounded-md overflow-hidden">
         {allDates.map((date) => {
           const isRehearsal = rehearsalSet.has(date);
-          const entriesOnDate = schedule.entries.filter((e) => e.date === date);
           const note = noteMap.get(date);
 
           return (
@@ -339,84 +462,21 @@ export default function SchedulePreviewPage() {
               ) : (
                 <div className="divide-y divide-border">
                   {roleOrder.map((role) => {
-                    const roleEntries = entriesOnDate.filter((e) => e.roleId === role.id);
-                    const isDependentRole = role.dependsOnRoleId != null;
-
-                    if (isDependentRole) {
-                      const sourceMembers = entriesOnDate
-                        .filter((e) => e.roleId === role.dependsOnRoleId)
-                        .filter((e) => {
-                          const member = members.find((m) => m.id === e.memberId);
-                          return member?.roleIds.includes(role.id);
-                        });
-                      const currentEntry = roleEntries[0] ?? null;
-                      return (
-                        <div key={role.id} className="px-4 py-3">
-                          <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1.5">{role.name}</div>
-                          <select
-                            className="rounded-md border border-border bg-transparent px-3 py-2 text-sm w-full min-h-[40px]"
-                            value={currentEntry?.memberId ?? ""}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              handleAssign(date, role.id, val ? parseInt(val, 10) : null);
-                            }}
-                          >
-                            <option value="">Seleccionar...</option>
-                            {sourceMembers.map((sm) => (
-                              <option key={sm.memberId} value={sm.memberId}>{sm.memberName}</option>
-                            ))}
-                          </select>
-                        </div>
-                      );
-                    }
+                    const existingEntries = schedule.entries.filter(
+                      (e) => e.date === date && e.roleId === role.id
+                    );
+                    const slotCount = Math.max(role.requiredCount, existingEntries.length);
 
                     return (
                       <div key={role.id} className="px-4 py-3">
-                        <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1.5">{role.name}</div>
-                        {roleEntries.length === 0 ? (
-                          <span className="text-sm text-muted-foreground/50">—</span>
-                        ) : (
-                          <div className="space-y-1.5">
-                            {roleEntries.map((entry) => (
-                              <div key={entry.id} className="flex items-center justify-between">
-                                {swapping?.entryId === entry.id ? (
-                                  <select
-                                    autoFocus
-                                    className="rounded-md border border-border bg-transparent px-3 py-2 text-sm w-full min-h-[40px]"
-                                    defaultValue=""
-                                    onChange={(e) => {
-                                      if (e.target.value === "__remove__") {
-                                        handleRemove(entry.id);
-                                      } else if (e.target.value) {
-                                        handleSwap(entry.id, parseInt(e.target.value, 10));
-                                      }
-                                    }}
-                                    onBlur={() => setSwapping(null)}
-                                  >
-                                    <option value="">Seleccionar...</option>
-                                    <option value="__remove__">— Vaciar —</option>
-                                    {members
-                                      .filter((m) => m.roleIds.includes(role.id))
-                                      .map((m) => (
-                                        <option key={m.id} value={m.id}>{m.name}</option>
-                                      ))}
-                                  </select>
-                                ) : (
-                                  <>
-                                    <span className="text-sm">{entry.memberName}</span>
-                                    <button
-                                      onClick={() => setSwapping({ entryId: entry.id, roleId: role.id })}
-                                      className="text-xs text-accent hover:opacity-80 px-2 py-1 transition-opacity"
-                                      title="Cambiar miembro"
-                                    >
-                                      cambiar
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1.5">
+                          {role.name}
+                        </div>
+                        <div className="space-y-2">
+                          {Array.from({ length: slotCount }).map((_, i) =>
+                            renderSlotSelect(date, role, i)
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -448,9 +508,6 @@ export default function SchedulePreviewPage() {
           <tbody>
             {allDates.map((date) => {
               const isRehearsal = rehearsalSet.has(date);
-              const entriesOnDate = schedule.entries.filter(
-                (e) => e.date === date
-              );
               const note = noteMap.get(date);
 
               return (
@@ -517,107 +574,18 @@ export default function SchedulePreviewPage() {
                     </td>
                   ) : (
                     roleOrder.map((role) => {
-                      const roleEntries = entriesOnDate.filter(
-                        (e) => e.roleId === role.id
+                      const existingEntries = schedule.entries.filter(
+                        (e) => e.date === date && e.roleId === role.id
                       );
-                      const isDependentRole = role.dependsOnRoleId != null;
-
-                      if (isDependentRole) {
-                        const sourceMembers = entriesOnDate
-                          .filter((e) => e.roleId === role.dependsOnRoleId)
-                          .filter((e) => {
-                            const member = members.find((m) => m.id === e.memberId);
-                            return member?.roleIds.includes(role.id);
-                          });
-                        const currentEntry = roleEntries[0] ?? null;
-                        return (
-                          <td key={role.id} className="px-4 py-3 text-sm">
-                            <select
-                              className="rounded-md border border-border bg-transparent px-2.5 py-1.5 text-sm w-full"
-                              value={currentEntry?.memberId ?? ""}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                handleAssign(
-                                  date,
-                                  role.id,
-                                  val ? parseInt(val, 10) : null
-                                );
-                              }}
-                            >
-                              <option value="">Seleccionar...</option>
-                              {sourceMembers.map((sm) => (
-                                <option key={sm.memberId} value={sm.memberId}>
-                                  {sm.memberName}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                        );
-                      }
+                      const slotCount = Math.max(role.requiredCount, existingEntries.length);
 
                       return (
                         <td key={role.id} className="px-4 py-3 text-sm">
-                          {roleEntries.length === 0 ? (
-                            <span className="text-muted-foreground/50">
-                              —
-                            </span>
-                          ) : (
-                            <div className="space-y-1">
-                              {roleEntries.map((entry) => (
-                                <div
-                                  key={entry.id}
-                                  className="flex items-center gap-1"
-                                >
-                                  {swapping?.entryId === entry.id ? (
-                                    <select
-                                      autoFocus
-                                      className="rounded-md border border-border bg-transparent px-2 py-1 text-sm"
-                                      defaultValue=""
-                                      onChange={(e) => {
-                                        if (e.target.value === "__remove__") {
-                                          handleRemove(entry.id);
-                                        } else if (e.target.value) {
-                                          handleSwap(
-                                            entry.id,
-                                            parseInt(e.target.value, 10)
-                                          );
-                                        }
-                                      }}
-                                      onBlur={() => setSwapping(null)}
-                                    >
-                                      <option value="">Seleccionar...</option>
-                                      <option value="__remove__">— Vaciar —</option>
-                                      {members
-                                        .filter((m) =>
-                                          m.roleIds.includes(role.id)
-                                        )
-                                        .map((m) => (
-                                          <option key={m.id} value={m.id}>
-                                            {m.name}
-                                          </option>
-                                        ))}
-                                    </select>
-                                  ) : (
-                                    <>
-                                      <span>{entry.memberName}</span>
-                                      <button
-                                        onClick={() =>
-                                          setSwapping({
-                                            entryId: entry.id,
-                                            roleId: role.id,
-                                          })
-                                        }
-                                        className="text-xs text-accent hover:opacity-80 ml-1 transition-opacity"
-                                        title="Cambiar miembro"
-                                      >
-                                        cambiar
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                          <div className="space-y-1.5">
+                            {Array.from({ length: slotCount }).map((_, i) =>
+                              renderSlotSelect(date, role, i)
+                            )}
+                          </div>
                         </td>
                       );
                     })

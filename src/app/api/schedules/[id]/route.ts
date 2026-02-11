@@ -289,6 +289,54 @@ export async function PUT(
     return NextResponse.json({ success: true });
   }
 
+  // Bulk update entries: replaces all entries for the schedule
+  if (body.action === "bulk_update" && Array.isArray(body.entries)) {
+    // body.entries: Array<{ date: string, roleId: number, memberId: number | null }>
+    // Each item represents a single slot. Multiple items with the same date+roleId
+    // represent multiple slots for roles with requiredCount > 1.
+    // We delete all existing non-dependent-role entries and re-insert the provided ones.
+
+    const allRoles = await db
+      .select()
+      .from(roles)
+      .where(eq(roles.groupId, schedule.groupId));
+    const dependentRoleIdSet = new Set(
+      allRoles.filter((r) => r.dependsOnRoleId != null).map((r) => r.id)
+    );
+
+    // Separate dependent vs non-dependent entries in the payload
+    const regularEntries: Array<{ date: string; roleId: number; memberId: number | null }> = [];
+    const dependentEntries: Array<{ date: string; roleId: number; memberId: number | null }> = [];
+
+    for (const entry of body.entries) {
+      if (dependentRoleIdSet.has(entry.roleId)) {
+        dependentEntries.push(entry);
+      } else {
+        regularEntries.push(entry);
+      }
+    }
+
+    // Delete all existing entries for this schedule
+    await db.delete(scheduleEntries)
+      .where(eq(scheduleEntries.scheduleId, scheduleId));
+
+    // Insert all non-empty entries
+    const toInsert = [...regularEntries, ...dependentEntries]
+      .filter((e) => e.memberId != null)
+      .map((e) => ({
+        scheduleId,
+        date: e.date,
+        roleId: e.roleId,
+        memberId: e.memberId!,
+      }));
+
+    if (toInsert.length > 0) {
+      await db.insert(scheduleEntries).values(toInsert);
+    }
+
+    return NextResponse.json({ success: true });
+  }
+
   return NextResponse.json({ error: "Acción inválida" }, { status: 400 });
 }
 
