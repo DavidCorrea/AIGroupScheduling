@@ -223,7 +223,11 @@ export default function SharedScheduleView({
   };
 
   const allDates = [
-    ...new Set([...entryDates, ...schedule.rehearsalDates]),
+    ...new Set([
+      ...entryDates,
+      ...schedule.rehearsalDates,
+      ...(schedule.extraDates ?? []).map((d) => d.date),
+    ]),
   ]
     .sort()
     .filter(isDateVisible);
