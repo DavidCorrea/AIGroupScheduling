@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { scheduleDateNotes } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { requireAuth } from "@/lib/api-helpers";
+import { logScheduleAction } from "@/lib/audit-log";
 
 export async function GET(
   _request: NextRequest,
@@ -22,6 +24,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   const { id } = await params;
   const scheduleId = parseInt(id, 10);
   const body = await request.json();
@@ -34,7 +39,6 @@ export async function POST(
     );
   }
 
-  // Check if a note already exists for this date
   const existing = (await db
     .select()
     .from(scheduleDateNotes)
@@ -46,20 +50,20 @@ export async function POST(
     ))[0];
 
   if (existing) {
-    // Update existing note
     await db.update(scheduleDateNotes)
       .set({ description: description.trim() })
       .where(eq(scheduleDateNotes.id, existing.id));
 
+    await logScheduleAction(scheduleId, authResult.user.id, "note_saved", `Nota guardada para ${date}`);
     return NextResponse.json({ ...existing, description: description.trim() });
   }
 
-  // Create new note
   const note = (await db
     .insert(scheduleDateNotes)
     .values({ scheduleId, date, description: description.trim() })
     .returning())[0];
 
+  await logScheduleAction(scheduleId, authResult.user.id, "note_saved", `Nota guardada para ${date}`);
   return NextResponse.json(note, { status: 201 });
 }
 
@@ -67,6 +71,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   const { id } = await params;
   const scheduleId = parseInt(id, 10);
   const { searchParams } = new URL(request.url);
@@ -87,5 +94,6 @@ export async function DELETE(
       )
     );
 
+  await logScheduleAction(scheduleId, authResult.user.id, "note_deleted", `Nota eliminada para ${date}`);
   return NextResponse.json({ success: true });
 }

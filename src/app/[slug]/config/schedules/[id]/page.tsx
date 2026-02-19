@@ -40,6 +40,14 @@ interface ExtraDate {
   type: string;
 }
 
+interface AuditLogEntry {
+  id: number;
+  action: string;
+  detail: string | null;
+  userName: string | null;
+  createdAt: string;
+}
+
 interface ScheduleDetail {
   id: number;
   month: number;
@@ -53,6 +61,7 @@ interface ScheduleDetail {
   nextScheduleId: number | null;
   holidayConflicts?: HolidayConflict[];
   extraDates?: ExtraDate[];
+  auditLog?: AuditLogEntry[];
 }
 
 interface Member {
@@ -107,6 +116,39 @@ function getDayOfWeek(dateStr: string): string {
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
+interface AuditDetailStructured {
+  message: string;
+  changes?: { date: string; role: string; from: string | null; to: string | null }[];
+  added?: { date: string; roleName: string; memberName: string }[];
+  mode?: string;
+  removedCount?: number;
+}
+
+function tryParseJson(str: string | null): AuditDetailStructured | null {
+  if (!str) return null;
+  try {
+    const parsed = JSON.parse(str);
+    return typeof parsed === "object" && parsed !== null && "message" in parsed ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function formatRelativeTime(isoStr: string): string {
+  const now = Date.now();
+  const then = new Date(isoStr).getTime();
+  const diffMs = now - then;
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "ahora";
+  if (diffMin < 60) return `hace ${diffMin} min`;
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return `hace ${diffHours}h`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays === 1) return "ayer";
+  if (diffDays < 30) return `hace ${diffDays} dias`;
+  return new Date(isoStr).toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+}
+
 // Key for the edit state map: "date|roleId|slotIndex"
 function slotKey(date: string, roleId: number, slotIndex: number): string {
   return `${date}|${roleId}|${slotIndex}`;
@@ -135,6 +177,10 @@ export default function SchedulePreviewPage() {
   const [rebuildPreview, setRebuildPreview] = useState<{ date: string; roleId: number; roleName: string; memberId: number; memberName: string }[] | null>(null);
   const [rebuildRemovedCount, setRebuildRemovedCount] = useState(0);
   const [rebuildLoading, setRebuildLoading] = useState(false);
+
+  // Audit log
+  const [logOpen, setLogOpen] = useState(false);
+  const [logDetailOpen, setLogDetailOpen] = useState<number | null>(null);
 
   // Local editable state: slotKey -> memberId | null
   const [editState, setEditState] = useState<Map<string, number | null>>(
@@ -876,6 +922,89 @@ export default function SchedulePreviewPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Audit log */}
+      {schedule.auditLog && schedule.auditLog.length > 0 && (
+        <div className="border border-border rounded-md">
+          <button
+            onClick={() => setLogOpen(!logOpen)}
+            className="w-full flex items-center justify-between px-4 py-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <span>Historial de cambios ({schedule.auditLog.length})</span>
+            <span className="text-xs">{logOpen ? "▲" : "▼"}</span>
+          </button>
+          {logOpen && (
+            <div className="border-t border-border divide-y divide-border">
+              {schedule.auditLog.map((entry) => {
+                const parsed = tryParseJson(entry.detail);
+                const isStructured = parsed && (parsed.changes || parsed.added);
+
+                return (
+                  <div key={entry.id} className="px-4 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm">
+                          {isStructured ? parsed.message : (entry.detail ?? entry.action)}
+                        </p>
+                        {entry.userName && (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            por {entry.userName}
+                          </p>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                        {formatRelativeTime(entry.createdAt)}
+                      </span>
+                    </div>
+                    {isStructured && (
+                      <div className="mt-1">
+                        <button
+                          onClick={() => setLogDetailOpen(logDetailOpen === entry.id ? null : entry.id)}
+                          className="text-xs text-accent hover:opacity-80 transition-opacity"
+                        >
+                          {logDetailOpen === entry.id ? "Ocultar detalles" : "Ver detalles"}
+                        </button>
+                        {logDetailOpen === entry.id && (
+                          <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                            {parsed.changes?.map((c, i) => (
+                              <div key={i} className="flex gap-2">
+                                <span className="shrink-0">{c.date}</span>
+                                <span className="shrink-0 uppercase tracking-wide">{c.role}</span>
+                                <span>
+                                  {c.from ?? "—"} → {c.to ?? "—"}
+                                </span>
+                              </div>
+                            ))}
+                            {parsed.added && (
+                              <>
+                                {(parsed.removedCount ?? 0) > 0 && (
+                                  <p>{parsed.removedCount} asignacion{parsed.removedCount === 1 ? "" : "es"} reemplazada{parsed.removedCount === 1 ? "" : "s"}</p>
+                                )}
+                                {parsed.added.map((a, i) => (
+                                  <div key={i} className="flex gap-2">
+                                    <span className="shrink-0">{a.date}</span>
+                                    <span className="shrink-0 uppercase tracking-wide">{a.roleName}</span>
+                                    <span>{a.memberName}</span>
+                                  </div>
+                                ))}
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+      {!schedule.auditLog?.length && (
+        <div className="text-sm text-muted-foreground text-center py-4">
+          Sin cambios registrados.
+        </div>
+      )}
 
       {/* Rebuild modal */}
       {rebuildOpen && (

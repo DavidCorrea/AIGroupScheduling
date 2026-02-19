@@ -6,8 +6,10 @@ import {
   scheduleDateNotes,
   scheduleRehearsalDates,
   scheduleExtraDates,
+  scheduleAuditLog,
   members,
   roles,
+  users,
 } from "@/db/schema";
 import { eq, and, or, lt, gt, asc, desc, gte } from "drizzle-orm";
 import { requireAuth } from "@/lib/api-helpers";
@@ -15,6 +17,7 @@ import { getHolidayConflicts } from "@/lib/holiday-conflicts";
 import { loadScheduleConfig, getPreviousAssignments } from "@/lib/schedule-helpers";
 import { generateSchedule } from "@/lib/scheduler";
 import { getScheduleDates } from "@/lib/dates";
+import { logScheduleAction } from "@/lib/audit-log";
 
 export async function GET(
   _request: NextRequest,
@@ -115,6 +118,19 @@ export async function GET(
     .from(scheduleExtraDates)
     .where(eq(scheduleExtraDates.scheduleId, scheduleId));
 
+  const auditLogRows = await db
+    .select({
+      id: scheduleAuditLog.id,
+      action: scheduleAuditLog.action,
+      detail: scheduleAuditLog.detail,
+      createdAt: scheduleAuditLog.createdAt,
+      userName: users.name,
+    })
+    .from(scheduleAuditLog)
+    .leftJoin(users, eq(scheduleAuditLog.userId, users.id))
+    .where(eq(scheduleAuditLog.scheduleId, scheduleId))
+    .orderBy(desc(scheduleAuditLog.createdAt));
+
   return NextResponse.json({
     ...schedule,
     entries: enrichedEntries,
@@ -125,6 +141,7 @@ export async function GET(
     nextScheduleId: nextSchedule?.id ?? null,
     holidayConflicts,
     extraDates: extraDates.map((d) => ({ date: d.date, type: d.type })),
+    auditLog: auditLogRows,
   });
 }
 
@@ -159,6 +176,8 @@ export async function PUT(
     await db.update(schedules)
       .set({ status: "committed" })
       .where(eq(schedules.id, scheduleId));
+
+    await logScheduleAction(scheduleId, authResult.user.id, "published", "Cronograma publicado");
 
     return NextResponse.json({
       ...schedule,
@@ -305,11 +324,6 @@ export async function PUT(
 
   // Bulk update entries: replaces all entries for the schedule
   if (body.action === "bulk_update" && Array.isArray(body.entries)) {
-    // body.entries: Array<{ date: string, roleId: number, memberId: number | null }>
-    // Each item represents a single slot. Multiple items with the same date+roleId
-    // represent multiple slots for roles with requiredCount > 1.
-    // We delete all existing non-dependent-role entries and re-insert the provided ones.
-
     const allRoles = await db
       .select()
       .from(roles)
@@ -317,6 +331,12 @@ export async function PUT(
     const dependentRoleIdSet = new Set(
       allRoles.filter((r) => r.dependsOnRoleId != null).map((r) => r.id)
     );
+
+    // Snapshot old entries for diff
+    const oldEntries = await db
+      .select()
+      .from(scheduleEntries)
+      .where(eq(scheduleEntries.scheduleId, scheduleId));
 
     // Separate dependent vs non-dependent entries in the payload
     const regularEntries: Array<{ date: string; roleId: number; memberId: number | null }> = [];
@@ -346,6 +366,56 @@ export async function PUT(
 
     if (toInsert.length > 0) {
       await db.insert(scheduleEntries).values(toInsert);
+    }
+
+    // Build diff for audit log
+    const allMembers = await db
+      .select({ id: members.id, name: members.name })
+      .from(members)
+      .where(eq(members.groupId, schedule.groupId));
+    const memberMap = new Map(allMembers.map((m) => [m.id, m.name]));
+    const roleMap = new Map(allRoles.map((r) => [r.id, r.name]));
+
+    // Build lookup from old entries: key "date|roleId|slotIdx" -> memberId
+    const oldBySlot = new Map<string, number>();
+    const oldSlotCount = new Map<string, number>();
+    for (const e of oldEntries) {
+      const baseKey = `${e.date}|${e.roleId}`;
+      const idx = oldSlotCount.get(baseKey) ?? 0;
+      oldBySlot.set(`${baseKey}|${idx}`, e.memberId);
+      oldSlotCount.set(baseKey, idx + 1);
+    }
+
+    const newBySlot = new Map<string, number | null>();
+    const newSlotCount = new Map<string, number>();
+    for (const e of body.entries) {
+      const baseKey = `${e.date}|${e.roleId}`;
+      const idx = newSlotCount.get(baseKey) ?? 0;
+      newBySlot.set(`${baseKey}|${idx}`, e.memberId ?? null);
+      newSlotCount.set(baseKey, idx + 1);
+    }
+
+    const changes: { date: string; role: string; from: string | null; to: string | null }[] = [];
+    const allKeys = new Set([...oldBySlot.keys(), ...newBySlot.keys()]);
+    for (const key of allKeys) {
+      const oldMid = oldBySlot.get(key) ?? null;
+      const newMid = newBySlot.get(key) ?? null;
+      if (oldMid !== newMid) {
+        const [date, roleIdStr] = key.split("|");
+        changes.push({
+          date,
+          role: roleMap.get(parseInt(roleIdStr, 10)) ?? "?",
+          from: oldMid != null ? (memberMap.get(oldMid) ?? "?") : null,
+          to: newMid != null ? (memberMap.get(newMid) ?? "?") : null,
+        });
+      }
+    }
+
+    if (changes.length > 0) {
+      await logScheduleAction(scheduleId, authResult.user.id, "bulk_update", {
+        message: `Cambios guardados: ${changes.length} asignacion${changes.length === 1 ? "" : "es"} actualizada${changes.length === 1 ? "" : "s"}`,
+        changes,
+      });
     }
 
     return NextResponse.json({ success: true });
@@ -477,13 +547,11 @@ export async function PUT(
 
     // rebuild_apply: persist the changes
     if (mode === "overwrite") {
-      // Delete all future entries
       for (const e of futureEntries) {
         await db.delete(scheduleEntries).where(eq(scheduleEntries.id, e.id));
       }
     }
 
-    // Insert new entries
     if (result.assignments.length > 0) {
       await db.insert(scheduleEntries).values(
         result.assignments.map((a) => ({
@@ -494,6 +562,14 @@ export async function PUT(
         }))
       );
     }
+
+    const modeLabel = mode === "overwrite" ? "regenerar todo" : "llenar vacios";
+    await logScheduleAction(scheduleId, authResult.user.id, "rebuild", {
+      message: `Reconstruccion aplicada (${modeLabel}): ${preview.length} asignacion${preview.length === 1 ? "" : "es"} nueva${preview.length === 1 ? "" : "s"}`,
+      mode,
+      removedCount,
+      added: preview,
+    });
 
     return NextResponse.json({ success: true });
   }
@@ -547,6 +623,9 @@ export async function PUT(
       });
     }
 
+    const typeLabel = type === "regular" ? "Asignacion" : "Ensayo";
+    await logScheduleAction(scheduleId, authResult.user.id, "add_date", `Fecha extra agregada: ${dateStr} (${typeLabel})`);
+
     return NextResponse.json({ success: true });
   }
 
@@ -590,6 +669,8 @@ export async function PUT(
         eq(scheduleEntries.date, dateStr)
       )
     );
+
+    await logScheduleAction(scheduleId, authResult.user.id, "remove_extra_date", `Fecha extra eliminada: ${dateStr}`);
 
     return NextResponse.json({ success: true });
   }

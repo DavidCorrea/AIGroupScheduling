@@ -150,6 +150,18 @@
 | schedule_id | integer | NOT NULL, FK → schedules.id ON DELETE CASCADE  |
 | date        | text    | NOT NULL                                       |
 
+### `schedule_audit_log`
+| Column      | Type    | Constraints                                    |
+|-------------|---------|------------------------------------------------|
+| id          | serial  | PRIMARY KEY                                    |
+| schedule_id | integer | NOT NULL, FK → schedules.id ON DELETE CASCADE  |
+| user_id     | text    | nullable, FK → users.id ON DELETE SET NULL     |
+| action      | text    | NOT NULL                                       |
+| detail      | text    | nullable (plain string or JSON)                |
+| created_at  | text    | NOT NULL, default: ISO timestamp               |
+
+**Actions**: `created`, `published`, `bulk_update`, `rebuild`, `add_date`, `remove_extra_date`, `note_saved`, `note_deleted`. For `bulk_update` and `rebuild`, `detail` contains a JSON object with structured change data.
+
 ### `day_role_priorities`
 | Column          | Type    | Constraints                                      |
 |-----------------|---------|--------------------------------------------------|

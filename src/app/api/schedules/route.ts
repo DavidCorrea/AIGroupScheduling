@@ -18,6 +18,12 @@ import { MemberInfo, RoleDefinition } from "@/lib/scheduler.types";
 import { getScheduleDates, getRehearsalDates } from "@/lib/dates";
 import { seedDefaults } from "@/lib/seed";
 import { requireGroupAccess } from "@/lib/api-helpers";
+import { logScheduleAction } from "@/lib/audit-log";
+
+const MONTH_NAMES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
 
 export async function GET(request: NextRequest) {
   const accessResult = await requireGroupAccess(request);
@@ -240,6 +246,13 @@ export async function POST(request: NextRequest) {
       await db.insert(scheduleRehearsalDates)
         .values({ scheduleId: schedule.id, date: rehearsalDate });
     }
+
+    await logScheduleAction(
+      schedule.id,
+      accessResult.user.id,
+      "created",
+      `Cronograma generado para ${MONTH_NAMES[month - 1]} ${year}`
+    );
 
     // Add these assignments to previousAssignments for subsequent months
     previousAssignments.push(...result.assignments);

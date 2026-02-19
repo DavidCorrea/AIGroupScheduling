@@ -5,7 +5,7 @@
 - Drizzle ORM with PostgreSQL (postgres-js driver, Neon-hosted) for data persistence
 - Auth.js v5 (next-auth) with Google OAuth and Drizzle adapter for authentication
 - Jest with ts-jest for testing (TDD)
-- Database schema with tables: users, accounts, groups, group_collaborators, members, exclusive_groups, roles, member_roles, schedule_days, member_availability, holidays, schedules, schedule_entries, schedule_date_notes, schedule_rehearsal_dates, schedule_extra_dates, day_role_priorities
+- Database schema with tables: users, accounts, groups, group_collaborators, members, exclusive_groups, roles, member_roles, schedule_days, member_availability, holidays, schedules, schedule_entries, schedule_date_notes, schedule_rehearsal_dates, schedule_extra_dates, schedule_audit_log, day_role_priorities
 
 ### Scripts
 - `npm run dev` — Start the dev server
@@ -85,6 +85,7 @@
 - Preview in grid, manual swap/edit, dependent role selection, date notes, rehearsal dates
 - **Extra dates**: Add one-off dates (regular assignment or rehearsal) to a schedule beyond the configured recurring days. Extra dates are visually tagged with an "Extra" badge and can be removed along with their entries
 - **Rebuild from today**: Regenerate assignments from today onwards in two modes — "Overwrite" (replaces all future entries) or "Fill empty" (keeps existing assignments, only fills vacant slots). Shows a full preview of proposed assignments before applying
+- **Audit log**: Tracks all schedule mutations (created, published, bulk updates, rebuilds, extra date add/remove, note changes) with who made the change and when. Bulk updates and rebuilds store structured JSON diffs with individual assignment changes. Displayed in a collapsible "Historial de cambios" section at the bottom of the schedule edit view.
 - **Previous/Next navigation** in both admin and public views
 - API routes: `/api/schedules?groupId=N`, `/api/schedules/[id]`, `/api/schedules/[id]/notes`, `/api/schedules/[id]/rehearsals`
 

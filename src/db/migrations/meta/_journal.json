@@ -43,6 +43,13 @@
       "when": 1771469422309,
       "tag": "0005_add-schedule-extra-dates",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1771471283594,
+      "tag": "0006_add-schedule-audit-log",
+      "breakpoints": true
     }
   ]
 }

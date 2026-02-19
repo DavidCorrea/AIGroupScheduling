@@ -181,6 +181,20 @@ export const scheduleExtraDates = pgTable("schedule_extra_dates", {
   type: text("type").notNull(), // "regular" | "rehearsal"
 });
 
+export const scheduleAuditLog = pgTable("schedule_audit_log", {
+  id: serial("id").primaryKey(),
+  scheduleId: integer("schedule_id")
+    .notNull()
+    .references(() => schedules.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .references(() => users.id, { onDelete: "set null" }),
+  action: text("action").notNull(),
+  detail: text("detail"),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
 export const dayRolePriorities = pgTable("day_role_priorities", {
   id: serial("id").primaryKey(),
   scheduleDayId: integer("schedule_day_id")
