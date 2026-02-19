@@ -29,6 +29,12 @@ interface RoleInfo {
   dependsOnRoleId: number | null;
 }
 
+interface HolidayConflict {
+  date: string;
+  memberId: number;
+  memberName: string;
+}
+
 interface ScheduleDetail {
   id: number;
   month: number;
@@ -40,6 +46,7 @@ interface ScheduleDetail {
   roles: RoleInfo[];
   prevScheduleId: number | null;
   nextScheduleId: number | null;
+  holidayConflicts?: HolidayConflict[];
 }
 
 interface Member {
@@ -161,6 +168,13 @@ export default function SchedulePreviewPage() {
 
   const rehearsalSet = useMemo(
     () => new Set(schedule?.rehearsalDates ?? []),
+    [schedule]
+  );
+  const conflictSet = useMemo(
+    () =>
+      new Set(
+        (schedule?.holidayConflicts ?? []).map((c) => `${c.date}-${c.memberId}`)
+      ),
     [schedule]
   );
   const noteMap = useMemo(
@@ -358,23 +372,34 @@ export default function SchedulePreviewPage() {
       (m) => !takenByOtherSlots.has(m.id) || m.id === currentMemberId
     );
 
+    const showConflict =
+      currentMemberId != null && conflictSet.has(`${date}-${currentMemberId}`);
+
     return (
-      <select
-        key={key}
-        className="rounded-md border border-border bg-transparent px-3 py-2 text-sm w-full"
-        value={currentMemberId ?? ""}
-        onChange={(e) => {
-          const val = e.target.value;
-          updateSlot(date, role.id, slotIndex, val ? parseInt(val, 10) : null);
-        }}
-      >
-        <option value="">— Vacío —</option>
-        {options.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.name}
-          </option>
-        ))}
-      </select>
+      <div key={key} className="w-full">
+        <select
+          className={`rounded-md border bg-transparent px-3 py-2 text-sm w-full ${
+            showConflict
+              ? "border-amber-500"
+              : "border-border"
+          }`}
+          value={currentMemberId ?? ""}
+          onChange={(e) => {
+            const val = e.target.value;
+            updateSlot(date, role.id, slotIndex, val ? parseInt(val, 10) : null);
+          }}
+        >
+          <option value="">— Vacío —</option>
+          {options.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+        {showConflict && (
+          <p className="text-xs text-amber-500 mt-0.5">⚠ En vacaciones</p>
+        )}
+      </div>
     );
   };
 

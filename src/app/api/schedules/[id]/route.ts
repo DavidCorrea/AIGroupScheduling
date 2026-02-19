@@ -10,6 +10,7 @@ import {
 } from "@/db/schema";
 import { eq, and, or, lt, gt, asc, desc } from "drizzle-orm";
 import { requireAuth } from "@/lib/api-helpers";
+import { getHolidayConflicts } from "@/lib/holiday-conflicts";
 
 export async function GET(
   _request: NextRequest,
@@ -103,6 +104,8 @@ export async function GET(
     .orderBy(asc(schedules.year), asc(schedules.month))
     .limit(1))[0] ?? null;
 
+  const holidayConflicts = await getHolidayConflicts(entries, groupId);
+
   return NextResponse.json({
     ...schedule,
     entries: enrichedEntries,
@@ -111,6 +114,7 @@ export async function GET(
     roles: allRoles,
     prevScheduleId: prevSchedule?.id ?? null,
     nextScheduleId: nextSchedule?.id ?? null,
+    holidayConflicts,
   });
 }
 

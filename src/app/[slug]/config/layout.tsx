@@ -17,6 +17,7 @@ function AdminNav() {
     { href: `/${slug}/config/members`, label: "Miembros" },
     { href: `/${slug}/config/roles`, label: "Roles" },
     { href: `/${slug}/config/configuration`, label: "Configuración" },
+    { href: `/${slug}/config/holidays`, label: "Vacaciones" },
     { href: `/${slug}/config/collaborators`, label: "Colaboradores" },
     { href: `/${slug}/config/schedules`, label: "Cronogramas" },
   ];

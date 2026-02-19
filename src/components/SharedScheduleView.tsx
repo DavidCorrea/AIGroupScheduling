@@ -33,6 +33,12 @@ export interface ScheduleNavLink {
   year: number;
 }
 
+export interface HolidayConflict {
+  date: string;
+  memberId: number;
+  memberName: string;
+}
+
 export interface SharedScheduleData {
   month: number;
   year: number;
@@ -46,6 +52,7 @@ export interface SharedScheduleData {
   roles?: RoleInfo[];
   prevSchedule?: ScheduleNavLink | null;
   nextSchedule?: ScheduleNavLink | null;
+  holidayConflicts?: HolidayConflict[];
 }
 
 const MONTH_NAMES = [
@@ -265,6 +272,12 @@ export default function SharedScheduleView({
 
   const noteMap = new Map(schedule.notes.map((n) => [n.date, n.description]));
   const rehearsalSet = new Set(schedule.rehearsalDates);
+
+  const conflictSet = new Set(
+    (schedule.holidayConflicts ?? []).map((c) => `${c.date}-${c.memberId}`)
+  );
+  const hasConflict = (date: string, memberId: number) =>
+    conflictSet.has(`${date}-${memberId}`);
 
   // Helper: check if the filtered member has a dependent role on a given date
   const hasDependentRoleOnDate = (date: string): boolean => {
@@ -678,9 +691,15 @@ export default function SharedScheduleView({
                                   {role.name}
                                 </span>
                                 <span className="font-medium text-right">
-                                  {roleEntries
-                                    .map((e) => e.memberName)
-                                    .join(", ")}
+                                  {roleEntries.map((e, i) => (
+                                    <React.Fragment key={e.id}>
+                                      {i > 0 && ", "}
+                                      {e.memberName}
+                                      {hasConflict(date, e.memberId) && (
+                                        <span className="text-amber-500 ml-1" title="Conflicto con vacaciones">⚠</span>
+                                      )}
+                                    </React.Fragment>
+                                  ))}
                                 </span>
                               </div>
                             );
@@ -952,9 +971,15 @@ export default function SharedScheduleView({
                                       —
                                     </span>
                                   ) : (
-                                    roleEntries
-                                      .map((e) => e.memberName)
-                                      .join(", ")
+                                    roleEntries.map((e, i) => (
+                                      <React.Fragment key={e.id}>
+                                        {i > 0 && ", "}
+                                        {e.memberName}
+                                        {hasConflict(date, e.memberId) && (
+                                          <span className="text-amber-500 ml-1" title="Conflicto con vacaciones">⚠</span>
+                                        )}
+                                      </React.Fragment>
+                                    ))
                                   )}
                                 </td>
                               );
@@ -1021,9 +1046,14 @@ export default function SharedScheduleView({
                       <span className="text-muted-foreground text-xs uppercase tracking-wide">
                         {e.roleName}
                       </span>
-                      {dependentRoleIdSet.has(e.roleId) && (
-                        <span className="text-xs font-medium">★</span>
-                      )}
+                      <span className="flex items-center gap-1">
+                        {hasConflict(e.date, e.memberId) && (
+                          <span className="text-amber-500" title="Conflicto con vacaciones">⚠</span>
+                        )}
+                        {dependentRoleIdSet.has(e.roleId) && (
+                          <span className="text-xs font-medium">★</span>
+                        )}
+                      </span>
                     </div>
                   ))}
                 {filteredEntries.filter((e) => e.date === calendarSelectedDate).length === 0 && (

@@ -8,6 +8,7 @@ import {
   roles,
 } from "@/db/schema";
 import { eq, and, or, lt, gt, asc, desc } from "drizzle-orm";
+import { getHolidayConflicts } from "./holiday-conflicts";
 
 /**
  * Build the full public schedule response for a committed schedule.
@@ -106,6 +107,8 @@ export async function buildPublicScheduleResponse(schedule: {
       .orderBy(asc(schedules.year), asc(schedules.month))
       .limit(1))[0] ?? null;
 
+  const holidayConflicts = await getHolidayConflicts(entries, groupId);
+
   return {
     month,
     year,
@@ -117,5 +120,6 @@ export async function buildPublicScheduleResponse(schedule: {
     roles: allRoles,
     prevSchedule,
     nextSchedule,
+    holidayConflicts,
   };
 }
