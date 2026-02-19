@@ -166,6 +166,8 @@ export default function SchedulePreviewPage() {
   const [editingNote, setEditingNote] = useState<string | null>(null);
   const [noteText, setNoteText] = useState("");
 
+  const [showPastDates, setShowPastDates] = useState(false);
+
   // Add extra date form
   const [extraDateValue, setExtraDateValue] = useState("");
   const [extraDateType, setExtraDateType] = useState<"regular" | "rehearsal">("regular");
@@ -425,6 +427,11 @@ export default function SchedulePreviewPage() {
   // Check if there are future dates for the rebuild button
   const todayISO = useMemo(() => new Date().toISOString().split("T")[0], []);
   const hasFutureDates = allDates.some((d) => d >= todayISO);
+  const hasPastDates = allDates.some((d) => d < todayISO);
+  const visibleDates = useMemo(() => {
+    if (showPastDates) return allDates;
+    return allDates.filter((d) => d >= todayISO);
+  }, [allDates, showPastDates, todayISO]);
 
   const startEditNote = (date: string) => {
     const existing = schedule?.notes.find((n) => n.date === date);
@@ -617,15 +624,27 @@ export default function SchedulePreviewPage() {
         </p>
       </div>
 
-      {/* Add extra date */}
-      <div>
+      {/* Add extra date + past dates toggle */}
+      <div className="flex items-center justify-between">
         <button
           onClick={() => setShowAddDate(!showAddDate)}
           className="text-sm text-accent hover:opacity-80 transition-opacity"
         >
           {showAddDate ? "Cancelar" : "+ Agregar fecha"}
         </button>
-        {showAddDate && (
+        {hasPastDates && (
+          <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={showPastDates}
+              onChange={(e) => setShowPastDates(e.target.checked)}
+              className="rounded border-border"
+            />
+            Mostrar fechas pasadas
+          </label>
+        )}
+      </div>
+      {showAddDate && (
           <div className="mt-3 flex flex-wrap items-end gap-3 border border-border rounded-md p-4">
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Fecha</label>
@@ -672,7 +691,6 @@ export default function SchedulePreviewPage() {
             </button>
           </div>
         )}
-      </div>
 
       {/* Sticky save bar */}
       {isDirty && (
@@ -692,7 +710,7 @@ export default function SchedulePreviewPage() {
 
       {/* Mobile card view */}
       <div className="md:hidden space-y-4">
-        {allDates.map((date) => {
+        {visibleDates.map((date) => {
           const isRehearsal = rehearsalSet.has(date);
           const note = noteMap.get(date);
 
@@ -820,7 +838,7 @@ export default function SchedulePreviewPage() {
             </tr>
           </thead>
           <tbody>
-            {allDates.map((date) => {
+            {visibleDates.map((date) => {
               const isRehearsal = rehearsalSet.has(date);
               const note = noteMap.get(date);
 
