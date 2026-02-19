@@ -443,9 +443,10 @@ export default function SchedulePreviewPage() {
           m.roleIds.includes(role.id)
       );
     }
-    // Regular role: members that have this role AND are available on this day
+    // For extra dates, skip availability check — admin explicitly added the date
+    const isExtra = extraDateSet.has(date);
     return members.filter(
-      (m) => m.roleIds.includes(role.id) && isMemberAvailable(m, date)
+      (m) => m.roleIds.includes(role.id) && (isExtra || isMemberAvailable(m, date))
     );
   };
 
