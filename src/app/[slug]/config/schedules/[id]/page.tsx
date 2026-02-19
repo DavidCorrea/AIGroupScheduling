@@ -35,6 +35,11 @@ interface HolidayConflict {
   memberName: string;
 }
 
+interface ExtraDate {
+  date: string;
+  type: string;
+}
+
 interface ScheduleDetail {
   id: number;
   month: number;
@@ -47,6 +52,7 @@ interface ScheduleDetail {
   prevScheduleId: number | null;
   nextScheduleId: number | null;
   holidayConflicts?: HolidayConflict[];
+  extraDates?: ExtraDate[];
 }
 
 interface Member {
@@ -118,6 +124,18 @@ export default function SchedulePreviewPage() {
   const [editingNote, setEditingNote] = useState<string | null>(null);
   const [noteText, setNoteText] = useState("");
 
+  // Add extra date form
+  const [extraDateValue, setExtraDateValue] = useState("");
+  const [extraDateType, setExtraDateType] = useState<"regular" | "rehearsal">("regular");
+  const [showAddDate, setShowAddDate] = useState(false);
+
+  // Rebuild flow
+  const [rebuildOpen, setRebuildOpen] = useState(false);
+  const [rebuildMode, setRebuildMode] = useState<"overwrite" | "fill_empty" | null>(null);
+  const [rebuildPreview, setRebuildPreview] = useState<{ date: string; roleId: number; roleName: string; memberId: number; memberName: string }[] | null>(null);
+  const [rebuildRemovedCount, setRebuildRemovedCount] = useState(0);
+  const [rebuildLoading, setRebuildLoading] = useState(false);
+
   // Local editable state: slotKey -> memberId | null
   const [editState, setEditState] = useState<Map<string, number | null>>(
     new Map()
@@ -181,10 +199,15 @@ export default function SchedulePreviewPage() {
     () => new Map((schedule?.notes ?? []).map((n) => [n.date, n.description])),
     [schedule]
   );
+  const extraDateSet = useMemo(
+    () => new Set((schedule?.extraDates ?? []).map((d) => d.date)),
+    [schedule]
+  );
   const allDates = useMemo(() => {
     if (!schedule) return [];
     const entryDates = [...new Set(schedule.entries.map((e) => e.date))];
-    return [...new Set([...entryDates, ...schedule.rehearsalDates])].sort();
+    const extraDates = (schedule.extraDates ?? []).map((d) => d.date);
+    return [...new Set([...entryDates, ...schedule.rehearsalDates, ...extraDates])].sort();
   }, [schedule]);
 
   // Map dayOfWeek name -> scheduleDayId for availability lookups
@@ -278,6 +301,84 @@ export default function SchedulePreviewPage() {
       fetchData();
     }
   };
+
+  const handleAddExtraDate = async () => {
+    if (!extraDateValue) return;
+    const res = await fetch(`/api/schedules/${params.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "add_date",
+        date: extraDateValue,
+        type: extraDateType,
+      }),
+    });
+    if (res.ok) {
+      setExtraDateValue("");
+      setShowAddDate(false);
+      fetchData();
+    } else {
+      const data = await res.json();
+      alert(data.error || "Error al agregar fecha");
+    }
+  };
+
+  const handleRemoveExtraDate = async (date: string) => {
+    if (!confirm("¿Eliminar esta fecha adicional y sus asignaciones?")) return;
+    const res = await fetch(`/api/schedules/${params.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "remove_extra_date", date }),
+    });
+    if (res.ok) fetchData();
+  };
+
+  const handleRebuildPreview = async (mode: "overwrite" | "fill_empty") => {
+    setRebuildMode(mode);
+    setRebuildLoading(true);
+    setRebuildPreview(null);
+    const res = await fetch(`/api/schedules/${params.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "rebuild_preview", mode }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setRebuildPreview(data.preview);
+      setRebuildRemovedCount(data.removedCount);
+    } else {
+      alert(data.error || "Error al generar vista previa");
+      setRebuildOpen(false);
+    }
+    setRebuildLoading(false);
+  };
+
+  const handleRebuildApply = async () => {
+    if (!rebuildMode) return;
+    setRebuildLoading(true);
+    const res = await fetch(`/api/schedules/${params.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "rebuild_apply", mode: rebuildMode }),
+    });
+    setRebuildLoading(false);
+    if (res.ok) {
+      setRebuildOpen(false);
+      setRebuildPreview(null);
+      setRebuildMode(null);
+      fetchData();
+    }
+  };
+
+  const closeRebuild = () => {
+    setRebuildOpen(false);
+    setRebuildPreview(null);
+    setRebuildMode(null);
+  };
+
+  // Check if there are future dates for the rebuild button
+  const todayISO = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const hasFutureDates = allDates.some((d) => d >= todayISO);
 
   const startEditNote = (date: string) => {
     const existing = schedule?.notes.find((n) => n.date === date);
@@ -430,6 +531,16 @@ export default function SchedulePreviewPage() {
             )}
           </div>
           <div className="flex gap-2 w-full sm:w-auto">
+            {hasFutureDates && (
+              <button
+                onClick={() => setRebuildOpen(true)}
+                disabled={isDirty}
+                className="flex-1 sm:flex-none rounded-md border border-border px-4 py-2.5 text-sm hover:border-foreground transition-colors disabled:opacity-50"
+                title={isDirty ? "Guarda los cambios primero" : "Reconstruir desde hoy"}
+              >
+                Reconstruir
+              </button>
+            )}
             {schedule.status === "draft" && (
               <button
                 onClick={handleCommit}
@@ -457,6 +568,63 @@ export default function SchedulePreviewPage() {
             "Borrador — revisa y edita antes de crear."
           )}
         </p>
+      </div>
+
+      {/* Add extra date */}
+      <div>
+        <button
+          onClick={() => setShowAddDate(!showAddDate)}
+          className="text-sm text-accent hover:opacity-80 transition-opacity"
+        >
+          {showAddDate ? "Cancelar" : "+ Agregar fecha"}
+        </button>
+        {showAddDate && (
+          <div className="mt-3 flex flex-wrap items-end gap-3 border border-border rounded-md p-4">
+            <div>
+              <label className="block text-xs text-muted-foreground mb-1">Fecha</label>
+              <input
+                type="date"
+                value={extraDateValue}
+                onChange={(e) => setExtraDateValue(e.target.value)}
+                min={`${schedule.year}-${String(schedule.month).padStart(2, "0")}-01`}
+                max={`${schedule.year}-${String(schedule.month).padStart(2, "0")}-${new Date(Date.UTC(schedule.year, schedule.month, 0)).getUTCDate()}`}
+                className="rounded-md border border-border bg-transparent px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-muted-foreground mb-1">Tipo</label>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setExtraDateType("regular")}
+                  className={`rounded-md px-3 py-2 text-sm border transition-colors ${
+                    extraDateType === "regular"
+                      ? "border-foreground text-foreground"
+                      : "border-border text-muted-foreground"
+                  }`}
+                >
+                  Asignación
+                </button>
+                <button
+                  onClick={() => setExtraDateType("rehearsal")}
+                  className={`rounded-md px-3 py-2 text-sm border transition-colors ${
+                    extraDateType === "rehearsal"
+                      ? "border-foreground text-foreground"
+                      : "border-border text-muted-foreground"
+                  }`}
+                >
+                  Ensayo
+                </button>
+              </div>
+            </div>
+            <button
+              onClick={handleAddExtraDate}
+              disabled={!extraDateValue}
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              Agregar
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Sticky save bar */}
@@ -489,10 +657,26 @@ export default function SchedulePreviewPage() {
               {/* Date header */}
               <div className="px-4 py-3 border-b border-border">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium text-sm">{formatDate(date)}</span>
-                  {isRehearsal && (
-                    <span className="text-xs text-muted-foreground italic">Ensayo</span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm">{formatDate(date)}</span>
+                    {extraDateSet.has(date) && (
+                      <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">Extra</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isRehearsal && (
+                      <span className="text-xs text-muted-foreground italic">Ensayo</span>
+                    )}
+                    {extraDateSet.has(date) && (
+                      <button
+                        onClick={() => handleRemoveExtraDate(date)}
+                        className="text-xs text-destructive hover:opacity-80"
+                        title="Eliminar fecha extra"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {/* Note editing */}
                 {editingNote === date ? (
@@ -599,12 +783,24 @@ export default function SchedulePreviewPage() {
                   className={`border-b border-border ${isRehearsal ? "bg-muted/20" : "hover:bg-muted/30"} transition-colors`}
                 >
                   <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">
-                    <div>
+                    <div className="flex items-center gap-2">
                       {formatDate(date)}
                       {isRehearsal && (
-                        <span className="ml-2 text-xs text-muted-foreground italic">
+                        <span className="text-xs text-muted-foreground italic">
                           Ensayo
                         </span>
+                      )}
+                      {extraDateSet.has(date) && (
+                        <>
+                          <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">Extra</span>
+                          <button
+                            onClick={() => handleRemoveExtraDate(date)}
+                            className="text-xs text-destructive hover:opacity-80"
+                            title="Eliminar fecha extra"
+                          >
+                            ✕
+                          </button>
+                        </>
                       )}
                     </div>
                     {editingNote === date ? (
@@ -679,6 +875,110 @@ export default function SchedulePreviewPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Rebuild modal */}
+      {rebuildOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-background border border-border rounded-lg shadow-lg max-w-lg w-full max-h-[80vh] flex flex-col">
+            <div className="px-6 py-4 border-b border-border">
+              <h2 className="font-[family-name:var(--font-display)] text-lg uppercase">
+                Reconstruir cronograma
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Regenerar asignaciones desde hoy hasta fin de mes.
+              </p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {!rebuildMode && (
+                <div className="space-y-3">
+                  <button
+                    onClick={() => handleRebuildPreview("overwrite")}
+                    className="w-full rounded-md border border-border p-4 text-left hover:border-foreground transition-colors"
+                  >
+                    <p className="text-sm font-medium">Regenerar todo desde hoy</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Reemplaza todas las asignaciones futuras con nuevas generadas por el algoritmo.
+                    </p>
+                  </button>
+                  <button
+                    onClick={() => handleRebuildPreview("fill_empty")}
+                    className="w-full rounded-md border border-border p-4 text-left hover:border-foreground transition-colors"
+                  >
+                    <p className="text-sm font-medium">Solo llenar vacíos desde hoy</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Mantiene las asignaciones existentes y solo llena los espacios vacíos.
+                    </p>
+                  </button>
+                </div>
+              )}
+
+              {rebuildLoading && (
+                <p className="text-sm text-muted-foreground py-8 text-center">
+                  Generando vista previa...
+                </p>
+              )}
+
+              {rebuildPreview && !rebuildLoading && (
+                <div className="space-y-4">
+                  {rebuildRemovedCount > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      Se reemplazarán {rebuildRemovedCount} asignaciones existentes.
+                    </p>
+                  )}
+                  {rebuildPreview.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-4 text-center">
+                      No hay asignaciones nuevas para generar.
+                    </p>
+                  ) : (
+                    <div className="divide-y divide-border">
+                      {(() => {
+                        const grouped = new Map<string, typeof rebuildPreview>();
+                        for (const entry of rebuildPreview!) {
+                          const list = grouped.get(entry.date) ?? [];
+                          list.push(entry);
+                          grouped.set(entry.date, list);
+                        }
+                        return [...grouped.entries()].map(([date, entries]) => (
+                          <div key={date} className="py-3 first:pt-0">
+                            <p className="text-sm font-medium mb-1.5">{formatDate(date)}</p>
+                            <div className="space-y-1">
+                              {entries.map((e, i) => (
+                                <div key={i} className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground text-xs uppercase tracking-wide">{e.roleName}</span>
+                                  <span>{e.memberName}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-border flex justify-end gap-3">
+              <button
+                onClick={closeRebuild}
+                className="rounded-md border border-border px-4 py-2 text-sm hover:border-foreground transition-colors"
+              >
+                Cancelar
+              </button>
+              {rebuildPreview && rebuildPreview.length > 0 && (
+                <button
+                  onClick={handleRebuildApply}
+                  disabled={rebuildLoading}
+                  className="rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {rebuildLoading ? "Aplicando..." : "Aplicar"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

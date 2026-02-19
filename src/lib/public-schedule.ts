@@ -4,6 +4,7 @@ import {
   scheduleEntries,
   scheduleDateNotes,
   scheduleRehearsalDates,
+  scheduleExtraDates,
   members,
   roles,
 } from "@/db/schema";
@@ -109,6 +110,11 @@ export async function buildPublicScheduleResponse(schedule: {
 
   const holidayConflicts = await getHolidayConflicts(entries, groupId);
 
+  const extraDates = await db
+    .select()
+    .from(scheduleExtraDates)
+    .where(eq(scheduleExtraDates.scheduleId, id));
+
   return {
     month,
     year,
@@ -121,5 +127,6 @@ export async function buildPublicScheduleResponse(schedule: {
     prevSchedule,
     nextSchedule,
     holidayConflicts,
+    extraDates: extraDates.map((d) => ({ date: d.date, type: d.type })),
   };
 }

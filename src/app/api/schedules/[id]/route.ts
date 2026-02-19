@@ -5,12 +5,16 @@ import {
   scheduleEntries,
   scheduleDateNotes,
   scheduleRehearsalDates,
+  scheduleExtraDates,
   members,
   roles,
 } from "@/db/schema";
-import { eq, and, or, lt, gt, asc, desc } from "drizzle-orm";
+import { eq, and, or, lt, gt, asc, desc, gte } from "drizzle-orm";
 import { requireAuth } from "@/lib/api-helpers";
 import { getHolidayConflicts } from "@/lib/holiday-conflicts";
+import { loadScheduleConfig, getPreviousAssignments } from "@/lib/schedule-helpers";
+import { generateSchedule } from "@/lib/scheduler";
+import { getScheduleDates } from "@/lib/dates";
 
 export async function GET(
   _request: NextRequest,
@@ -106,6 +110,11 @@ export async function GET(
 
   const holidayConflicts = await getHolidayConflicts(entries, groupId);
 
+  const extraDates = await db
+    .select()
+    .from(scheduleExtraDates)
+    .where(eq(scheduleExtraDates.scheduleId, scheduleId));
+
   return NextResponse.json({
     ...schedule,
     entries: enrichedEntries,
@@ -115,6 +124,7 @@ export async function GET(
     prevScheduleId: prevSchedule?.id ?? null,
     nextScheduleId: nextSchedule?.id ?? null,
     holidayConflicts,
+    extraDates: extraDates.map((d) => ({ date: d.date, type: d.type })),
   });
 }
 
@@ -337,6 +347,249 @@ export async function PUT(
     if (toInsert.length > 0) {
       await db.insert(scheduleEntries).values(toInsert);
     }
+
+    return NextResponse.json({ success: true });
+  }
+
+  // Rebuild: preview or apply
+  if (
+    (body.action === "rebuild_preview" || body.action === "rebuild_apply") &&
+    (body.mode === "overwrite" || body.mode === "fill_empty")
+  ) {
+    const { mode } = body;
+    const { groupId } = schedule;
+    const today = new Date().toISOString().split("T")[0];
+
+    const config = await loadScheduleConfig(groupId);
+
+    // Get all regular dates for this month (recurring + extra regular)
+    const recurringDates = getScheduleDates(schedule.month, schedule.year, config.activeDayNames);
+    const extraRegular = await db
+      .select()
+      .from(scheduleExtraDates)
+      .where(
+        and(
+          eq(scheduleExtraDates.scheduleId, scheduleId),
+          eq(scheduleExtraDates.type, "regular")
+        )
+      );
+    const extraRegularDates = extraRegular.map((d) => d.date);
+    const allRegularDates = [...new Set([...recurringDates, ...extraRegularDates])].sort();
+
+    // Only dates from today onwards
+    const futureDates = allRegularDates.filter((d) => d >= today);
+
+    if (futureDates.length === 0) {
+      return NextResponse.json(
+        { error: "No hay fechas futuras para reconstruir" },
+        { status: 400 }
+      );
+    }
+
+    // Current entries for this schedule
+    const currentEntries = await db
+      .select()
+      .from(scheduleEntries)
+      .where(eq(scheduleEntries.scheduleId, scheduleId));
+
+    const pastEntries = currentEntries.filter((e) => e.date < today);
+    const futureEntries = currentEntries.filter((e) => e.date >= today);
+
+    // Previous assignments for rotation continuity
+    const previousAssignments = await getPreviousAssignments(groupId);
+    // Also include past entries from this schedule
+    const allPrevious = [
+      ...previousAssignments,
+      ...pastEntries.map((e) => ({ date: e.date, roleId: e.roleId, memberId: e.memberId })),
+    ];
+
+    let datesToGenerate: string[];
+    let keptFutureEntries: typeof futureEntries = [];
+
+    if (mode === "overwrite") {
+      datesToGenerate = futureDates;
+    } else {
+      // fill_empty: find dates/roles that have unfilled slots
+      const dependentRoleIdSet = new Set(
+        config.allRoles.filter((r) => r.dependsOnRoleId != null).map((r) => r.id)
+      );
+      const filledSlots = new Map<string, number>();
+      for (const e of futureEntries) {
+        if (dependentRoleIdSet.has(e.roleId)) continue;
+        const key = `${e.date}|${e.roleId}`;
+        filledSlots.set(key, (filledSlots.get(key) ?? 0) + 1);
+      }
+
+      const datesWithGaps = new Set<string>();
+      for (const date of futureDates) {
+        for (const role of config.roleDefinitions) {
+          const filled = filledSlots.get(`${date}|${role.id}`) ?? 0;
+          if (filled < role.requiredCount) {
+            datesWithGaps.add(date);
+          }
+        }
+      }
+      datesToGenerate = [...datesWithGaps].sort();
+      keptFutureEntries = futureEntries;
+
+      // Include kept future entries as previous assignments so the scheduler
+      // doesn't duplicate them
+      allPrevious.push(
+        ...keptFutureEntries.map((e) => ({ date: e.date, roleId: e.roleId, memberId: e.memberId }))
+      );
+    }
+
+    if (datesToGenerate.length === 0) {
+      return NextResponse.json({
+        preview: [],
+        removedCount: 0,
+      });
+    }
+
+    const result = generateSchedule({
+      dates: datesToGenerate,
+      roles: config.roleDefinitions,
+      members: config.memberInfos,
+      previousAssignments: allPrevious,
+      dayRolePriorities:
+        Object.keys(config.dayRolePriorityMap).length > 0
+          ? config.dayRolePriorityMap
+          : undefined,
+    });
+
+    // Enrich assignments with names
+    const memberMap = new Map(config.memberInfos.map((m) => [m.id, m.name]));
+    const roleMap = new Map(config.allRoles.map((r) => [r.id, r.name]));
+
+    const preview = result.assignments.map((a) => ({
+      date: a.date,
+      roleId: a.roleId,
+      roleName: roleMap.get(a.roleId) ?? "Desconocido",
+      memberId: a.memberId,
+      memberName: memberMap.get(a.memberId) ?? "Desconocido",
+    }));
+
+    const removedCount = mode === "overwrite" ? futureEntries.length : 0;
+
+    if (body.action === "rebuild_preview") {
+      return NextResponse.json({ preview, removedCount });
+    }
+
+    // rebuild_apply: persist the changes
+    if (mode === "overwrite") {
+      // Delete all future entries
+      for (const e of futureEntries) {
+        await db.delete(scheduleEntries).where(eq(scheduleEntries.id, e.id));
+      }
+    }
+
+    // Insert new entries
+    if (result.assignments.length > 0) {
+      await db.insert(scheduleEntries).values(
+        result.assignments.map((a) => ({
+          scheduleId,
+          date: a.date,
+          roleId: a.roleId,
+          memberId: a.memberId,
+        }))
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  }
+
+  // Add a one-off extra date
+  if (body.action === "add_date" && body.date && body.type) {
+    const dateStr = body.date as string;
+    const type = body.type as string;
+
+    if (type !== "regular" && type !== "rehearsal") {
+      return NextResponse.json({ error: "Tipo inválido" }, { status: 400 });
+    }
+
+    // Validate the date belongs to the schedule's month/year
+    const [dy, dm] = dateStr.split("-").map(Number);
+    if (dy !== schedule.year || dm !== schedule.month) {
+      return NextResponse.json(
+        { error: "La fecha debe estar dentro del mes del cronograma" },
+        { status: 400 }
+      );
+    }
+
+    // Check for duplicates
+    const existing = (await db
+      .select()
+      .from(scheduleExtraDates)
+      .where(
+        and(
+          eq(scheduleExtraDates.scheduleId, scheduleId),
+          eq(scheduleExtraDates.date, dateStr)
+        )
+      ))[0];
+
+    if (existing) {
+      return NextResponse.json(
+        { error: "Esa fecha ya fue agregada" },
+        { status: 409 }
+      );
+    }
+
+    await db.insert(scheduleExtraDates).values({
+      scheduleId,
+      date: dateStr,
+      type,
+    });
+
+    if (type === "rehearsal") {
+      await db.insert(scheduleRehearsalDates).values({
+        scheduleId,
+        date: dateStr,
+      });
+    }
+
+    return NextResponse.json({ success: true });
+  }
+
+  // Remove a one-off extra date
+  if (body.action === "remove_extra_date" && body.date) {
+    const dateStr = body.date as string;
+
+    const extra = (await db
+      .select()
+      .from(scheduleExtraDates)
+      .where(
+        and(
+          eq(scheduleExtraDates.scheduleId, scheduleId),
+          eq(scheduleExtraDates.date, dateStr)
+        )
+      ))[0];
+
+    if (!extra) {
+      return NextResponse.json(
+        { error: "Fecha extra no encontrada" },
+        { status: 404 }
+      );
+    }
+
+    await db.delete(scheduleExtraDates).where(eq(scheduleExtraDates.id, extra.id));
+
+    // Remove rehearsal date entry if it was a rehearsal
+    if (extra.type === "rehearsal") {
+      await db.delete(scheduleRehearsalDates).where(
+        and(
+          eq(scheduleRehearsalDates.scheduleId, scheduleId),
+          eq(scheduleRehearsalDates.date, dateStr)
+        )
+      );
+    }
+
+    // Remove any schedule entries on that date
+    await db.delete(scheduleEntries).where(
+      and(
+        eq(scheduleEntries.scheduleId, scheduleId),
+        eq(scheduleEntries.date, dateStr)
+      )
+    );
 
     return NextResponse.json({ success: true });
   }

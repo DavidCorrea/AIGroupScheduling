@@ -53,6 +53,7 @@ export interface SharedScheduleData {
   prevSchedule?: ScheduleNavLink | null;
   nextSchedule?: ScheduleNavLink | null;
   holidayConflicts?: HolidayConflict[];
+  extraDates?: { date: string; type: string }[];
 }
 
 const MONTH_NAMES = [
@@ -272,6 +273,7 @@ export default function SharedScheduleView({
 
   const noteMap = new Map(schedule.notes.map((n) => [n.date, n.description]));
   const rehearsalSet = new Set(schedule.rehearsalDates);
+  const extraDateSet = new Set((schedule.extraDates ?? []).map((d) => d.date));
 
   const conflictSet = new Set(
     (schedule.holidayConflicts ?? []).map((c) => `${c.date}-${c.memberId}`)

@@ -172,6 +172,15 @@ export const scheduleRehearsalDates = pgTable("schedule_rehearsal_dates", {
   date: text("date").notNull(),
 });
 
+export const scheduleExtraDates = pgTable("schedule_extra_dates", {
+  id: serial("id").primaryKey(),
+  scheduleId: integer("schedule_id")
+    .notNull()
+    .references(() => schedules.id, { onDelete: "cascade" }),
+  date: text("date").notNull(),
+  type: text("type").notNull(), // "regular" | "rehearsal"
+});
+
 export const dayRolePriorities = pgTable("day_role_priorities", {
   id: serial("id").primaryKey(),
   scheduleDayId: integer("schedule_day_id")
