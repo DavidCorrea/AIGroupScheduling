@@ -187,27 +187,11 @@ interface DayRolePriority {
   roleName: string;
 }
 
-interface MemberOption {
-  id: number;
-  name: string;
-}
-
-interface MemberHoliday {
-  id: number;
-  memberId: number;
-  memberName: string;
-  startDate: string;
-  endDate: string;
-  description: string | null;
-}
-
 export default function ConfigurationPage() {
   const { groupId, loading: groupLoading } = useGroup();
   const [roles, setRoles] = useState<Role[]>([]);
   const [days, setDays] = useState<ScheduleDay[]>([]);
   const [priorities, setPriorities] = useState<DayRolePriority[]>([]);
-  const [memberOptions, setMemberOptions] = useState<MemberOption[]>([]);
-  const [memberHolidays, setMemberHolidays] = useState<MemberHoliday[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Priority editing
@@ -215,28 +199,16 @@ export default function ConfigurationPage() {
     null
   );
 
-  // Holiday form state
-  const [holidayMemberId, setHolidayMemberId] = useState<number | "">("");
-  const [holidayStart, setHolidayStart] = useState("");
-  const [holidayEnd, setHolidayEnd] = useState("");
-  const [holidayDescription, setHolidayDescription] = useState("");
-  const [holidayError, setHolidayError] = useState("");
-
   const fetchData = useCallback(async () => {
     if (!groupId) return;
-    const [rolesRes, daysRes, prioritiesRes, membersRes, holidaysRes] = await Promise.all([
+    const [rolesRes, daysRes, prioritiesRes] = await Promise.all([
       fetch(`/api/configuration/roles?groupId=${groupId}`),
       fetch(`/api/configuration/days?groupId=${groupId}`),
       fetch(`/api/configuration/priorities?groupId=${groupId}`),
-      fetch(`/api/members?groupId=${groupId}`),
-      fetch(`/api/configuration/holidays?groupId=${groupId}`),
     ]);
     setRoles(await rolesRes.json());
     setDays(await daysRes.json());
     setPriorities(await prioritiesRes.json());
-    const membersData = await membersRes.json();
-    setMemberOptions(membersData.map((m: { id: number; name: string }) => ({ id: m.id, name: m.name })));
-    setMemberHolidays(await holidaysRes.json());
     setLoading(false);
   }, [groupId]);
 
@@ -292,7 +264,7 @@ export default function ConfigurationPage() {
       <div>
         <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl uppercase">Configuración</h1>
         <p className="mt-3 text-muted-foreground">
-          Configura días activos, orden de columnas y prioridades de roles.
+          Configura días activos, ensayos, prioridades y orden de columnas.
         </p>
       </div>
 
@@ -448,178 +420,6 @@ export default function ConfigurationPage() {
         </div>
       </section>
 
-      {/* Member Holidays */}
-      <section className="space-y-4 border-t border-border pt-8">
-        <div>
-          <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">
-            Vacaciones de miembros
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Configura fechas de ausencia para los miembros del grupo. Los miembros vinculados a un usuario
-            también pueden gestionar sus propias ausencias desde{" "}
-            <a href="/settings" className="text-accent hover:opacity-80 transition-opacity">Ajustes personales</a>.
-          </p>
-        </div>
-
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setHolidayError("");
-
-            if (!holidayMemberId || !holidayStart || !holidayEnd) {
-              setHolidayError("Todos los campos son obligatorios");
-              return;
-            }
-
-            if (holidayStart > holidayEnd) {
-              setHolidayError("La fecha de inicio debe ser anterior o igual a la fecha de fin");
-              return;
-            }
-
-            const res = await fetch(`/api/configuration/holidays?groupId=${groupId}`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                memberId: Number(holidayMemberId),
-                startDate: holidayStart,
-                endDate: holidayEnd,
-                description: holidayDescription.trim() || null,
-              }),
-            });
-
-            if (!res.ok) {
-              const data = await res.json();
-              setHolidayError(data.error || "Error al crear la fecha");
-              return;
-            }
-
-            setHolidayMemberId("");
-            setHolidayStart("");
-            setHolidayEnd("");
-            setHolidayDescription("");
-            fetchData();
-          }}
-          className="space-y-4"
-        >
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm text-muted-foreground mb-1.5">
-                Miembro
-              </label>
-              <select
-                value={holidayMemberId}
-                onChange={(e) => setHolidayMemberId(e.target.value ? Number(e.target.value) : "")}
-                className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm focus:outline-none focus:border-foreground"
-                required
-              >
-                <option value="">Seleccionar miembro...</option>
-                {memberOptions.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm text-muted-foreground mb-1.5">
-                Descripción
-              </label>
-              <input
-                type="text"
-                value={holidayDescription}
-                onChange={(e) => setHolidayDescription(e.target.value)}
-                className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
-                placeholder="Opcional"
-              />
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm text-muted-foreground mb-1.5">
-                Desde
-              </label>
-              <input
-                type="date"
-                value={holidayStart}
-                onChange={(e) => setHolidayStart(e.target.value)}
-                className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm focus:outline-none focus:border-foreground"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-muted-foreground mb-1.5">
-                Hasta
-              </label>
-              <input
-                type="date"
-                value={holidayEnd}
-                onChange={(e) => setHolidayEnd(e.target.value)}
-                className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm focus:outline-none focus:border-foreground"
-                required
-              />
-            </div>
-          </div>
-
-          {holidayError && <p className="text-sm text-destructive">{holidayError}</p>}
-
-          <button
-            type="submit"
-            className="rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
-          >
-            Agregar
-          </button>
-        </form>
-
-        {memberHolidays.length === 0 ? (
-          <div className="border-t border-dashed border-border py-10 text-center">
-            <p className="text-sm text-muted-foreground">
-              No hay fechas de ausencia configuradas para los miembros.
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-border">
-            {memberHolidays.map((h) => {
-              const formatDate = (d: string) => {
-                const [y, m, day] = d.split("-").map(Number);
-                return new Date(Date.UTC(y, m - 1, day)).toLocaleDateString("es-ES", {
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                  timeZone: "UTC",
-                });
-              };
-              return (
-                <div key={h.id} className="py-4 first:pt-0 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium">
-                      {h.memberName}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {h.startDate === h.endDate
-                        ? formatDate(h.startDate)
-                        : `${formatDate(h.startDate)} — ${formatDate(h.endDate)}`}
-                    </p>
-                    {h.description && (
-                      <p className="text-xs text-muted-foreground/60 mt-0.5">{h.description}</p>
-                    )}
-                  </div>
-                  <button
-                    onClick={async () => {
-                      await fetch(`/api/configuration/holidays?id=${h.id}&groupId=${groupId}`, {
-                        method: "DELETE",
-                      });
-                      fetchData();
-                    }}
-                    className="shrink-0 rounded-md border border-border px-3.5 py-2 text-sm text-destructive hover:border-destructive transition-colors"
-                  >
-                    Eliminar
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
     </div>
   );
 }

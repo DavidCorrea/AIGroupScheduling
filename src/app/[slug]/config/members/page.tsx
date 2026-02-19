@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useGroup } from "@/lib/group-context";
 
 interface Role {
@@ -27,13 +27,6 @@ interface Member {
   availableDayIds: number[];
 }
 
-interface UserSearchResult {
-  id: string;
-  name: string | null;
-  email: string;
-  image: string | null;
-}
-
 export default function MembersPage() {
   const { groupId, loading: groupLoading } = useGroup();
   const [members, setMembers] = useState<Member[]>([]);
@@ -45,13 +38,9 @@ export default function MembersPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [memberName, setMemberName] = useState("");
   const [memberEmail, setMemberEmail] = useState("");
-  const [linkedUser, setLinkedUser] = useState<UserSearchResult | null>(null);
-  const [emailSearchResults, setEmailSearchResults] = useState<UserSearchResult[]>([]);
-  const [showEmailDropdown, setShowEmailDropdown] = useState(false);
   const [selectedRoles, setSelectedRoles] = useState<number[]>([]);
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [formError, setFormError] = useState("");
-  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!groupId) return;
@@ -71,41 +60,10 @@ export default function MembersPage() {
     if (groupId) fetchData();
   }, [groupId, fetchData]);
 
-  // Debounced user search by email for linking
-  useEffect(() => {
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    // Don't search if already linked or email too short
-    if (linkedUser || memberEmail.length < 3) {
-      setEmailSearchResults([]);
-      setShowEmailDropdown(false);
-      return;
-    }
-    searchTimeout.current = setTimeout(async () => {
-      const res = await fetch(`/api/users/search?q=${encodeURIComponent(memberEmail)}`);
-      const results: UserSearchResult[] = await res.json();
-      // Exclude users whose email is already used by a member in this group (except the one being edited)
-      const existingEmails = new Set(
-        members
-          .filter((m) => m.id !== editingId)
-          .map((m) => m.memberEmail?.toLowerCase())
-          .filter(Boolean)
-      );
-      const filtered = results.filter((u) => !existingEmails.has(u.email.toLowerCase()));
-      setEmailSearchResults(filtered);
-      setShowEmailDropdown(filtered.length > 0);
-    }, 300);
-    return () => {
-      if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    };
-  }, [memberEmail, linkedUser]);
-
   const resetForm = () => {
     setEditingId(null);
     setMemberName("");
     setMemberEmail("");
-    setLinkedUser(null);
-    setEmailSearchResults([]);
-    setShowEmailDropdown(false);
     setSelectedRoles([]);
     setSelectedDays([]);
     setFormError("");
@@ -115,32 +73,8 @@ export default function MembersPage() {
     setEditingId(member.id);
     setMemberName(member.name);
     setMemberEmail(member.memberEmail ?? "");
-    if (member.userId) {
-      setLinkedUser({
-        id: member.userId,
-        name: member.userName,
-        email: member.email ?? "",
-        image: member.image,
-      });
-    } else {
-      setLinkedUser(null);
-    }
-    setEmailSearchResults([]);
-    setShowEmailDropdown(false);
     setSelectedRoles([...member.roleIds]);
     setSelectedDays([...member.availableDayIds]);
-  };
-
-  const selectUserToLink = (user: UserSearchResult) => {
-    setLinkedUser(user);
-    setMemberEmail(user.email);
-    setEmailSearchResults([]);
-    setShowEmailDropdown(false);
-  };
-
-  const unlinkUser = () => {
-    setLinkedUser(null);
-    // Keep email editable but don't clear it
   };
 
   const toggleRole = (roleId: number) => {
@@ -170,7 +104,6 @@ export default function MembersPage() {
         body: JSON.stringify({
           name: memberName.trim(),
           email: memberEmail.trim() || null,
-          userId: linkedUser?.id ?? null,
           roleIds: selectedRoles,
           availableDayIds: selectedDays,
         }),
@@ -182,7 +115,6 @@ export default function MembersPage() {
         body: JSON.stringify({
           name: memberName.trim(),
           email: memberEmail.trim() || null,
-          userId: linkedUser?.id ?? undefined,
           roleIds: selectedRoles,
           availableDayIds: selectedDays,
         }),
@@ -233,7 +165,6 @@ export default function MembersPage() {
           {editingId ? "Editar miembro" : "Agregar miembro"}
         </h2>
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Name input (always shown, primary field) */}
           <div>
             <label className="block text-sm text-muted-foreground mb-1.5">
               Nombre
@@ -248,81 +179,17 @@ export default function MembersPage() {
             />
           </div>
 
-          {/* Unified email + user linking */}
           <div>
             <label className="block text-sm text-muted-foreground mb-1.5">
               Email <span className="text-muted-foreground/50">(opcional)</span>
             </label>
-            {linkedUser ? (
-              <div className="flex items-center gap-3 rounded-md border border-border px-3 py-2.5">
-                {linkedUser.image && (
-                  <img
-                    src={linkedUser.image}
-                    alt=""
-                    className="h-6 w-6 rounded-full"
-                  />
-                )}
-                <div className="min-w-0 flex-1">
-                  <span className="text-sm block truncate">
-                    {linkedUser.name ?? linkedUser.email}
-                  </span>
-                  <span className="text-xs text-muted-foreground block truncate">
-                    {linkedUser.email} — cuenta vinculada
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={unlinkUser}
-                  className="shrink-0 text-sm text-destructive hover:opacity-80 transition-opacity"
-                >
-                  Desvincular
-                </button>
-              </div>
-            ) : (
-              <div className="relative">
-                <input
-                  type="email"
-                  value={memberEmail}
-                  onChange={(e) => setMemberEmail(e.target.value)}
-                  onFocus={() => emailSearchResults.length > 0 && setShowEmailDropdown(true)}
-                  onBlur={() => setTimeout(() => setShowEmailDropdown(false), 200)}
-                  className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
-                  placeholder="correo@ejemplo.com"
-                />
-                {showEmailDropdown && (
-                  <div className="absolute z-10 top-full mt-1 w-full rounded-md border border-border bg-background shadow-sm max-h-60 overflow-y-auto">
-                    <p className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/50">
-                      Usuarios encontrados — clic para vincular
-                    </p>
-                    {emailSearchResults.map((user) => (
-                      <button
-                        key={user.id}
-                        type="button"
-                        onClick={() => selectUserToLink(user)}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-muted transition-colors"
-                      >
-                        {user.image && (
-                          <img
-                            src={user.image}
-                            alt=""
-                            className="h-6 w-6 rounded-full"
-                          />
-                        )}
-                        <div>
-                          <span className="text-sm block">{user.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {user.email}
-                          </span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            <p className="mt-1.5 text-xs text-muted-foreground/60">
-              Si el usuario ya existe, podrás vincularlo. Si no, se vinculará automáticamente cuando inicie sesión.
-            </p>
+            <input
+              type="email"
+              value={memberEmail}
+              onChange={(e) => setMemberEmail(e.target.value)}
+              className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
+              placeholder="correo@ejemplo.com"
+            />
           </div>
 
           <div>
@@ -427,19 +294,6 @@ export default function MembersPage() {
                         {member.memberEmail && (
                           <p className="text-xs text-muted-foreground">
                             {member.memberEmail}
-                          </p>
-                        )}
-                        {member.userId ? (
-                          <p className="text-xs text-muted-foreground/50">
-                            Cuenta vinculada
-                          </p>
-                        ) : member.memberEmail ? (
-                          <p className="text-xs text-muted-foreground/50 italic">
-                            Pendiente de vincular
-                          </p>
-                        ) : (
-                          <p className="text-xs text-muted-foreground/50 italic">
-                            Sin cuenta vinculada
                           </p>
                         )}
                       </div>

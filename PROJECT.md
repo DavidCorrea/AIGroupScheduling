@@ -46,7 +46,8 @@
 
 ## Holidays
 - **User-scoped holidays**: Each user manages their own absence dates from `/settings`. These apply globally across all groups the user belongs to. API: `GET/POST/DELETE /api/holidays`
-- **Member-scoped holidays**: Admins can set absence dates for specific members (linked or unlinked) from the group configuration page. These are scoped to the member. API: `GET/POST/DELETE /api/configuration/holidays?groupId=N`
+- **Member-scoped holidays**: Admins can set absence dates for specific members (linked or unlinked) from the group holidays page (`/:slug/config/holidays`). These are scoped to the member. API: `GET/POST/DELETE /api/configuration/holidays?groupId=N`
+- **Group holidays page** (`/:slug/config/holidays`): shows both user-scoped and member-scoped holidays for the group, filtered to current and future dates only. User-scoped holidays are read-only (managed in `/settings`). Member-scoped holidays can be added and deleted by admins
 - The scheduler combines both sources: for linked members it fetches user-level + member-level holidays; for unlinked members it only fetches member-level holidays
 
 ## Schedule Generation Algorithm
@@ -76,8 +77,7 @@
 - **Rehearsal Days**: Toggle rehearsal days
 - **Column Order**: Configurable display order for role columns
 - **Role Priorities by Day**: Set fill order per day
-- **Member Holidays**: Admin-managed absence dates for specific members
-- API routes: `/api/configuration/days?groupId=N`, `/api/configuration/priorities?groupId=N`, `/api/configuration/holidays?groupId=N`
+- API routes: `/api/configuration/days?groupId=N`, `/api/configuration/priorities?groupId=N`
 
 ## Schedule Generation & Preview
 - Generate schedules for one or more months at a time via `/:slug/config/schedules`

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { holidays, members } from "@/db/schema";
-import { eq, and, inArray, isNotNull } from "drizzle-orm";
+import { eq, and, inArray, isNotNull, gte } from "drizzle-orm";
 import { requireGroupAccess } from "@/lib/api-helpers";
 
 /**
  * Admin-managed member-level holidays for a group.
- * These are holidays set by admins for specific members (linked or unlinked).
+ * GET also returns user-scoped holidays for linked members.
  */
 
 export async function GET(request: NextRequest) {
@@ -14,9 +14,11 @@ export async function GET(request: NextRequest) {
   if (accessResult.error) return accessResult.error;
   const { groupId } = accessResult;
 
-  // Get all member IDs for this group
+  const today = new Date().toISOString().split("T")[0];
+
+  // Get all members for this group (including userId for linked members)
   const groupMembers = await db
-    .select({ id: members.id, name: members.name })
+    .select({ id: members.id, name: members.name, userId: members.userId })
     .from(members)
     .where(eq(members.groupId, groupId));
 
@@ -26,22 +28,70 @@ export async function GET(request: NextRequest) {
     return NextResponse.json([]);
   }
 
-  // Fetch member-level holidays (where memberId is set)
+  // Fetch member-level holidays (admin-set, where memberId is set)
   const memberHolidays = await db
     .select()
     .from(holidays)
     .where(
       and(
         inArray(holidays.memberId, memberIds),
-        isNotNull(holidays.memberId)
+        isNotNull(holidays.memberId),
+        gte(holidays.endDate, today)
       )
     );
 
-  // Enrich with member name
-  const result = memberHolidays.map((h) => ({
-    ...h,
+  const result: Array<{
+    id: number;
+    memberId: number | null;
+    userId: string | null;
+    startDate: string;
+    endDate: string;
+    description: string | null;
+    memberName: string;
+    source: "member" | "user";
+  }> = memberHolidays.map((h) => ({
+    id: h.id,
+    memberId: h.memberId,
+    userId: h.userId,
+    startDate: h.startDate,
+    endDate: h.endDate,
+    description: h.description,
     memberName: groupMembers.find((m) => m.id === h.memberId)?.name ?? "Desconocido",
+    source: "member" as const,
   }));
+
+  // Fetch user-scoped holidays for linked members
+  const linkedMembers = groupMembers.filter((m) => m.userId != null);
+  if (linkedMembers.length > 0) {
+    const linkedUserIds = linkedMembers.map((m) => m.userId!);
+    const userHolidays = await db
+      .select()
+      .from(holidays)
+      .where(
+        and(
+          inArray(holidays.userId, linkedUserIds),
+          isNotNull(holidays.userId),
+          gte(holidays.endDate, today)
+        )
+      );
+
+    for (const h of userHolidays) {
+      const member = linkedMembers.find((m) => m.userId === h.userId);
+      result.push({
+        id: h.id,
+        memberId: null,
+        userId: h.userId,
+        startDate: h.startDate,
+        endDate: h.endDate,
+        description: h.description,
+        memberName: member?.name ?? "Desconocido",
+        source: "user" as const,
+      });
+    }
+  }
+
+  // Sort by start date
+  result.sort((a, b) => a.startDate.localeCompare(b.startDate));
 
   return NextResponse.json(result);
 }

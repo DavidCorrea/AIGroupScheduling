@@ -23,7 +23,12 @@ export default function AdminHome() {
     {
       href: `/${slug}/config/configuration`,
       label: "Configuración",
-      description: "Configura días activos, ensayos, prioridades, orden de columnas y vacaciones de miembros.",
+      description: "Configura días activos, ensayos, prioridades y orden de columnas.",
+    },
+    {
+      href: `/${slug}/config/holidays`,
+      label: "Vacaciones",
+      description: "Gestiona fechas de ausencia de los miembros del grupo.",
     },
     {
       href: `/${slug}/config/collaborators`,

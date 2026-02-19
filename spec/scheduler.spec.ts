@@ -3,18 +3,9 @@ import {
   MemberInfo,
   RoleDefinition,
   ScheduleAssignment,
-  SchedulerInput,
 } from "@/lib/scheduler.types";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function makeRole(
-  id: number,
-  name: string,
-  requiredCount = 1
-): RoleDefinition {
+function makeRole(id: number, name: string, requiredCount = 1): RoleDefinition {
   return { id, name, requiredCount };
 }
 
@@ -23,12 +14,11 @@ function makeMember(
   name: string,
   roleIds: number[],
   availableDays: string[] = ["Miércoles", "Viernes", "Domingo"],
-  holidays: MemberInfo["holidays"] = []
+  holidays: MemberInfo["holidays"] = [],
 ): MemberInfo {
   return { id, name, roleIds, availableDays, holidays };
 }
 
-// Common roles
 const LEADER = makeRole(1, "Leader");
 const KEYBOARD = makeRole(2, "Keyboard", 2);
 const ELECTRIC_GUITAR = makeRole(3, "Electric Guitar");
@@ -36,10 +26,6 @@ const ACOUSTIC_GUITAR = makeRole(4, "Acoustic Guitar");
 const BASS = makeRole(5, "Bass");
 const DRUMS = makeRole(6, "Drums");
 const VOICE = makeRole(7, "Voice", 4);
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe("Schedule generation", () => {
   describe("when assigning members to roles", () => {
@@ -61,10 +47,7 @@ describe("Schedule generation", () => {
 
     it("fills multiple slots when a role requires more than one person", () => {
       const roles = [makeRole(2, "Keyboard", 2)];
-      const members = [
-        makeMember(1, "Alice", [2]),
-        makeMember(2, "Bob", [2]),
-      ];
+      const members = [makeMember(1, "Alice", [2]), makeMember(2, "Bob", [2])];
 
       const result = generateSchedule({
         dates: ["2026-03-04"],
@@ -126,18 +109,10 @@ describe("Schedule generation", () => {
 
     it("wraps around the rotation when there are more dates than members", () => {
       const roles = [makeRole(1, "Leader")];
-      const members = [
-        makeMember(1, "Alice", [1]),
-        makeMember(2, "Bob", [1]),
-      ];
+      const members = [makeMember(1, "Alice", [1]), makeMember(2, "Bob", [1])];
 
       const result = generateSchedule({
-        dates: [
-          "2026-03-04",
-          "2026-03-11",
-          "2026-03-18",
-          "2026-03-25",
-        ], // all Wednesdays
+        dates: ["2026-03-04", "2026-03-11", "2026-03-18", "2026-03-25"], // all Wednesdays
         roles,
         members,
       });
@@ -201,7 +176,7 @@ describe("Schedule generation", () => {
           { date: "2026-03-04", roleId: 1, memberId: 1 }, // Alice on Wed
           { date: "2026-03-06", roleId: 1, memberId: 2 }, // Bob on Fri
           { date: "2026-03-08", roleId: 1, memberId: 3 }, // Charlie on Sun
-        ])
+        ]),
       );
     });
 
@@ -229,9 +204,13 @@ describe("Schedule generation", () => {
     it("does not assign a member during their holiday period", () => {
       const roles = [makeRole(1, "Leader")];
       const members = [
-        makeMember(1, "Alice", [1], ["Miércoles", "Viernes", "Domingo"], [
-          { startDate: "2026-03-01", endDate: "2026-03-07" },
-        ]),
+        makeMember(
+          1,
+          "Alice",
+          [1],
+          ["Miércoles", "Viernes", "Domingo"],
+          [{ startDate: "2026-03-01", endDate: "2026-03-07" }],
+        ),
         makeMember(2, "Bob", [1]),
       ];
 
@@ -245,10 +224,10 @@ describe("Schedule generation", () => {
       });
 
       const wednesdayAssignment = result.assignments.find(
-        (a) => a.date === "2026-03-04"
+        (a) => a.date === "2026-03-04",
       );
       const sundayAssignment = result.assignments.find(
-        (a) => a.date === "2026-03-08"
+        (a) => a.date === "2026-03-08",
       );
 
       expect(wednesdayAssignment?.memberId).toBe(2); // Bob fills in
@@ -258,9 +237,13 @@ describe("Schedule generation", () => {
     it("handles a holiday that spans exactly one day", () => {
       const roles = [makeRole(1, "Leader")];
       const members = [
-        makeMember(1, "Alice", [1], ["Miércoles"], [
-          { startDate: "2026-03-04", endDate: "2026-03-04" },
-        ]),
+        makeMember(
+          1,
+          "Alice",
+          [1],
+          ["Miércoles"],
+          [{ startDate: "2026-03-04", endDate: "2026-03-04" }],
+        ),
         makeMember(2, "Bob", [1]),
       ];
 
@@ -288,9 +271,7 @@ describe("Schedule generation", () => {
       });
 
       expect(result.assignments).toEqual([]);
-      expect(result.unfilledSlots).toEqual([
-        { date: "2026-03-04", roleId: 1 },
-      ]);
+      expect(result.unfilledSlots).toEqual([{ date: "2026-03-04", roleId: 1 }]);
     });
 
     it("partially fills slots when some but not enough members are available", () => {
@@ -383,7 +364,7 @@ describe("Schedule generation", () => {
       // Verify no member is assigned twice on the same date
       for (const date of marchDates) {
         const assignmentsOnDate = result.assignments.filter(
-          (a) => a.date === date
+          (a) => a.date === date,
         );
         const memberIds = assignmentsOnDate.map((a) => a.memberId);
         expect(new Set(memberIds).size).toBe(memberIds.length);
@@ -395,7 +376,12 @@ describe("Schedule generation", () => {
     it("assigns a multi-role member to only one role per date when roles share an exclusive group", () => {
       const roles: RoleDefinition[] = [
         { id: 1, name: "Keyboard", requiredCount: 1, exclusiveGroupId: 1 },
-        { id: 3, name: "Electric Guitar", requiredCount: 1, exclusiveGroupId: 1 },
+        {
+          id: 3,
+          name: "Electric Guitar",
+          requiredCount: 1,
+          exclusiveGroupId: 1,
+        },
       ];
       const members = [
         makeMember(1, "Alice", [1, 3]), // Can play keyboard and guitar
@@ -411,7 +397,7 @@ describe("Schedule generation", () => {
 
       // Alice should appear at most once (exclusive group prevents double assignment)
       const aliceAssignments = result.assignments.filter(
-        (a) => a.memberId === 1
+        (a) => a.memberId === 1,
       );
       expect(aliceAssignments.length).toBeLessThanOrEqual(1);
 
@@ -427,12 +413,22 @@ describe("Schedule generation", () => {
       // Electric Guitar (priority 1). This matters when a member can play both
       // and roles are in the same exclusive group.
       const roles: RoleDefinition[] = [
-        { id: 3, name: "Electric Guitar", requiredCount: 1, exclusiveGroupId: 1 },
-        { id: 4, name: "Acoustic Guitar", requiredCount: 1, exclusiveGroupId: 1 },
+        {
+          id: 3,
+          name: "Electric Guitar",
+          requiredCount: 1,
+          exclusiveGroupId: 1,
+        },
+        {
+          id: 4,
+          name: "Acoustic Guitar",
+          requiredCount: 1,
+          exclusiveGroupId: 1,
+        },
       ];
       const members = [
         makeMember(1, "Alice", [3, 4]), // Can play both guitars
-        makeMember(2, "Bob", [3]),       // Only electric
+        makeMember(2, "Bob", [3]), // Only electric
       ];
 
       const result = generateSchedule({
@@ -446,12 +442,8 @@ describe("Schedule generation", () => {
 
       // Alice should be assigned to Acoustic Guitar (higher priority)
       // Bob should fill Electric Guitar
-      const acousticAssignment = result.assignments.find(
-        (a) => a.roleId === 4
-      );
-      const electricAssignment = result.assignments.find(
-        (a) => a.roleId === 3
-      );
+      const acousticAssignment = result.assignments.find((a) => a.roleId === 4);
+      const electricAssignment = result.assignments.find((a) => a.roleId === 3);
 
       expect(acousticAssignment?.memberId).toBe(1);
       expect(electricAssignment?.memberId).toBe(2);
@@ -505,7 +497,7 @@ describe("Schedule generation", () => {
         expect.arrayContaining([
           expect.objectContaining({ roleId: 1, memberId: 1 }),
           expect.objectContaining({ roleId: 2, memberId: 1 }),
-        ])
+        ]),
       );
     });
 
@@ -513,7 +505,12 @@ describe("Schedule generation", () => {
       // Both Keyboard and Electric Guitar are in "Instrumento" group
       const roles: RoleDefinition[] = [
         { id: 1, name: "Keyboard", requiredCount: 1, exclusiveGroupId: 1 },
-        { id: 2, name: "Electric Guitar", requiredCount: 1, exclusiveGroupId: 1 },
+        {
+          id: 2,
+          name: "Electric Guitar",
+          requiredCount: 1,
+          exclusiveGroupId: 1,
+        },
       ];
       // David can play both but should only get one
       const members = [
@@ -530,7 +527,9 @@ describe("Schedule generation", () => {
       // David gets Keyboard (first role), Bob gets Electric Guitar
       expect(result.assignments).toHaveLength(2);
       expect(result.unfilledSlots).toHaveLength(0);
-      const davidAssignments = result.assignments.filter((a) => a.memberId === 1);
+      const davidAssignments = result.assignments.filter(
+        (a) => a.memberId === 1,
+      );
       const bobAssignments = result.assignments.filter((a) => a.memberId === 2);
       expect(davidAssignments).toHaveLength(1);
       expect(bobAssignments).toHaveLength(1);
@@ -559,7 +558,7 @@ describe("Schedule generation", () => {
         expect.arrayContaining([
           expect.objectContaining({ roleId: 1, memberId: 1 }),
           expect.objectContaining({ roleId: 2, memberId: 1 }),
-        ])
+        ]),
       );
     });
 
@@ -567,7 +566,12 @@ describe("Schedule generation", () => {
       // Both roles in "Instrumento" group, only one member
       const roles: RoleDefinition[] = [
         { id: 1, name: "Keyboard", requiredCount: 1, exclusiveGroupId: 1 },
-        { id: 2, name: "Electric Guitar", requiredCount: 1, exclusiveGroupId: 1 },
+        {
+          id: 2,
+          name: "Electric Guitar",
+          requiredCount: 1,
+          exclusiveGroupId: 1,
+        },
       ];
       const members = [makeMember(1, "David", [1, 2])];
 
@@ -580,11 +584,11 @@ describe("Schedule generation", () => {
       // David gets Keyboard, Electric Guitar is unfilled
       expect(result.assignments).toHaveLength(1);
       expect(result.assignments[0]).toEqual(
-        expect.objectContaining({ roleId: 1, memberId: 1 })
+        expect.objectContaining({ roleId: 1, memberId: 1 }),
       );
       expect(result.unfilledSlots).toHaveLength(1);
       expect(result.unfilledSlots[0]).toEqual(
-        expect.objectContaining({ roleId: 2 })
+        expect.objectContaining({ roleId: 2 }),
       );
     });
   });
