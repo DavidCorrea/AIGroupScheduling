@@ -1,0 +1,283 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { useGroup } from "@/lib/group-context";
+import { OptionToggleGroup } from "@/components/OptionToggleGroup";
+
+interface Role {
+  id: number;
+  name: string;
+  requiredCount: number;
+}
+
+interface ScheduleDay {
+  id: number;
+  dayOfWeek: string;
+  active: boolean;
+}
+
+interface Member {
+  id: number;
+  name: string;
+  memberEmail: string | null;
+  userId: string | null;
+  roleIds: number[];
+  availableDayIds: number[];
+}
+
+export default function EditMemberPage() {
+  const params = useParams();
+  const slug = params.slug as string;
+  const id = params.id as string;
+  const router = useRouter();
+  const { groupId, loading: groupLoading } = useGroup();
+  const [member, setMember] = useState<Member | null>(null);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [days, setDays] = useState<ScheduleDay[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
+  const [memberName, setMemberName] = useState("");
+  const [memberEmail, setMemberEmail] = useState("");
+  const [selectedRoles, setSelectedRoles] = useState<number[]>([]);
+  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const [formError, setFormError] = useState("");
+  const [linkCheck, setLinkCheck] = useState<{ canLink: true; user: { id: string; name: string | null; email: string } } | { canLink: false } | null>(null);
+  const [linkLoading, setLinkLoading] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    if (!groupId || !id) return;
+    const memberId = parseInt(id, 10);
+    if (Number.isNaN(memberId)) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
+    const q = `?groupId=${groupId}`;
+    const [memberRes, rolesRes, daysRes] = await Promise.all([
+      fetch(`/api/members/${memberId}`),
+      fetch(`/api/configuration/roles${q}`),
+      fetch(`/api/configuration/days${q}`),
+    ]);
+    if (!memberRes.ok) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
+    const memberData = await memberRes.json();
+    setMember(memberData);
+    setMemberName(memberData.name);
+    setMemberEmail(memberData.memberEmail ?? "");
+    setSelectedRoles([...memberData.roleIds]);
+    setSelectedDays([...memberData.availableDayIds]);
+    setRoles(await rolesRes.json());
+    setDays(await daysRes.json());
+    setLoading(false);
+  }, [groupId, id]);
+
+  // When member has email but no userId, check if we can link to a Google account
+  useEffect(() => {
+    if (!member || !member.memberEmail?.trim() || member.userId) {
+      setLinkCheck(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const res = await fetch(`/api/members/${member.id}/link-check`);
+      if (cancelled) return;
+      const data = await res.json();
+      if (data.canLink && data.user) {
+        setLinkCheck({ canLink: true, user: data.user });
+      } else {
+        setLinkCheck({ canLink: false });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [member?.id, member?.memberEmail, member?.userId]);
+
+  const handleLinkToUser = async () => {
+    if (!linkCheck || !linkCheck.canLink || !("user" in linkCheck)) return;
+    setLinkLoading(true);
+    setFormError("");
+    try {
+      const res = await fetch(`/api/members/${member!.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: linkCheck.user.id }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setFormError(data.error || "Error al vincular");
+        return;
+      }
+      await fetchData();
+    } finally {
+      setLinkLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (groupId) fetchData();
+  }, [groupId, fetchData]);
+
+  const toggleRole = (roleId: number) => {
+    setSelectedRoles((prev) =>
+      prev.includes(roleId) ? prev.filter((id) => id !== roleId) : [...prev, roleId]
+    );
+  };
+
+  const toggleDay = (dayId: number) => {
+    setSelectedDays((prev) =>
+      prev.includes(dayId) ? prev.filter((id) => id !== dayId) : [...prev, dayId]
+    );
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError("");
+
+    if (!memberName.trim()) return;
+
+    const res = await fetch(`/api/members/${member!.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: memberName.trim(),
+        email: memberEmail.trim() || null,
+        roleIds: selectedRoles,
+        availableDayIds: selectedDays,
+      }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      setFormError(data.error || "Error al guardar el miembro");
+      return;
+    }
+
+    router.push(`/${slug}/config/members`);
+  };
+
+  if (groupLoading || loading) {
+    return <p className="text-sm text-muted-foreground">Cargando...</p>;
+  }
+
+  if (notFound || !member) {
+    return (
+      <div className="space-y-6">
+        <p className="text-sm text-muted-foreground">Miembro no encontrado.</p>
+        <Link
+          href={`/${slug}/config/members`}
+          className="text-sm text-primary hover:underline"
+        >
+          Volver a Miembros
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-12">
+      <div>
+        <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl uppercase">
+          Editar miembro
+        </h1>
+        <p className="mt-3 text-muted-foreground">
+          Modifica los datos del miembro.
+        </p>
+      </div>
+
+      <section className="border-t border-border pt-8">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="max-w-md">
+            <label className="block text-sm text-muted-foreground mb-1.5">
+              Nombre
+            </label>
+            <input
+              type="text"
+              value={memberName}
+              onChange={(e) => setMemberName(e.target.value)}
+              className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
+              placeholder="Nombre del miembro"
+              required
+            />
+          </div>
+
+          <div className="max-w-md">
+            <label className="block text-sm text-muted-foreground mb-1.5">
+              Email <span className="text-muted-foreground/50">(opcional)</span>
+            </label>
+            <input
+              type="email"
+              value={memberEmail}
+              onChange={(e) => setMemberEmail(e.target.value)}
+              className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
+              placeholder="correo@ejemplo.com"
+            />
+          </div>
+
+          {linkCheck?.canLink && "user" in linkCheck && (
+            <div className="rounded-lg border border-border bg-muted/30 p-4">
+              <p className="text-sm text-muted-foreground mb-2">
+                Este email coincide con una cuenta de Google que ya ha accedido a la app. Puedes vincular el miembro a esa cuenta.
+              </p>
+              <button
+                type="button"
+                onClick={handleLinkToUser}
+                disabled={linkLoading}
+                className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:border-foreground hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {linkLoading ? "Vinculando…" : "Vincular con cuenta de Google"}
+              </button>
+            </div>
+          )}
+
+          <div>
+            <OptionToggleGroup
+              items={roles}
+              getKey={(r) => r.id}
+              getLabel={(r) => r.name}
+              isSelected={(r) => selectedRoles.includes(r.id)}
+              onToggle={(r) => toggleRole(r.id)}
+              title="Roles"
+            />
+          </div>
+
+          <div>
+            <OptionToggleGroup
+              items={days}
+              getKey={(d) => d.id}
+              getLabel={(d) => d.dayOfWeek}
+              isSelected={(d) => selectedDays.includes(d.id)}
+              onToggle={(d) => toggleDay(d.id)}
+              title="Días disponibles"
+              description="Selecciona en qué días de la semana está disponible este miembro."
+            />
+          </div>
+
+          {formError && (
+            <p className="text-sm text-destructive">{formError}</p>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="submit"
+              disabled={!memberName.trim()}
+              className="rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Actualizar
+            </button>
+            <Link
+              href={`/${slug}/config/members`}
+              className="rounded-md border border-border px-5 py-2.5 text-sm hover:border-foreground transition-colors inline-block"
+            >
+              Cancelar
+            </Link>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}

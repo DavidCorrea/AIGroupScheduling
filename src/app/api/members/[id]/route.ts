@@ -93,7 +93,23 @@ export async function PUT(
 
   // email can be set or cleared
   if (email !== undefined) {
-    updateFields.email = email && typeof email === "string" ? email.trim().toLowerCase() : null;
+    const normalizedEmail = email && typeof email === "string" ? email.trim().toLowerCase() : null;
+    updateFields.email = normalizedEmail;
+
+    // If client didn't explicitly send userId, try to link member to a user by email (e.g. Google account)
+    if (userId === undefined) {
+      if (normalizedEmail) {
+        const userByEmail = (await db.select().from(users).where(eq(users.email, normalizedEmail)))[0];
+        if (userByEmail) {
+          updateFields.userId = userByEmail.id;
+          updateFields.email = userByEmail.email.toLowerCase().trim();
+        } else {
+          updateFields.userId = null;
+        }
+      } else {
+        updateFields.userId = null;
+      }
+    }
   }
 
   // userId can be set (link), or null (unlink)

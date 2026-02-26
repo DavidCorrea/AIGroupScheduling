@@ -20,6 +20,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useGroup } from "@/lib/group-context";
 import { buildColumnOrderPayload } from "@/lib/column-order";
 import { useUnsavedConfig } from "@/lib/unsaved-config-context";
+import { OptionToggleGroup } from "@/components/OptionToggleGroup";
 
 function PriorityEditor({
   roles,
@@ -401,47 +402,6 @@ interface DayRolePriority {
   roleName: string;
 }
 
-function DayOptionsGroup<T extends { id: number; dayOfWeek: string }>({
-  days,
-  isSelected,
-  onToggle,
-  title,
-  description,
-}: {
-  days: T[];
-  isSelected: (day: T) => boolean;
-  onToggle: (day: T) => void;
-  title: string;
-  description: string;
-}) {
-  return (
-    <section className="space-y-4">
-      <div>
-        <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">{title}</h2>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </div>
-      <div className="rounded-lg border border-border w-full lg:w-fit max-w-full">
-        <div className="flex flex-col lg:flex-row lg:flex-wrap gap-0">
-          {days.map((day) => (
-            <button
-              key={day.id}
-              type="button"
-              onClick={() => onToggle(day)}
-              className={`w-full lg:w-auto rounded-none px-4 py-3 text-sm transition-colors text-left border-r border-b border-border first:border-l-0 last:border-r-0 last:border-b-0 lg:border-b-0 ${
-                isSelected(day)
-                  ? "bg-primary/5 text-foreground font-medium"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {day.dayOfWeek}
-            </button>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 export default function ConfigurationPage() {
   const { groupId, loading: groupLoading } = useGroup();
   const { setDirty } = useUnsavedConfig();
@@ -664,17 +624,21 @@ export default function ConfigurationPage() {
         </p>
       </div>
 
-      {/* Schedule Days: separate sections, shared DayOptionsGroup component */}
+      {/* Schedule Days: separate sections, shared OptionToggleGroup component */}
       <div className="border-t border-border pt-8 space-y-8">
-        <DayOptionsGroup
-          days={localDays}
+        <OptionToggleGroup
+          items={localDays}
+          getKey={(day) => day.id}
+          getLabel={(day) => day.dayOfWeek}
           isSelected={(day) => day.active}
           onToggle={toggleDay}
           title="Días activos"
           description="Selecciona qué días de la semana se incluyen en el cronograma."
         />
-        <DayOptionsGroup
-          days={localDays}
+        <OptionToggleGroup
+          items={localDays}
+          getKey={(day) => day.id}
+          getLabel={(day) => day.dayOfWeek}
           isSelected={(day) => day.isRehearsal}
           onToggle={toggleRehearsal}
           title="Días de ensayo"
