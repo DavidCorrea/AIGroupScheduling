@@ -1,7 +1,23 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import {
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useGroup } from "@/lib/group-context";
+import { buildColumnOrderPayload } from "@/lib/column-order";
 
 function PriorityEditor({
   roles,
@@ -103,6 +119,22 @@ function ColumnOrderEditor({
     setOrderedRoles([...roles].sort((a, b) => a.displayOrder - b.displayOrder));
   }, [roles]);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 250, tolerance: 5 },
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = orderedRoles.findIndex((r) => r.id === active.id);
+    const newIndex = orderedRoles.findIndex((r) => r.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    setOrderedRoles((prev) => arrayMove(prev, oldIndex, newIndex));
+  };
+
   const moveUp = (index: number) => {
     if (index === 0) return;
     const newOrder = [...orderedRoles];
@@ -125,40 +157,134 @@ function ColumnOrderEditor({
 
   return (
     <div className="space-y-2">
-      {orderedRoles.map((role, index) => (
-        <div
-          key={role.id}
-          className="flex items-center gap-2 border-b border-border px-4 py-3 text-sm last:border-b-0"
+      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        <SortableContext
+          items={orderedRoles.map((r) => r.id)}
+          strategy={verticalListSortingStrategy}
         >
-          <span className="text-muted-foreground w-6 text-right text-xs">
-            {index + 1}.
-          </span>
-          <span className="flex-1 font-medium">{role.name}</span>
-          <button
-            onClick={() => moveUp(index)}
-            disabled={index === 0}
-            className="p-2 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
-          >
-            ↑
-          </button>
-          <button
-            onClick={() => moveDown(index)}
-            disabled={index === orderedRoles.length - 1}
-            className="p-2 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
-          >
-            ↓
-          </button>
-        </div>
-      ))}
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="px-2 py-3 text-left text-xs font-medium uppercase tracking-widest text-muted-foreground w-10">
+                    <span className="sr-only">Arrastrar</span>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Posición
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Rol
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Acciones
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {orderedRoles.map((role, index) => (
+                  <SortableRow
+                    key={role.id}
+                    role={role}
+                    index={index}
+                    total={orderedRoles.length}
+                    onMoveUp={() => moveUp(index)}
+                    onMoveDown={() => moveDown(index)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </SortableContext>
+      </DndContext>
       <button
-        onClick={() =>
-          onSave(orderedRoles.map((r, i) => ({ id: r.id, displayOrder: i })))
-        }
+        onClick={() => onSave(buildColumnOrderPayload(orderedRoles))}
         className="mt-2 w-full sm:w-auto rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
       >
         Guardar orden
       </button>
     </div>
+  );
+}
+
+function SortableRow({
+  role,
+  index,
+  total,
+  onMoveUp,
+  onMoveDown,
+}: {
+  role: Role;
+  index: number;
+  total: number;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: role.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className={`border-b border-border hover:bg-muted/30 transition-colors text-sm ${
+        isDragging ? "opacity-50 bg-muted/50" : ""
+      }`}
+    >
+      <td className="px-2 py-3 w-10">
+        <button
+          ref={setActivatorNodeRef}
+          type="button"
+          className="touch-manipulation p-1.5 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing rounded focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+          aria-label="Arrastrar para reordenar"
+          {...attributes}
+          {...listeners}
+        >
+          <span className="inline-block text-base" aria-hidden="true">
+            ≡
+          </span>
+        </button>
+      </td>
+      <td className="px-4 py-3 text-muted-foreground font-medium">
+        {index + 1}
+      </td>
+      <td className="px-4 py-3 font-medium">
+        {role.name}
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onMoveUp}
+            disabled={index === 0}
+            aria-label="Subir"
+            className="p-2 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors rounded focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            onClick={onMoveDown}
+            disabled={index === total - 1}
+            aria-label="Bajar"
+            className="p-2 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors rounded focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+          >
+            ↓
+          </button>
+        </div>
+      </td>
+    </tr>
   );
 }
 

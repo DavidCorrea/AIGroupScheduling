@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 
@@ -36,7 +36,23 @@ const ROLE_LABELS: Record<string, string> = {
   member: "Miembro",
 };
 
-function formatDate(dateStr: string): string {
+const MONTH_NAMES = [
+  "enero", "febrero", "marzo", "abril", "mayo", "junio",
+  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+];
+
+function formatDateLong(dateStr: string): string {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.toLocaleDateString("es-ES", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+  });
+}
+
+function formatDateShort(dateStr: string): string {
   const [year, month, day] = dateStr.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));
   return date.toLocaleDateString("es-ES", {
@@ -47,14 +63,22 @@ function formatDate(dateStr: string): string {
   });
 }
 
+function getRelativeLabel(dateStr: string, todayStr: string): string {
+  const d = new Date(dateStr + "T00:00:00Z");
+  const t = new Date(todayStr + "T00:00:00Z");
+  const diff = Math.round((d.getTime() - t.getTime()) / 86400000);
+  if (diff === 0) return "hoy";
+  if (diff === 1) return "mañana";
+  if (diff < 0) return `hace ${Math.abs(diff)} día${Math.abs(diff) > 1 ? "s" : ""}`;
+  return `en ${diff} día${diff > 1 ? "s" : ""}`;
+}
+
 export default function HomePage() {
   const { data: session } = useSession();
   const [groups, setGroups] = useState<Group[]>([]);
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [error, setError] = useState("");
+  const [calendarSelectedDate, setCalendarSelectedDate] = useState<string | null>(null);
 
   const canCreate = session?.user?.isAdmin || session?.user?.canCreateGroups || false;
 
@@ -72,42 +96,48 @@ export default function HomePage() {
     fetchData();
   }, [fetchData]);
 
-  const generateSlug = (value: string) => {
-    return value
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "");
-  };
+  const todayISO = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  }, []);
 
-  const handleNameChange = (value: string) => {
-    setName(value);
-    setSlug(generateSlug(value));
-  };
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
+  const assignmentsByDate = useMemo(() => {
+    const map = new Map<string, Assignment[]>();
+    if (!dashboard) return map;
+    for (const a of dashboard.assignments) {
+      if (!map.has(a.date)) map.set(a.date, []);
+      map.get(a.date)!.push(a);
+    }
+    return map;
+  }, [dashboard]);
 
-    if (!name.trim() || !slug.trim()) return;
+  const conflictDateSet = useMemo(() => {
+    if (!dashboard) return new Set<string>();
+    return new Set(dashboard.conflicts.map((c) => c.date));
+  }, [dashboard]);
 
-    const res = await fetch("/api/groups", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim(), slug: slug.trim() }),
-    });
+  const nextAssignment = useMemo(() => {
+    if (!dashboard || dashboard.assignments.length === 0) return null;
+    const future = dashboard.assignments.filter((a) => a.date >= todayISO);
+    if (future.length === 0) return null;
+    const firstDate = future[0].date;
+    const onDate = future.filter((a) => a.date === firstDate);
 
-    if (!res.ok) {
-      const data = await res.json();
-      setError(data.error || "Error al crear el grupo");
-      return;
+    const byGroup = new Map<number, { groupName: string; groupSlug: string; roles: string[] }>();
+    for (const a of onDate) {
+      const existing = byGroup.get(a.groupId);
+      if (existing) {
+        existing.roles.push(a.roleName);
+      } else {
+        byGroup.set(a.groupId, { groupName: a.groupName, groupSlug: a.groupSlug, roles: [a.roleName] });
+      }
     }
 
-    setName("");
-    setSlug("");
-    fetchData();
-  };
+    return { date: firstDate, items: [...byGroup.values()] };
+  }, [dashboard, todayISO]);
 
   if (loading) {
     return (
@@ -117,35 +147,11 @@ export default function HomePage() {
     );
   }
 
-  // Compute the closest upcoming assignment per group
-  const closestByGroup = (() => {
-    if (!dashboard || dashboard.assignments.length === 0) return [];
-
-    const grouped = new Map<
-      number,
-      { groupName: string; groupSlug: string; date: string; roles: string[] }
-    >();
-
-    // Assignments are already sorted by date from the API
-    for (const a of dashboard.assignments) {
-      const existing = grouped.get(a.groupId);
-      if (!existing) {
-        // First (closest) date for this group
-        grouped.set(a.groupId, {
-          groupName: a.groupName,
-          groupSlug: a.groupSlug,
-          date: a.date,
-          roles: [a.roleName],
-        });
-      } else if (existing.date === a.date) {
-        // Same closest date, additional role
-        existing.roles.push(a.roleName);
-      }
-      // Skip later dates — we only want the closest
-    }
-
-    return [...grouped.values()].sort((a, b) => a.date.localeCompare(b.date));
-  })();
+  const daysInMonth = new Date(Date.UTC(currentYear, currentMonth, 0)).getUTCDate();
+  const firstDayDow = new Date(Date.UTC(currentYear, currentMonth - 1, 1)).getUTCDay();
+  const leadingBlanks = firstDayDow === 0 ? 6 : firstDayDow - 1;
+  const dayHeaders = ["L", "M", "X", "J", "V", "S", "D"];
+  const hasAssignments = dashboard && dashboard.assignments.length > 0;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -168,68 +174,123 @@ export default function HomePage() {
           </Link>
         </div>
 
-        {/* Closest upcoming assignments */}
-        {closestByGroup.length > 0 && (
-          <div className="mb-12">
-            <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">
-              Próxima asignación
-            </h2>
-            <div className="divide-y divide-border">
-              {closestByGroup.map((item) => (
-                <div key={item.groupSlug} className="py-4 first:pt-0">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium">
-                        {formatDate(item.date)}
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-0.5">
+        <div className="border-t border-border pt-8 lg:grid lg:grid-cols-[1fr_1px_1fr] lg:gap-8">
+          {/* Left column: assignments + calendar */}
+          <div>
+            {/* Next assignment */}
+            {nextAssignment && (
+              <div className="mb-12">
+                <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">
+                  Próxima asignación
+                </h2>
+                <p className="font-medium capitalize">
+                  {formatDateLong(nextAssignment.date)}
+                  <span className="ml-2 text-sm text-muted-foreground font-normal">
+                    — {getRelativeLabel(nextAssignment.date, todayISO)}
+                  </span>
+                </p>
+                {conflictDateSet.has(nextAssignment.date) && (
+                  <p className="text-xs text-destructive mt-1">Conflicto: múltiples grupos en esta fecha</p>
+                )}
+                <div className="mt-3 space-y-1.5">
+                  {nextAssignment.items.map((item) => (
+                    <div key={item.groupSlug} className="flex items-center justify-between gap-3">
+                      <p className="text-sm text-muted-foreground">
                         {item.roles.join(", ")}
                       </p>
+                      <Link
+                        href={`/${item.groupSlug}/cronograma`}
+                        className="shrink-0 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {item.groupName} &rarr;
+                      </Link>
                     </div>
-                    <Link
-                      href={`/${item.groupSlug}/cronograma`}
-                      className="shrink-0 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {item.groupName} &rarr;
-                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Calendar grid */}
+            {hasAssignments && (
+              <div className="mb-12 border-t border-border pt-8">
+                <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">
+                  {MONTH_NAMES[currentMonth - 1]} {currentYear}
+                </h2>
+                <div className="max-w-md mx-auto lg:max-w-none lg:mx-0">
+                  <div className="grid grid-cols-7 gap-1 mb-1">
+                    {dayHeaders.map((d) => (
+                      <div
+                        key={d}
+                        className="text-center text-xs font-medium text-muted-foreground py-1"
+                      >
+                        {d}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-1">
+                    {Array.from({ length: leadingBlanks }).map((_, i) => (
+                      <div key={`blank-${i}`} />
+                    ))}
+
+                    {Array.from({ length: daysInMonth }).map((_, i) => {
+                      const dayNum = i + 1;
+                      const dateStr = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+                      const dateAssignments = assignmentsByDate.get(dateStr);
+                      const hasAny = !!dateAssignments && dateAssignments.length > 0;
+                      const isConflict = conflictDateSet.has(dateStr);
+                      const isToday = dateStr === todayISO;
+                      const isPast = dateStr < todayISO;
+
+                      return (
+                        <button
+                          key={dayNum}
+                          onClick={() => { if (hasAny) setCalendarSelectedDate(dateStr); }}
+                          disabled={!hasAny}
+                          className={[
+                            "aspect-square rounded-md flex items-center justify-center text-sm transition-colors relative",
+                            isPast ? "opacity-50" : "",
+                            isToday ? "ring-1 ring-foreground" : "",
+                            isConflict
+                              ? "bg-destructive/15 font-semibold"
+                              : hasAny
+                                ? "bg-muted/50 font-medium"
+                                : "text-muted-foreground",
+                            hasAny ? "cursor-pointer hover:bg-muted/70 active:bg-muted" : "cursor-default",
+                          ].filter(Boolean).join(" ")}
+                        >
+                          {dayNum}
+                          {isConflict && (
+                            <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-destructive" />
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
-        )}
 
-        {/* Conflicts */}
-        {dashboard && dashboard.conflicts.length > 0 && (
-          <div className="mb-12">
-            <h2 className="uppercase tracking-widest text-xs font-medium text-destructive mb-6">
-              Conflictos
+          {/* Vertical divider */}
+          <div className="hidden lg:block bg-border" />
+
+          {/* Right column: groups */}
+          <div className="border-t border-border pt-8 mt-4 lg:border-t-0 lg:pt-0 lg:mt-0">
+            <div className="mb-12">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground">
+              Mis grupos
             </h2>
-            <div className="border border-destructive/30 rounded-md p-4">
-              <ul className="space-y-2">
-                {dashboard.conflicts.map((conflict) => (
-                  <li
-                    key={conflict.date}
-                    className="text-sm"
-                  >
-                    <span className="font-medium">
-                      {formatDate(conflict.date)}
-                    </span>
-                    <span className="text-muted-foreground">
-                      {" "}— {conflict.groups.join(", ")}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {canCreate && (
+              <Link
+                href="/groups/new"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                + Crear grupo
+              </Link>
+            )}
           </div>
-        )}
-
-        {/* Groups list */}
-        <div className="mb-12">
-          <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">
-            Mis grupos
-          </h2>
           {groups.length === 0 ? (
             <div className="border-t border-dashed border-border py-12 text-center">
               <p className="text-muted-foreground text-sm">
@@ -240,7 +301,7 @@ export default function HomePage() {
             <div className="divide-y divide-border">
               {groups.map((group) => (
                 <div key={group.id} className="py-5 first:pt-0">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <h3 className="font-medium truncate">{group.name}</h3>
@@ -252,79 +313,77 @@ export default function HomePage() {
                         /{group.slug}
                       </p>
                     </div>
-                    <div className="flex gap-2 shrink-0">
-                      {(group.role === "owner" || group.role === "collaborator") && (
-                        <Link
-                          href={`/${group.slug}/config`}
-                          className="flex-1 sm:flex-none text-center rounded-md border border-border px-4 py-2 text-sm hover:border-foreground transition-colors"
-                        >
-                          Configurar
-                        </Link>
-                      )}
+                    {(group.role === "owner" || group.role === "collaborator") && (
                       <Link
-                        href={`/${group.slug}/cronograma`}
-                        className="flex-1 sm:flex-none text-center rounded-md border border-foreground px-4 py-2 text-sm font-medium hover:bg-foreground hover:text-background transition-colors"
+                        href={`/${group.slug}/config`}
+                        className="shrink-0 rounded-md border border-border px-4 py-2 text-sm hover:border-foreground transition-colors"
                       >
-                        Ver cronograma
+                        Configurar
                       </Link>
-                    </div>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </div>
-
-        {/* Create group form */}
-        {canCreate ? (
-          <div className="mb-12 border-t border-border pt-8">
-            <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">
-              Crear grupo
-            </h2>
-            <form onSubmit={handleSubmit}>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-sm text-muted-foreground mb-1.5">
-                    Nombre
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => handleNameChange(e.target.value)}
-                    className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
-                    placeholder="Nombre del grupo"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-muted-foreground mb-1.5">
-                    Slug (URL)
-                  </label>
-                  <input
-                    type="text"
-                    value={slug}
-                    onChange={(e) => setSlug(e.target.value)}
-                    className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
-                    placeholder="slug-del-grupo"
-                    required
-                  />
-                </div>
-              </div>
-
-              {error && (
-                <p className="mt-3 text-sm text-destructive">{error}</p>
-              )}
-
-              <button
-                type="submit"
-                className="mt-5 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
-              >
-                Crear grupo
-              </button>
-            </form>
+            </div>
           </div>
-        ) : null}
+        </div>
       </div>
+
+      {/* Calendar day detail dialog */}
+      {calendarSelectedDate && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={() => setCalendarSelectedDate(null)}
+        >
+          <div
+            className="bg-background border border-border rounded-lg w-full max-w-sm p-5 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="font-medium capitalize">
+                  {formatDateLong(calendarSelectedDate)}
+                </h3>
+                {conflictDateSet.has(calendarSelectedDate) && (
+                  <p className="text-xs text-destructive mt-0.5">Conflicto</p>
+                )}
+              </div>
+              <button
+                onClick={() => setCalendarSelectedDate(null)}
+                className="text-muted-foreground hover:text-foreground transition-colors text-lg leading-none ml-3"
+                aria-label="Cerrar"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {(assignmentsByDate.get(calendarSelectedDate) ?? []).map((a, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between text-sm"
+                >
+                  <span className="text-muted-foreground text-xs uppercase tracking-wide">
+                    {a.roleName}
+                  </span>
+                  <Link
+                    href={`/${a.groupSlug}/cronograma`}
+                    onClick={() => setCalendarSelectedDate(null)}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {a.groupName} &rarr;
+                  </Link>
+                </div>
+              ))}
+              {(assignmentsByDate.get(calendarSelectedDate) ?? []).length === 0 && (
+                <p className="text-sm text-muted-foreground">Sin asignaciones</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

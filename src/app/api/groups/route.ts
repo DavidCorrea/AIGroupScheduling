@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { groups, groupCollaborators, members, users } from "@/db/schema";
+import { groups, groupCollaborators, members, users, scheduleDays, roles } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { seedDefaults } from "@/lib/seed";
 import { requireAuth } from "@/lib/api-helpers";
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { name, slug } = body;
+  const { name, slug, days, roles: rolesList, collaboratorUserIds } = body;
 
   if (!name || typeof name !== "string" || name.trim().length === 0) {
     return NextResponse.json(
@@ -110,7 +110,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Validate slug format (lowercase, alphanumeric, hyphens)
   if (!/^[a-z0-9-]+$/.test(slug.trim())) {
     return NextResponse.json(
       { error: "El slug solo puede contener letras minúsculas, números y guiones" },
@@ -118,7 +117,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Check uniqueness
   const existing = (await db
     .select()
     .from(groups)
@@ -136,8 +134,43 @@ export async function POST(request: NextRequest) {
     .values({ name: name.trim(), slug: slug.trim(), ownerId: userId })
     .returning())[0];
 
-  // Seed default schedule days for the new group
-  await seedDefaults(group.id);
+  if (Array.isArray(days) && days.length > 0) {
+    for (const d of days) {
+      await db.insert(scheduleDays).values({
+        dayOfWeek: d.dayOfWeek,
+        active: d.active,
+        isRehearsal: d.isRehearsal,
+        groupId: group.id,
+      });
+    }
+  } else {
+    await seedDefaults(group.id);
+  }
+
+  if (Array.isArray(rolesList) && rolesList.length > 0) {
+    for (let i = 0; i < rolesList.length; i++) {
+      const r = rolesList[i];
+      if (r.name && typeof r.name === "string" && r.name.trim()) {
+        await db.insert(roles).values({
+          name: r.name.trim(),
+          requiredCount: r.requiredCount ?? 1,
+          displayOrder: i,
+          groupId: group.id,
+        });
+      }
+    }
+  }
+
+  if (Array.isArray(collaboratorUserIds) && collaboratorUserIds.length > 0) {
+    for (const uid of collaboratorUserIds) {
+      if (uid !== userId) {
+        await db.insert(groupCollaborators).values({
+          userId: uid,
+          groupId: group.id,
+        });
+      }
+    }
+  }
 
   return NextResponse.json(group, { status: 201 });
 }

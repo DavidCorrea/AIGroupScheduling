@@ -25,7 +25,9 @@ export async function GET() {
     return NextResponse.json({ assignments: [], conflicts: [] });
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const now = new Date();
+  const today = now.toISOString().split("T")[0];
+  const firstOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 
   // Gather upcoming assignments across all groups
   const allAssignments: Array<{
@@ -58,7 +60,7 @@ export async function GET() {
           and(
             eq(scheduleEntries.scheduleId, schedule.id),
             eq(scheduleEntries.memberId, membership.id),
-            gte(scheduleEntries.date, today)
+            gte(scheduleEntries.date, firstOfMonth)
           )
         );
 

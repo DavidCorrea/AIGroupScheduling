@@ -34,11 +34,12 @@
 ## Multi-Group Architecture
 - The app supports multiple independent groups, each with their own members, roles, schedules, and configuration
 - **Groups table**: `id`, `name`, `slug` (unique), `owner_id` (FK to users). Slug is used in client-facing URLs
+- **Group creation**: dedicated page at `/groups/new`. Users can configure the group name, slug, active days, rehearsal days, roles, and collaborators in a single form. All optional config is sent with the group creation in one API call. If no days are configured, defaults are seeded (Wednesday, Friday, Sunday active)
 - **Group collaborators**: users with full admin access to a group (same as owner). Managed via `/:slug/config/collaborators`
 - **Members**: belong to a group with their own `name` and optional `email` columns. Optionally linked to a user via `user_id` (nullable). When a member has an email set and a new user signs in with that email for the first time, the member is automatically linked to the new user
 - **Group scoping**: `members`, `roles`, `exclusive_groups`, `schedule_days`, and `schedules` tables have a `group_id` FK
 - **Unique constraint**: schedules have a unique index on `(group_id, month, year)` — one schedule per month per group
-- **Landing page** at `/` (behind auth): lists all groups the user owns, collaborates on, or is a member of (with role badges). Shows cross-group upcoming assignments with conflict detection
+- **Landing page** at `/` (behind auth): lists all groups the user owns, collaborates on, or is a member of (with role badges). Shows cross-group upcoming assignments with conflict detection. Links to `/groups/new` for group creation (visible only to users with permission)
 - **Admin routes**: `/:slug/config/*` — scoped to a group via slug in URL. Requires owner or collaborator access
 - **Public routes**: `/:slug/cronograma` (current month), `/:slug/cronograma/:year/:month` (specific month)
 - **API routes**: admin APIs at their original paths (e.g. `/api/members`, `/api/schedules`) accept `groupId` as a query parameter with auth + group access checks. Public APIs at `/api/cronograma/:slug/*`
@@ -75,7 +76,7 @@
 ## Configuration
 - **Active Days**: Toggle which days are included in schedules
 - **Rehearsal Days**: Toggle rehearsal days
-- **Column Order**: Configurable display order for role columns
+- **Column Order**: Configurable display order for role columns; shown in a table (Posición, Rol, Acciones) with drag-and-drop reordering via a handle (≡) and up/down buttons. On mobile, long-press the handle to drag (touch delay 250ms so scrolling is not blocked). Save with "Guardar orden". Uses @dnd-kit (core, sortable, utilities).
 - **Role Priorities by Day**: Set fill order per day
 - API routes: `/api/configuration/days?groupId=N`, `/api/configuration/priorities?groupId=N`
 
@@ -107,8 +108,8 @@
 - Public API: `/api/cronograma/:slug` (current month), `/api/cronograma/:slug/:year/:month` (specific month)
 
 ## Default Seeds
-- Schedule days are seeded per group on first access (defaults: Wednesday, Friday, Sunday active)
-- No default roles are seeded; configured by the user via the roles page
+- Schedule days are seeded per group on creation if no day configuration is provided (defaults: Wednesday, Friday, Sunday active)
+- No default roles are seeded; configured by the user via the roles page or during group creation
 
 ## Environment Variables
 - `DATABASE_URL` — PostgreSQL connection string
