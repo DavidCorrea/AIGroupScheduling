@@ -38,6 +38,7 @@ export interface HolidayConflict {
 }
 
 export interface SharedScheduleData {
+  groupName?: string;
   month: number;
   year: number;
   entries: ScheduleEntry[];
@@ -160,17 +161,15 @@ export default function SharedScheduleView({
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
   const [dayFilter, setDayFilter] = useState("");
   const [showPastDates, setShowPastDates] = useState(false);
-  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const [calendarSelectedDate, setCalendarSelectedDate] = useState<string | null>(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
 
   useEffect(() => {
     setToday(getTodayISO());
   }, []);
 
-  // Reset view mode when member filter changes
   useEffect(() => {
-    setViewMode("list");
     setCalendarSelectedDate(null);
   }, [filteredMemberId]);
 
@@ -354,110 +353,206 @@ export default function SharedScheduleView({
       {/* Header */}
       <header className="border-b border-border sticky top-14 z-10 bg-background">
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex items-center gap-3">
-              {schedule.prevSchedule && (
-                <a
-                  href={`${basePath}/${schedule.prevSchedule.year}/${schedule.prevSchedule.month}`}
-                  className="rounded-md border border-border px-3 py-1.5 text-sm hover:border-foreground transition-colors"
-                  title={`${MONTH_NAMES[schedule.prevSchedule.month - 1]} ${schedule.prevSchedule.year}`}
-                >
-                  ← Anterior
-                </a>
+          <div className="flex items-center justify-between">
+            {schedule.prevSchedule ? (
+              <a
+                href={`${basePath}/${schedule.prevSchedule.year}/${schedule.prevSchedule.month}`}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                ←
+              </a>
+            ) : (
+              <span className="text-sm text-muted-foreground/40 cursor-default">←</span>
+            )}
+            <div className="text-center">
+              {schedule.groupName && (
+                <p className="text-xs text-muted-foreground uppercase tracking-widest">{schedule.groupName}</p>
               )}
-              <div>
-                <h1 className="font-[family-name:var(--font-display)] text-2xl sm:text-3xl uppercase">
-                  {MONTH_NAMES[schedule.month - 1]} {schedule.year}
-                </h1>
-                <p className="text-xs text-muted-foreground mt-0.5 uppercase tracking-widest">Agenda del Grupo</p>
-              </div>
-              {schedule.nextSchedule && (
-                <a
-                  href={`${basePath}/${schedule.nextSchedule.year}/${schedule.nextSchedule.month}`}
-                  className="rounded-md border border-border px-3 py-1.5 text-sm hover:border-foreground transition-colors"
-                  title={`${MONTH_NAMES[schedule.nextSchedule.month - 1]} ${schedule.nextSchedule.year}`}
-                >
-                  Siguiente →
-                </a>
-              )}
+              <h1 className="font-[family-name:var(--font-display)] text-2xl sm:text-3xl uppercase">
+                {MONTH_NAMES[schedule.month - 1]} {schedule.year}
+              </h1>
             </div>
+            {schedule.nextSchedule ? (
+              <a
+                href={`${basePath}/${schedule.nextSchedule.year}/${schedule.nextSchedule.month}`}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                →
+              </a>
+            ) : (
+              <span className="text-sm text-muted-foreground/40 cursor-default">→</span>
+            )}
           </div>
 
           <div className="border-t border-border mt-3 sm:hidden -mx-4" />
 
-          {/* Filters - mobile toggle */}
-          <button
-            onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}
-            className="mt-3 sm:hidden flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-            </svg>
-            Filtros
-            {(filteredMemberId || filteredRoleId || dayFilter || showPastDates) && (
-              <span className="w-2 h-2 rounded-full bg-foreground" />
-            )}
-            <svg className={`w-3.5 h-3.5 transition-transform ${mobileFiltersOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
+          {/* Filters + view mode row */}
+          <div className="mt-3 flex items-start justify-between gap-3">
+            {/* Mobile: filters toggle + view mode side by side */}
+            <button
+              onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}
+              className="sm:hidden flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-1.5"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              {(() => {
+                const count = [filteredMemberId, filteredRoleId, dayFilter, showPastDates].filter(Boolean).length;
+                return count > 0 ? `Filtros (${count})` : "Filtros";
+              })()}
+              <svg className={`w-3.5 h-3.5 transition-transform ${mobileFiltersOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
 
-          {/* Filters - desktop (always visible) + mobile (collapsible) */}
-          <div className={`mt-3 flex-col sm:flex-row gap-2 sm:items-center ${mobileFiltersOpen ? "flex" : "hidden sm:flex"}`}>
-            <select
-              value={filteredMemberId ?? ""}
-              onChange={(e) =>
-                setFilteredMemberId(
-                  e.target.value ? parseInt(e.target.value, 10) : null
-                )
-              }
-              className="w-full sm:w-auto rounded-md border border-border bg-transparent px-3.5 py-2 text-sm"
-            >
-              <option value="">Todas las personas</option>
-              {schedule.members.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={filteredRoleId ?? ""}
-              onChange={(e) =>
-                setFilteredRoleId(
-                  e.target.value ? parseInt(e.target.value, 10) : null
-                )
-              }
-              className="w-full sm:w-auto rounded-md border border-border bg-transparent px-3.5 py-2 text-sm"
-            >
-              <option value="">Todos los roles</option>
-              {roleOrder.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={dayFilter}
-              onChange={(e) => setDayFilter(e.target.value)}
-              className="w-full sm:w-auto rounded-md border border-border bg-transparent px-3.5 py-2 text-sm"
-            >
-              <option value="">Todos los días</option>
-              {availableWeekdays.map((day) => (
-                <option key={day} value={day}>
-                  {day.charAt(0).toUpperCase() + day.slice(1)}
-                </option>
-              ))}
-            </select>
-            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={showPastDates}
-                onChange={(e) => setShowPastDates(e.target.checked)}
-                className="rounded border-border"
-              />
-              <span className="text-muted-foreground">Mostrar fechas pasadas</span>
-            </label>
+            {/* Desktop: filters inline */}
+            <div className="hidden sm:flex flex-row gap-2 items-center flex-wrap">
+              <select
+                value={filteredMemberId ?? ""}
+                onChange={(e) =>
+                  setFilteredMemberId(
+                    e.target.value ? parseInt(e.target.value, 10) : null
+                  )
+                }
+                className="rounded-md border border-border bg-transparent px-3.5 py-2 text-sm"
+              >
+                <option value="">Todas las personas</option>
+                {schedule.members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={filteredRoleId ?? ""}
+                onChange={(e) =>
+                  setFilteredRoleId(
+                    e.target.value ? parseInt(e.target.value, 10) : null
+                  )
+                }
+                className="rounded-md border border-border bg-transparent px-3.5 py-2 text-sm"
+              >
+                <option value="">Todos los roles</option>
+                {roleOrder.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+              {viewMode === "list" && (
+                <>
+                  <select
+                    value={dayFilter}
+                    onChange={(e) => setDayFilter(e.target.value)}
+                    className="rounded-md border border-border bg-transparent px-3.5 py-2 text-sm"
+                  >
+                    <option value="">Todos los días</option>
+                    {availableWeekdays.map((day) => (
+                      <option key={day} value={day}>
+                        {day.charAt(0).toUpperCase() + day.slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={showPastDates}
+                      onChange={(e) => setShowPastDates(e.target.checked)}
+                      className="rounded border-border"
+                    />
+                    <span className="text-muted-foreground">Mostrar fechas pasadas</span>
+                  </label>
+                </>
+              )}
+            </div>
+
+            {/* View mode toggle */}
+            <div className="flex w-fit rounded-lg border border-border p-0.5 shrink-0">
+              <button
+                onClick={() => { setViewMode("list"); setDayFilter(""); setShowPastDates(false); }}
+                className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                  viewMode === "list"
+                    ? "bg-muted font-medium text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Lista
+              </button>
+              <button
+                onClick={() => { setViewMode("calendar"); setDayFilter(""); setShowPastDates(false); }}
+                className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                  viewMode === "calendar"
+                    ? "bg-muted font-medium text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Calendario
+              </button>
+            </div>
           </div>
+
+          {/* Mobile: collapsible filters */}
+          {mobileFiltersOpen && (
+            <div className="sm:hidden mt-3 flex flex-col gap-2">
+              <select
+                value={filteredMemberId ?? ""}
+                onChange={(e) =>
+                  setFilteredMemberId(
+                    e.target.value ? parseInt(e.target.value, 10) : null
+                  )
+                }
+                className="w-full rounded-md border border-border bg-transparent px-3.5 py-2 text-sm"
+              >
+                <option value="">Todas las personas</option>
+                {schedule.members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={filteredRoleId ?? ""}
+                onChange={(e) =>
+                  setFilteredRoleId(
+                    e.target.value ? parseInt(e.target.value, 10) : null
+                  )
+                }
+                className="w-full rounded-md border border-border bg-transparent px-3.5 py-2 text-sm"
+              >
+                <option value="">Todos los roles</option>
+                {roleOrder.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+              {viewMode === "list" && (
+                <>
+                  <select
+                    value={dayFilter}
+                    onChange={(e) => setDayFilter(e.target.value)}
+                    className="w-full rounded-md border border-border bg-transparent px-3.5 py-2 text-sm"
+                  >
+                    <option value="">Todos los días</option>
+                    {availableWeekdays.map((day) => (
+                      <option key={day} value={day}>
+                        {day.charAt(0).toUpperCase() + day.slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={showPastDates}
+                      onChange={(e) => setShowPastDates(e.target.checked)}
+                      className="rounded border-border"
+                    />
+                    <span className="text-muted-foreground">Mostrar fechas pasadas</span>
+                  </label>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
@@ -552,34 +647,8 @@ export default function SharedScheduleView({
           </div>
         )}
 
-        {/* View mode tabs (when member is selected) */}
-        {filteredMemberId && (
-          <div className="flex border-b border-border mb-6">
-            <button
-              onClick={() => setViewMode("list")}
-              className={`px-4 py-2.5 text-sm transition-colors ${
-                viewMode === "list"
-                  ? "border-b-2 border-foreground font-medium"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Lista
-            </button>
-            <button
-              onClick={() => setViewMode("calendar")}
-              className={`px-4 py-2.5 text-sm transition-colors ${
-                viewMode === "calendar"
-                  ? "border-b-2 border-foreground font-medium"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Calendario
-            </button>
-          </div>
-        )}
-
-        {/* Mobile card view (list mode) */}
-        <div className={`lg:hidden ${filteredMemberId && viewMode !== "list" ? "hidden" : "block"}`}>
+        {/* Mobile card view */}
+        <div className={`lg:hidden ${viewMode !== "list" ? "hidden" : ""}`}>
           {displayDates.map((date, index) => {
             const isRehearsal = rehearsalSet.has(date);
             const entriesOnDate = filteredEntries.filter(
@@ -691,103 +760,87 @@ export default function SharedScheduleView({
           })}
         </div>
 
-        {/* Calendar grid view (when member is selected and calendar tab active) */}
-        {filteredMemberId && viewMode === "calendar" && (
-          <div className="max-w-md mx-auto">
-            {(() => {
-              // Build the full month grid
-              const year = schedule.year;
-              const month = schedule.month; // 1-based
-              const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
-              // Day of week for the 1st (0=Sun..6=Sat) -> convert to Mon-based (0=Mon..6=Sun)
-              const firstDayDow = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
-              const leadingBlanks = firstDayDow === 0 ? 6 : firstDayDow - 1;
+        {/* Calendar grid view */}
+        {viewMode === "calendar" && (() => {
+          const year = schedule.year;
+          const month = schedule.month;
+          const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+          const firstDayDow = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+          const leadingBlanks = firstDayDow === 0 ? 6 : firstDayDow - 1;
 
-              // Build a set of dates that have assignments for the filtered member
-              const assignmentDateSet = new Set(
-                filteredEntries.map((e) => e.date)
-              );
-              // Set of dates with relevant or dependent roles
-              const highlightedDateSet = new Set<string>();
-              for (const d of assignmentDateSet) {
-                if (hasDependentRoleOnDate(d) || hasRelevantRoleOnDate(d)) {
-                  highlightedDateSet.add(d);
-                }
-              }
+          const allAssignmentDates = new Set(entryDates);
+          const filteredDateSet = new Set(filteredDates);
+          const calDayHeaders = ["L", "M", "X", "J", "V", "S", "D"];
 
-              const dayHeaders = ["L", "M", "X", "J", "V", "S", "D"];
-
-              return (
-                <div>
-                  {/* Weekday headers */}
-                  <div className="grid grid-cols-7 gap-1 mb-1">
-                    {dayHeaders.map((d) => (
-                      <div
-                        key={d}
-                        className="text-center text-xs font-medium text-muted-foreground py-1"
-                      >
-                        {d}
-                      </div>
-                    ))}
+          return (
+            <div className="max-w-md mx-auto mb-10">
+              <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-4">
+                Calendario
+              </h2>
+              <div className="grid grid-cols-7 gap-1 mb-1">
+                {calDayHeaders.map((d) => (
+                  <div
+                    key={d}
+                    className="text-center text-xs font-medium text-muted-foreground py-1"
+                  >
+                    {d}
                   </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {Array.from({ length: leadingBlanks }).map((_, i) => (
+                  <div key={`blank-${i}`} />
+                ))}
+                {Array.from({ length: daysInMonth }).map((_, i) => {
+                  const dayNum = i + 1;
+                  const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+                  const hasAnyAssignment = allAssignmentDates.has(dateStr);
+                  const matchesFilter = filteredDateSet.has(dateStr);
+                  const isRehearsalDay = rehearsalSet.has(dateStr);
+                  const isToday = dateStr === today;
+                  const past = isPast(dateStr);
+                  const hasContent = hasAnyAssignment || isRehearsalDay;
+                  const dimmed = hasActiveFilter && hasContent && !matchesFilter;
 
-                  {/* Day cells */}
-                  <div className="grid grid-cols-7 gap-1">
-                    {/* Leading blanks */}
-                    {Array.from({ length: leadingBlanks }).map((_, i) => (
-                      <div key={`blank-${i}`} />
-                    ))}
-
-                    {/* Actual days */}
-                    {Array.from({ length: daysInMonth }).map((_, i) => {
-                      const dayNum = i + 1;
-                      const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
-                      const hasAssignment = assignmentDateSet.has(dateStr);
-                      const isHighlighted = highlightedDateSet.has(dateStr);
-                      const isRehearsalDay = rehearsalSet.has(dateStr);
-                      const isToday = dateStr === today;
-                      const past = isPast(dateStr);
-                      const hasContent = hasAssignment || isRehearsalDay;
-
-                      return (
-                        <button
-                          key={dayNum}
-                          onClick={() => {
-                            if (hasContent) setCalendarSelectedDate(dateStr);
-                          }}
-                          disabled={!hasContent}
-                          className={[
-                            "aspect-square rounded-md flex items-center justify-center text-sm transition-colors relative",
-                            past ? "opacity-50" : "",
-                            isToday ? "ring-1 ring-foreground" : "",
-                            isHighlighted
-                              ? "bg-foreground/15 font-semibold"
-                              : hasAssignment
-                                ? "bg-muted/50 font-medium"
-                                : isRehearsalDay
-                                  ? "border border-dashed border-border"
-                                  : "text-muted-foreground",
-                            hasContent ? "cursor-pointer hover:bg-muted/70 active:bg-muted" : "cursor-default",
-                          ]
-                            .filter(Boolean)
-                            .join(" ")}
-                        >
-                          {dayNum}
-                          {isHighlighted && (
-                            <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-foreground" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        )}
+                  return (
+                    <button
+                      key={dayNum}
+                      onClick={() => {
+                        if (hasContent) setCalendarSelectedDate(dateStr);
+                      }}
+                      disabled={!hasContent}
+                      className={[
+                        "aspect-square rounded-md flex items-center justify-center text-sm transition-colors relative",
+                        past ? "opacity-50" : "",
+                        isToday ? "ring-1 ring-foreground" : "",
+                        dimmed
+                          ? "opacity-30"
+                          : matchesFilter && hasAnyAssignment
+                            ? "bg-foreground/15 font-semibold"
+                            : hasAnyAssignment
+                              ? "bg-muted/50 font-medium"
+                              : isRehearsalDay
+                                ? "border border-dashed border-border"
+                                : "text-muted-foreground",
+                        hasContent ? "cursor-pointer hover:bg-muted/70 active:bg-muted" : "cursor-default",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      {dayNum}
+                      {matchesFilter && hasAnyAssignment && (
+                        <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-foreground" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Desktop table view */}
-        <div className={`hidden lg:block overflow-x-auto ${filteredMemberId && viewMode === "calendar" ? "!hidden" : ""}`}>
+        <div className={`hidden lg:block overflow-x-auto ${viewMode !== "list" ? "!hidden" : ""}`}>
           {filteredMemberId ? (
             // Simplified table for individual member
             <table className="w-full border-collapse">
@@ -1013,7 +1066,7 @@ export default function SharedScheduleView({
               <p className="text-sm text-muted-foreground italic">Ensayo</p>
             ) : (
               <div className="space-y-2">
-                {filteredEntries
+                {schedule.entries
                   .filter((e) => e.date === calendarSelectedDate)
                   .map((e) => (
                     <div
@@ -1023,17 +1076,15 @@ export default function SharedScheduleView({
                       <span className="text-muted-foreground text-xs uppercase tracking-wide">
                         {e.roleName}
                       </span>
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1.5">
+                        <span>{e.memberName}</span>
                         {hasConflict(e.date, e.memberId) && (
                           <span className="text-amber-500" title="Conflicto con vacaciones">⚠</span>
-                        )}
-                        {dependentRoleIdSet.has(e.roleId) && (
-                          <span className="text-xs font-medium">★</span>
                         )}
                       </span>
                     </div>
                   ))}
-                {filteredEntries.filter((e) => e.date === calendarSelectedDate).length === 0 && (
+                {schedule.entries.filter((e) => e.date === calendarSelectedDate).length === 0 && (
                   <p className="text-sm text-muted-foreground">Sin asignaciones</p>
                 )}
               </div>

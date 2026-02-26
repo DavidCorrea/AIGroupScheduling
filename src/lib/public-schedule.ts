@@ -7,6 +7,7 @@ import {
   scheduleExtraDates,
   members,
   roles,
+  groups,
 } from "@/db/schema";
 import { eq, and, or, lt, gt, asc, desc } from "drizzle-orm";
 import { getHolidayConflicts } from "./holiday-conflicts";
@@ -22,6 +23,12 @@ export async function buildPublicScheduleResponse(schedule: {
   groupId: number;
 }) {
   const { id, month, year, groupId } = schedule;
+
+  const group = await db
+    .select({ name: groups.name })
+    .from(groups)
+    .where(eq(groups.id, groupId))
+    .then((rows) => rows[0]);
 
   const entries = await db
     .select()
@@ -116,6 +123,7 @@ export async function buildPublicScheduleResponse(schedule: {
     .where(eq(scheduleExtraDates.scheduleId, id));
 
   return {
+    groupName: group?.name ?? undefined,
     month,
     year,
     entries: enrichedEntries,
