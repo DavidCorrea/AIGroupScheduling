@@ -82,7 +82,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
+      <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
         {/* Header */}
         <div className="mb-12 flex items-start justify-between">
           <div>

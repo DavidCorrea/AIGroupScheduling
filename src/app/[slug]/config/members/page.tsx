@@ -159,191 +159,193 @@ export default function MembersPage() {
         </p>
       </div>
 
-      {/* Add / Edit form */}
-      <div className="border-t border-border pt-8">
-        <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">
-          {editingId ? "Editar miembro" : "Agregar miembro"}
-        </h2>
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-sm text-muted-foreground mb-1.5">
-              Nombre
-            </label>
-            <input
-              type="text"
-              value={memberName}
-              onChange={(e) => setMemberName(e.target.value)}
-              className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
-              placeholder="Nombre del miembro"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm text-muted-foreground mb-1.5">
-              Email <span className="text-muted-foreground/50">(opcional)</span>
-            </label>
-            <input
-              type="email"
-              value={memberEmail}
-              onChange={(e) => setMemberEmail(e.target.value)}
-              className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
-              placeholder="correo@ejemplo.com"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm text-muted-foreground mb-2">
-              Roles
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {roles.map((role) => (
-                <button
-                  key={role.id}
-                  type="button"
-                  onClick={() => toggleRole(role.id)}
-                  className={`rounded-full px-3.5 py-1.5 text-sm border transition-colors ${
-                    selectedRoles.includes(role.id)
-                      ? "border-foreground text-foreground bg-transparent"
-                      : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
-                  }`}
-                >
-                  {role.name}
-                </button>
-              ))}
+      <div className="border-t border-border pt-8 lg:grid lg:grid-cols-[1fr_2fr] lg:gap-12">
+        {/* Add / Edit form */}
+        <div>
+          <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">
+            {editingId ? "Editar miembro" : "Agregar miembro"}
+          </h2>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="block text-sm text-muted-foreground mb-1.5">
+                Nombre
+              </label>
+              <input
+                type="text"
+                value={memberName}
+                onChange={(e) => setMemberName(e.target.value)}
+                className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
+                placeholder="Nombre del miembro"
+                required
+              />
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm text-muted-foreground mb-2">
-              Días disponibles
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {activeDays.map((day) => (
-                <button
-                  key={day.id}
-                  type="button"
-                  onClick={() => toggleDay(day.id)}
-                  className={`rounded-full px-3.5 py-1.5 text-sm border transition-colors ${
-                    selectedDays.includes(day.id)
-                      ? "border-foreground text-foreground bg-transparent"
-                      : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
-                  }`}
-                >
-                  {day.dayOfWeek}
-                </button>
-              ))}
+            <div>
+              <label className="block text-sm text-muted-foreground mb-1.5">
+                Email <span className="text-muted-foreground/50">(opcional)</span>
+              </label>
+              <input
+                type="email"
+                value={memberEmail}
+                onChange={(e) => setMemberEmail(e.target.value)}
+                className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
+                placeholder="correo@ejemplo.com"
+              />
             </div>
-          </div>
 
-          {formError && (
-            <p className="text-sm text-destructive">{formError}</p>
-          )}
+            <div>
+              <label className="block text-sm text-muted-foreground mb-2">
+                Roles
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {roles.map((role) => (
+                  <button
+                    key={role.id}
+                    type="button"
+                    onClick={() => toggleRole(role.id)}
+                    className={`rounded-full px-3.5 py-1.5 text-sm border transition-colors ${
+                      selectedRoles.includes(role.id)
+                        ? "border-foreground text-foreground bg-transparent"
+                        : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {role.name}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-          <div className="flex gap-2 pt-1">
-            <button
-              type="submit"
-              disabled={!memberName.trim()}
-              className="rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {editingId ? "Actualizar" : "Agregar miembro"}
-            </button>
-            {editingId && (
-              <button
-                type="button"
-                onClick={resetForm}
-                className="rounded-md border border-border px-5 py-2.5 text-sm hover:border-foreground transition-colors"
-              >
-                Cancelar
-              </button>
+            <div>
+              <label className="block text-sm text-muted-foreground mb-2">
+                Días disponibles
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {activeDays.map((day) => (
+                  <button
+                    key={day.id}
+                    type="button"
+                    onClick={() => toggleDay(day.id)}
+                    className={`rounded-full px-3.5 py-1.5 text-sm border transition-colors ${
+                      selectedDays.includes(day.id)
+                        ? "border-foreground text-foreground bg-transparent"
+                        : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {day.dayOfWeek}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {formError && (
+              <p className="text-sm text-destructive">{formError}</p>
             )}
-          </div>
-        </form>
-      </div>
 
-      {/* Members list */}
-      <div className="border-t border-border pt-8">
-        <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">
-          Miembros ({members.length})
-        </h2>
-        {members.length === 0 ? (
-          <div className="border-t border-dashed border-border py-10 text-center">
-            <p className="text-sm text-muted-foreground">
-              Aún no se han agregado miembros.
-            </p>
-            <p className="text-xs text-muted-foreground/50 mt-1">
-              Usa el formulario de arriba para agregar el primer miembro.
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-border">
-            {members.map((member) => (
-              <div key={member.id} className="py-4 first:pt-0">
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                  <div className="space-y-2 min-w-0">
-                    <div className="flex items-center gap-2">
-                      {member.image && (
-                        <img
-                          src={member.image}
-                          alt=""
-                          className="h-7 w-7 rounded-full"
-                        />
-                      )}
-                      <div>
-                        <h3 className="font-medium">{member.name}</h3>
-                        {member.memberEmail && (
-                          <p className="text-xs text-muted-foreground">
-                            {member.memberEmail}
-                          </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="submit"
+                disabled={!memberName.trim()}
+                className="rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {editingId ? "Actualizar" : "Agregar miembro"}
+              </button>
+              {editingId && (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="rounded-md border border-border px-5 py-2.5 text-sm hover:border-foreground transition-colors"
+                >
+                  Cancelar
+                </button>
+              )}
+            </div>
+          </form>
+        </div>
+
+        {/* Members list */}
+        <div className="border-t border-border pt-8 mt-12 lg:border-t-0 lg:pt-0 lg:mt-0">
+          <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">
+            Miembros ({members.length})
+          </h2>
+          {members.length === 0 ? (
+            <div className="border-t border-dashed border-border py-10 text-center">
+              <p className="text-sm text-muted-foreground">
+                Aún no se han agregado miembros.
+              </p>
+              <p className="text-xs text-muted-foreground/50 mt-1">
+                Usa el formulario para agregar el primer miembro.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {members.map((member) => (
+                <div key={member.id} className="py-4 first:pt-0">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div className="space-y-2 min-w-0">
+                      <div className="flex items-center gap-2">
+                        {member.image && (
+                          <img
+                            src={member.image}
+                            alt=""
+                            className="h-7 w-7 rounded-full"
+                          />
                         )}
+                        <div>
+                          <h3 className="font-medium">{member.name}</h3>
+                          {member.memberEmail && (
+                            <p className="text-xs text-muted-foreground">
+                              {member.memberEmail}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {member.roleIds.map((roleId) => {
+                          const role = roles.find((r) => r.id === roleId);
+                          return (
+                            <span
+                              key={roleId}
+                              className="rounded-full border border-border px-2.5 py-0.5 text-xs"
+                            >
+                              {role?.name ?? "Desconocido"}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {member.availableDayIds.map((dayId) => {
+                          const day = days.find((d) => d.id === dayId);
+                          return (
+                            <span
+                              key={dayId}
+                              className="rounded-full border border-border px-2.5 py-0.5 text-xs text-muted-foreground"
+                            >
+                              {day?.dayOfWeek ?? "Desconocido"}
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {member.roleIds.map((roleId) => {
-                        const role = roles.find((r) => r.id === roleId);
-                        return (
-                          <span
-                            key={roleId}
-                            className="rounded-full border border-border px-2.5 py-0.5 text-xs"
-                          >
-                            {role?.name ?? "Desconocido"}
-                          </span>
-                        );
-                      })}
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        onClick={() => startEdit(member)}
+                        className="flex-1 sm:flex-none rounded-md border border-border px-3.5 py-2 text-sm hover:border-foreground transition-colors"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => handleDelete(member.id)}
+                        className="flex-1 sm:flex-none rounded-md border border-border px-3.5 py-2 text-sm text-destructive hover:border-destructive transition-colors"
+                      >
+                        Eliminar
+                      </button>
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {member.availableDayIds.map((dayId) => {
-                        const day = days.find((d) => d.id === dayId);
-                        return (
-                          <span
-                            key={dayId}
-                            className="rounded-full border border-border px-2.5 py-0.5 text-xs text-muted-foreground"
-                          >
-                            {day?.dayOfWeek ?? "Desconocido"}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className="flex gap-2 shrink-0">
-                    <button
-                      onClick={() => startEdit(member)}
-                      className="flex-1 sm:flex-none rounded-md border border-border px-3.5 py-2 text-sm hover:border-foreground transition-colors"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => handleDelete(member.id)}
-                      className="flex-1 sm:flex-none rounded-md border border-border px-3.5 py-2 text-sm text-destructive hover:border-destructive transition-colors"
-                    >
-                      Eliminar
-                    </button>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

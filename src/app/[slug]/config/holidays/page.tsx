@@ -129,19 +129,17 @@ export default function HolidaysPage() {
         </p>
       </div>
 
-      {/* Add holiday form */}
-      <section className="border-t border-border pt-8 space-y-4">
+      <div className="border-t border-border pt-8 lg:grid lg:grid-cols-[1fr_2fr] lg:gap-12">
+        {/* Add holiday form */}
         <div>
           <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">
             Agregar ausencia
           </h2>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground mb-4">
             Configura una fecha de ausencia para un miembro específico de este grupo.
           </p>
-        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm text-muted-foreground mb-1.5">
                 Miembro
@@ -174,126 +172,125 @@ export default function HolidaysPage() {
                 placeholder="Opcional"
               />
             </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm text-muted-foreground mb-1.5">
-                Desde
-              </label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm focus:outline-none focus:border-foreground"
-                required
-              />
+            <div className="grid gap-4 grid-cols-2">
+              <div>
+                <label className="block text-sm text-muted-foreground mb-1.5">
+                  Desde
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm focus:outline-none focus:border-foreground"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-muted-foreground mb-1.5">
+                  Hasta
+                </label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm focus:outline-none focus:border-foreground"
+                  required
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm text-muted-foreground mb-1.5">
-                Hasta
-              </label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm focus:outline-none focus:border-foreground"
-                required
-              />
-            </div>
-          </div>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p className="text-sm text-destructive">{error}</p>}
 
-          <button
-            type="submit"
-            className="rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
-          >
-            Agregar
-          </button>
-        </form>
-      </section>
-
-      {/* Group holidays (admin-set) */}
-      <section className="border-t border-border pt-8 space-y-4">
-        <div>
-          <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">
-            Ausencias del grupo
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Fechas configuradas por los administradores para miembros de este grupo.
-          </p>
+            <button
+              type="submit"
+              className="w-full rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+            >
+              Agregar
+            </button>
+          </form>
         </div>
 
-        {memberHolidays.length === 0 ? (
-          <div className="border-t border-dashed border-border py-10 text-center">
-            <p className="text-sm text-muted-foreground">
-              No hay ausencias configuradas para este grupo.
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-border">
-            {memberHolidays.map((h) => (
-              <div
-                key={h.id}
-                className="py-4 first:pt-0 flex items-center justify-between gap-3"
-              >
-                <div>
-                  <p className="text-sm font-medium">{h.memberName}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {formatDateRange(h.startDate, h.endDate)}
-                  </p>
-                  {h.description && (
-                    <p className="text-xs text-muted-foreground/60 mt-0.5">
-                      {h.description}
-                    </p>
-                  )}
-                </div>
-                <button
-                  onClick={() => handleDelete(h.id)}
-                  className="shrink-0 rounded-md border border-border px-3.5 py-2 text-sm text-destructive hover:border-destructive transition-colors"
-                >
-                  Eliminar
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* User holidays (personal, read-only) */}
-      {userHolidays.length > 0 && (
-        <section className="border-t border-border pt-8 space-y-4">
+        {/* Holiday lists */}
+        <div className="border-t border-border pt-8 mt-12 lg:border-t-0 lg:pt-0 lg:mt-0 space-y-10">
+          {/* Group holidays (admin-set) */}
           <div>
             <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">
-              Ausencias personales
+              Ausencias del grupo
             </h2>
-            <p className="text-sm text-muted-foreground">
-              Fechas configuradas por los propios miembros desde sus ajustes personales. Aplican a todos sus grupos.
+            <p className="text-sm text-muted-foreground mb-4">
+              Fechas configuradas por los administradores para miembros de este grupo.
             </p>
+
+            {memberHolidays.length === 0 ? (
+              <div className="border-t border-dashed border-border py-10 text-center">
+                <p className="text-sm text-muted-foreground">
+                  No hay ausencias configuradas para este grupo.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {memberHolidays.map((h) => (
+                  <div
+                    key={h.id}
+                    className="py-4 first:pt-0 flex items-center justify-between gap-3"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{h.memberName}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {formatDateRange(h.startDate, h.endDate)}
+                      </p>
+                      {h.description && (
+                        <p className="text-xs text-muted-foreground/60 mt-0.5">
+                          {h.description}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => handleDelete(h.id)}
+                      className="shrink-0 rounded-md border border-border px-3.5 py-2 text-sm text-destructive hover:border-destructive transition-colors"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div className="divide-y divide-border">
-            {userHolidays.map((h) => (
-              <div key={h.id} className="py-4 first:pt-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium">{h.memberName}</p>
-                  <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-                    Personal
-                  </span>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {formatDateRange(h.startDate, h.endDate)}
-                </p>
-                {h.description && (
-                  <p className="text-xs text-muted-foreground/60 mt-0.5">
-                    {h.description}
-                  </p>
-                )}
+          {/* User holidays (personal, read-only) */}
+          {userHolidays.length > 0 && (
+            <div className="border-t border-border pt-8">
+              <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">
+                Ausencias personales
+              </h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Fechas configuradas por los propios miembros desde sus ajustes personales. Aplican a todos sus grupos.
+              </p>
+
+              <div className="divide-y divide-border">
+                {userHolidays.map((h) => (
+                  <div key={h.id} className="py-4 first:pt-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">{h.memberName}</p>
+                      <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                        Personal
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {formatDateRange(h.startDate, h.endDate)}
+                    </p>
+                    {h.description && (
+                      <p className="text-xs text-muted-foreground/60 mt-0.5">
+                        {h.description}
+                      </p>
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </section>
-      )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -381,6 +381,16 @@ export default function SchedulePreviewPage() {
     if (res.ok) fetchData();
   };
 
+  const handleRemoveDate = async (date: string) => {
+    if (!confirm("¿Eliminar esta fecha y todas sus asignaciones? Puedes restaurarla con una reconstrucción.")) return;
+    const res = await fetch(`/api/schedules/${params.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "remove_date", date }),
+    });
+    if (res.ok) fetchData();
+  };
+
   const handleRebuildPreview = async (mode: "overwrite" | "fill_empty") => {
     setRebuildMode(mode);
     setRebuildLoading(true);
@@ -732,11 +742,19 @@ export default function SchedulePreviewPage() {
                     {isRehearsal && (
                       <span className="text-xs text-muted-foreground italic">Ensayo</span>
                     )}
-                    {extraDateSet.has(date) && (
+                    {extraDateSet.has(date) ? (
                       <button
                         onClick={() => handleRemoveExtraDate(date)}
                         className="text-xs text-destructive hover:opacity-80"
                         title="Eliminar fecha extra"
+                      >
+                        ✕
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleRemoveDate(date)}
+                        className="text-xs text-destructive hover:opacity-80"
+                        title="Eliminar fecha"
                       >
                         ✕
                       </button>
@@ -855,7 +873,7 @@ export default function SchedulePreviewPage() {
                           Ensayo
                         </span>
                       )}
-                      {extraDateSet.has(date) && (
+                      {extraDateSet.has(date) ? (
                         <>
                           <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">Extra</span>
                           <button
@@ -866,6 +884,14 @@ export default function SchedulePreviewPage() {
                             ✕
                           </button>
                         </>
+                      ) : (
+                        <button
+                          onClick={() => handleRemoveDate(date)}
+                          className="text-xs text-destructive hover:opacity-80"
+                          title="Eliminar fecha"
+                        >
+                          ✕
+                        </button>
                       )}
                     </div>
                     {editingNote === date ? (

@@ -112,96 +112,101 @@ export default function CollaboratorsPage() {
         </p>
       </div>
 
-      {/* Owner */}
-      {owner && (
-        <div className="border-t border-border pt-8">
-          <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">
-            Dueño
-          </h2>
-          <div className="flex items-center gap-3">
-            {owner.image && (
-              <img src={owner.image} alt="" className="h-8 w-8 rounded-full" />
-            )}
+      <div className="border-t border-border pt-8 lg:grid lg:grid-cols-[1fr_2fr] lg:gap-12">
+        {/* Left column: Owner + Add form */}
+        <div className="space-y-8">
+          {/* Owner */}
+          {owner && (
             <div>
-              <p className="text-sm font-medium">{owner.name ?? "Sin nombre"}</p>
-              <p className="text-xs text-muted-foreground">{owner.email}</p>
+              <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">
+                Dueño
+              </h2>
+              <div className="flex items-center gap-3">
+                {owner.image && (
+                  <img src={owner.image} alt="" className="h-8 w-8 rounded-full" />
+                )}
+                <div>
+                  <p className="text-sm font-medium">{owner.name ?? "Sin nombre"}</p>
+                  <p className="text-xs text-muted-foreground">{owner.email}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Add collaborator */}
+          <div className={owner ? "border-t border-border pt-8 lg:border-t-0 lg:pt-0" : ""}>
+            <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">
+              Agregar colaborador
+            </h2>
+            <div className="relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
+                onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+                className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
+                placeholder="Buscar usuario por email o nombre..."
+              />
+              {showDropdown && (
+                <div className="absolute z-10 top-full mt-1 w-full rounded-md border border-border bg-background shadow-sm max-h-60 overflow-y-auto">
+                  {searchResults.map((user) => (
+                    <button
+                      key={user.id}
+                      type="button"
+                      onClick={() => addCollaborator(user)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-muted transition-colors"
+                    >
+                      {user.image && (
+                        <img src={user.image} alt="" className="h-6 w-6 rounded-full" />
+                      )}
+                      <div>
+                        <span className="text-sm block">{user.name}</span>
+                        <span className="text-xs text-muted-foreground">{user.email}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
-      )}
 
-      {/* Add collaborator */}
-      <div className="border-t border-border pt-8">
-        <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">
-          Agregar colaborador
-        </h2>
-        <div className="relative max-w-md">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
-            onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-            className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
-            placeholder="Buscar usuario por email o nombre..."
-          />
-          {showDropdown && (
-            <div className="absolute z-10 top-full mt-1 w-full rounded-md border border-border bg-background shadow-sm max-h-60 overflow-y-auto">
-              {searchResults.map((user) => (
-                <button
-                  key={user.id}
-                  type="button"
-                  onClick={() => addCollaborator(user)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-muted transition-colors"
-                >
-                  {user.image && (
-                    <img src={user.image} alt="" className="h-6 w-6 rounded-full" />
-                  )}
-                  <div>
-                    <span className="text-sm block">{user.name}</span>
-                    <span className="text-xs text-muted-foreground">{user.email}</span>
+        {/* Right column: Collaborators list */}
+        <div className="border-t border-border pt-8 mt-12 lg:border-t-0 lg:pt-0 lg:mt-0">
+          <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">
+            Colaboradores ({collaborators.length})
+          </h2>
+          {collaborators.length === 0 ? (
+            <div className="border-t border-dashed border-border py-10 text-center">
+              <p className="text-sm text-muted-foreground">
+                No hay colaboradores aún.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {collaborators.map((collab) => (
+                <div key={collab.id} className="py-4 first:pt-0 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {collab.userImage && (
+                      <img src={collab.userImage} alt="" className="h-7 w-7 rounded-full shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{collab.userName ?? "Sin nombre"}</p>
+                      <p className="text-xs text-muted-foreground truncate">{collab.userEmail}</p>
+                    </div>
                   </div>
-                </button>
+                  <button
+                    onClick={() => removeCollaborator(collab.id)}
+                    className="shrink-0 rounded-md border border-border px-3.5 py-2 text-sm text-destructive hover:border-destructive transition-colors"
+                  >
+                    Eliminar
+                  </button>
+                </div>
               ))}
             </div>
           )}
         </div>
-      </div>
-
-      {/* Collaborators list */}
-      <div className="border-t border-border pt-8">
-        <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">
-          Colaboradores ({collaborators.length})
-        </h2>
-        {collaborators.length === 0 ? (
-          <div className="border-t border-dashed border-border py-10 text-center">
-            <p className="text-sm text-muted-foreground">
-              No hay colaboradores aún.
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-border">
-            {collaborators.map((collab) => (
-              <div key={collab.id} className="py-4 first:pt-0 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  {collab.userImage && (
-                    <img src={collab.userImage} alt="" className="h-7 w-7 rounded-full shrink-0" />
-                  )}
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{collab.userName ?? "Sin nombre"}</p>
-                    <p className="text-xs text-muted-foreground truncate">{collab.userEmail}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => removeCollaborator(collab.id)}
-                  className="shrink-0 rounded-md border border-border px-3.5 py-2 text-sm text-destructive hover:border-destructive transition-colors"
-                >
-                  Eliminar
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

@@ -376,7 +376,7 @@ export default function SharedScheduleView({
     <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
       <header className="border-b border-border sticky top-0 z-10 bg-background">
-        <div className="mx-auto max-w-4xl px-4 py-4 sm:px-6">
+        <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-3">
               {schedule.prevSchedule && (
@@ -490,7 +490,7 @@ export default function SharedScheduleView({
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         {/* Mobile: merged summary card (Agenda + upcoming) */}
         {filteredMemberId && selectedMember && (
           <div className="mb-8 border border-foreground/20 rounded-md p-5 lg:hidden">

@@ -268,157 +268,159 @@ export default function ConfigurationPage() {
         </p>
       </div>
 
-      {/* Schedule Days */}
-      <section className="space-y-4 border-t border-border pt-8">
-        <div>
-          <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">Días activos</h2>
-          <p className="text-sm text-muted-foreground">
-            Selecciona qué días de la semana se incluyen en el cronograma.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {days.map((day) => (
-            <button
-              key={day.id}
-              onClick={() => toggleDay(day)}
-              className={`rounded-full px-4 py-2 text-sm border transition-colors ${
-                day.active
-                  ? "border-foreground text-foreground bg-transparent"
-                  : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
-              }`}
-            >
-              {day.dayOfWeek}
-            </button>
-          ))}
-        </div>
-      </section>
+      {/* Schedule Days + Rehearsal Days side by side on desktop */}
+      <div className="border-t border-border pt-8 lg:grid lg:grid-cols-2 lg:gap-12 space-y-12 lg:space-y-0">
+        <section className="space-y-4">
+          <div>
+            <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">Días activos</h2>
+            <p className="text-sm text-muted-foreground">
+              Selecciona qué días de la semana se incluyen en el cronograma.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {days.map((day) => (
+              <button
+                key={day.id}
+                onClick={() => toggleDay(day)}
+                className={`rounded-full px-4 py-2 text-sm border transition-colors ${
+                  day.active
+                    ? "border-foreground text-foreground bg-transparent"
+                    : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
+                }`}
+              >
+                {day.dayOfWeek}
+              </button>
+            ))}
+          </div>
+        </section>
 
-      {/* Rehearsal Days */}
-      <section className="space-y-4 border-t border-border pt-8">
-        <div>
-          <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">Días de ensayo</h2>
-          <p className="text-sm text-muted-foreground">
-            Selecciona qué días de la semana son días de ensayo. Las fechas de ensayo aparecen en el cronograma pero no tienen asignaciones de miembros.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {days.map((day) => (
-            <button
-              key={day.id}
-              onClick={() => toggleRehearsal(day)}
-              className={`rounded-full px-4 py-2 text-sm border transition-colors ${
-                day.isRehearsal
-                  ? "border-foreground text-foreground bg-transparent"
-                  : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
-              }`}
-            >
-              {day.dayOfWeek}
-            </button>
-          ))}
-        </div>
-      </section>
+        <section className="space-y-4">
+          <div>
+            <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">Días de ensayo</h2>
+            <p className="text-sm text-muted-foreground">
+              Selecciona qué días de la semana son días de ensayo. Las fechas de ensayo aparecen en el cronograma pero no tienen asignaciones de miembros.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {days.map((day) => (
+              <button
+                key={day.id}
+                onClick={() => toggleRehearsal(day)}
+                className={`rounded-full px-4 py-2 text-sm border transition-colors ${
+                  day.isRehearsal
+                    ? "border-foreground text-foreground bg-transparent"
+                    : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
+                }`}
+              >
+                {day.dayOfWeek}
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>
 
-      {/* Column Order */}
-      <section className="space-y-4 border-t border-border pt-8">
-        <div>
-          <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">Orden de columnas</h2>
-          <p className="text-sm text-muted-foreground">
-            Configura el orden de visualización de las columnas de roles en todas las vistas de cronogramas.
-          </p>
-        </div>
-        <ColumnOrderEditor
-          roles={roles}
-          onSave={async (order) => {
-            await fetch(`/api/configuration/roles?groupId=${groupId}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ order }),
-            });
-            fetchData();
-          }}
-        />
-      </section>
+      {/* Column Order + Role Priorities side by side on desktop */}
+      <div className="border-t border-border pt-8 lg:grid lg:grid-cols-[1fr_2fr] lg:gap-12 space-y-12 lg:space-y-0">
+        <section className="space-y-4">
+          <div>
+            <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">Orden de columnas</h2>
+            <p className="text-sm text-muted-foreground">
+              Configura el orden de visualización de las columnas de roles en todas las vistas de cronogramas.
+            </p>
+          </div>
+          <ColumnOrderEditor
+            roles={roles}
+            onSave={async (order) => {
+              await fetch(`/api/configuration/roles?groupId=${groupId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ order }),
+              });
+              fetchData();
+            }}
+          />
+        </section>
 
-      {/* Role Priorities per Day */}
-      <section className="space-y-4 border-t border-border pt-8">
-        <div>
-          <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">Prioridades de roles por día</h2>
-          <p className="text-sm text-muted-foreground">
-            Configura el orden de prioridad de roles para cada día activo. Los roles con números de prioridad más bajos se llenan primero.
-          </p>
-        </div>
+        <section className="space-y-4">
+          <div>
+            <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">Prioridades de roles por día</h2>
+            <p className="text-sm text-muted-foreground">
+              Configura el orden de prioridad de roles para cada día activo. Los roles con números de prioridad más bajos se llenan primero.
+            </p>
+          </div>
 
-        <div className="divide-y divide-border">
-          {days
-            .filter((d) => d.active)
-            .map((day) => {
-              const dayPriorities = priorities.filter(
-                (p) => p.scheduleDayId === day.id
-              );
-              const isEditing = editingPriorityDay === day.id;
+          <div className="divide-y divide-border">
+            {days
+              .filter((d) => d.active)
+              .map((day) => {
+                const dayPriorities = priorities.filter(
+                  (p) => p.scheduleDayId === day.id
+                );
+                const isEditing = editingPriorityDay === day.id;
 
-              return (
-                <div key={day.id} className="py-5 first:pt-0">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-medium">{day.dayOfWeek}</h3>
-                    <div className="flex gap-3">
-                      {isEditing ? (
-                        <button
-                          onClick={() => setEditingPriorityDay(null)}
-                          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          Cancelar
-                        </button>
-                      ) : (
-                        <>
+                return (
+                  <div key={day.id} className="py-5 first:pt-0">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-medium">{day.dayOfWeek}</h3>
+                      <div className="flex gap-3">
+                        {isEditing ? (
                           <button
-                            onClick={() => setEditingPriorityDay(day.id)}
-                            className="text-sm text-accent hover:opacity-80 transition-opacity"
+                            onClick={() => setEditingPriorityDay(null)}
+                            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                           >
-                            {dayPriorities.length > 0 ? "Editar" : "Establecer prioridades"}
+                            Cancelar
                           </button>
-                          {dayPriorities.length > 0 && (
+                        ) : (
+                          <>
                             <button
-                              onClick={() => clearPriorities(day.id)}
-                              className="text-sm text-destructive hover:opacity-80 transition-opacity"
+                              onClick={() => setEditingPriorityDay(day.id)}
+                              className="text-sm text-accent hover:opacity-80 transition-opacity"
                             >
-                              Limpiar
+                              {dayPriorities.length > 0 ? "Editar" : "Establecer prioridades"}
                             </button>
-                          )}
-                        </>
-                      )}
+                            {dayPriorities.length > 0 && (
+                              <button
+                                onClick={() => clearPriorities(day.id)}
+                                className="text-sm text-destructive hover:opacity-80 transition-opacity"
+                              >
+                                Limpiar
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  {isEditing ? (
-                    <PriorityEditor
-                      roles={roles}
-                      existingPriorities={dayPriorities}
-                      onSave={(rp) => savePriorities(day.id, rp)}
-                    />
-                  ) : dayPriorities.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {dayPriorities
-                        .sort((a, b) => a.priority - b.priority)
-                        .map((p) => (
-                          <span
-                            key={p.id}
-                            className="rounded-full border border-border px-3 py-1 text-xs"
-                          >
-                            {p.priority + 1}. {p.roleName}
-                          </span>
-                        ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Usando el orden de roles predeterminado.
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-        </div>
-      </section>
+                    {isEditing ? (
+                      <PriorityEditor
+                        roles={roles}
+                        existingPriorities={dayPriorities}
+                        onSave={(rp) => savePriorities(day.id, rp)}
+                      />
+                    ) : dayPriorities.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {dayPriorities
+                          .sort((a, b) => a.priority - b.priority)
+                          .map((p) => (
+                            <span
+                              key={p.id}
+                              className="rounded-full border border-border px-3 py-1 text-xs"
+                            >
+                              {p.priority + 1}. {p.roleName}
+                            </span>
+                          ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Usando el orden de roles predeterminado.
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+          </div>
+        </section>
+      </div>
 
     </div>
   );

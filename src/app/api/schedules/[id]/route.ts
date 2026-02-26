@@ -675,6 +675,36 @@ export async function PUT(
     return NextResponse.json({ success: true });
   }
 
+  // Remove a regular (recurring) date from the schedule
+  if (body.action === "remove_date" && body.date) {
+    const dateStr = body.date as string;
+
+    await db.delete(scheduleEntries).where(
+      and(
+        eq(scheduleEntries.scheduleId, scheduleId),
+        eq(scheduleEntries.date, dateStr)
+      )
+    );
+
+    await db.delete(scheduleRehearsalDates).where(
+      and(
+        eq(scheduleRehearsalDates.scheduleId, scheduleId),
+        eq(scheduleRehearsalDates.date, dateStr)
+      )
+    );
+
+    await db.delete(scheduleDateNotes).where(
+      and(
+        eq(scheduleDateNotes.scheduleId, scheduleId),
+        eq(scheduleDateNotes.date, dateStr)
+      )
+    );
+
+    await logScheduleAction(scheduleId, authResult.user.id, "remove_date", `Fecha eliminada: ${dateStr}`);
+
+    return NextResponse.json({ success: true });
+  }
+
   return NextResponse.json({ error: "Acción inválida" }, { status: 400 });
 }
 
