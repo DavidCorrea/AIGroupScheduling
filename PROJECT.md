@@ -95,6 +95,10 @@
 - Conflicts: same date in multiple groups highlighted in red
 - API: `GET /api/user/dashboard`
 
+## Navigation
+- **Global nav bar** (`AppNavBar`): Rendered in the root layout on every page except `/login`. Shows "Cronogramas" title linking to `/`, "Inicio" and "Ajustes" links, and user avatar/name/sign-out when authenticated. Shows "Iniciar sesión" link when unauthenticated. Includes a mobile hamburger menu
+- **Group sub-nav** (`GroupSubNav`): Rendered in the config layout (`/:slug/config/*`) below the global nav. Shows the group name and section links (Inicio, Miembros, Roles, Configuración, Vacaciones, Colaboradores, Cronogramas). Mobile hamburger for section links only. No user info (handled by global nav)
+
 ## Localisation
 - All UI text in Spanish
 - App name: **Cronogramas**

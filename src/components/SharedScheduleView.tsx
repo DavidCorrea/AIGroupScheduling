@@ -1,8 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
-import Link from "next/link";
 
 export interface ScheduleEntry {
   id: number;
@@ -156,40 +154,19 @@ export default function SharedScheduleView({
   schedule: SharedScheduleData;
   basePath?: string;
 }) {
-  const { data: session } = useSession();
   const [filteredMemberId, setFilteredMemberId] = useState<number | null>(null);
   const [filteredRoleId, setFilteredRoleId] = useState<number | null>(null);
-  const [darkMode, setDarkMode] = useState(true);
   const [today, setToday] = useState("");
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
   const [dayFilter, setDayFilter] = useState("");
   const [showPastDates, setShowPastDates] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const [calendarSelectedDate, setCalendarSelectedDate] = useState<string | null>(null);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
-  // Initialise dark mode from system preference or localStorage
   useEffect(() => {
-    const stored = localStorage.getItem("band-scheduler-theme");
-    if (stored) {
-      setDarkMode(stored === "dark");
-    } else {
-      setDarkMode(window.matchMedia("(prefers-color-scheme: dark)").matches);
-    }
     setToday(getTodayISO());
   }, []);
-
-  // Apply dark/light class to html element
-  useEffect(() => {
-    const html = document.documentElement;
-    if (darkMode) {
-      html.classList.add("dark");
-      html.classList.remove("light");
-    } else {
-      html.classList.add("light");
-      html.classList.remove("dark");
-    }
-    localStorage.setItem("band-scheduler-theme", darkMode ? "dark" : "light");
-  }, [darkMode]);
 
   // Reset view mode when member filter changes
   useEffect(() => {
@@ -375,8 +352,8 @@ export default function SharedScheduleView({
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
-      <header className="border-b border-border sticky top-0 z-10 bg-background">
-        <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
+      <header className="border-b border-border sticky top-14 z-10 bg-background">
+        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-3">
               {schedule.prevSchedule && (
@@ -404,35 +381,29 @@ export default function SharedScheduleView({
                 </a>
               )}
             </div>
-            <div className="self-start sm:self-auto flex items-center gap-2">
-              <button
-                onClick={() => setDarkMode(!darkMode)}
-                className="rounded-md border border-border px-3 py-1.5 text-sm hover:border-foreground transition-colors flex items-center gap-1.5"
-                aria-label="Cambiar modo"
-              >
-                <span className="text-base leading-none">{darkMode ? "☀️" : "🌙"}</span>
-                <span>{darkMode ? "Claro" : "Oscuro"}</span>
-              </button>
-              {session ? (
-                <Link
-                  href="/"
-                  className="rounded-md border border-border px-3 py-1.5 text-sm hover:border-foreground transition-colors"
-                >
-                  Inicio
-                </Link>
-              ) : (
-                <Link
-                  href="/login"
-                  className="rounded-md border border-border px-3 py-1.5 text-sm hover:border-foreground transition-colors"
-                >
-                  Iniciar sesión
-                </Link>
-              )}
-            </div>
           </div>
 
-          {/* Filters */}
-          <div className="mt-3 flex flex-col sm:flex-row gap-2 sm:items-center">
+          <div className="border-t border-border mt-3 sm:hidden -mx-4" />
+
+          {/* Filters - mobile toggle */}
+          <button
+            onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}
+            className="mt-3 sm:hidden flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+            Filtros
+            {(filteredMemberId || filteredRoleId || dayFilter || showPastDates) && (
+              <span className="w-2 h-2 rounded-full bg-foreground" />
+            )}
+            <svg className={`w-3.5 h-3.5 transition-transform ${mobileFiltersOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {/* Filters - desktop (always visible) + mobile (collapsible) */}
+          <div className={`mt-3 flex-col sm:flex-row gap-2 sm:items-center ${mobileFiltersOpen ? "flex" : "hidden sm:flex"}`}>
             <select
               value={filteredMemberId ?? ""}
               onChange={(e) =>
@@ -468,11 +439,11 @@ export default function SharedScheduleView({
             <select
               value={dayFilter}
               onChange={(e) => setDayFilter(e.target.value)}
-              className="w-full sm:w-auto rounded-md border border-border bg-transparent px-3.5 py-2 text-sm capitalize"
+              className="w-full sm:w-auto rounded-md border border-border bg-transparent px-3.5 py-2 text-sm"
             >
               <option value="">Todos los días</option>
               {availableWeekdays.map((day) => (
-                <option key={day} value={day} className="capitalize">
+                <option key={day} value={day}>
                   {day.charAt(0).toUpperCase() + day.slice(1)}
                 </option>
               ))}
@@ -490,7 +461,7 @@ export default function SharedScheduleView({
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Mobile: merged summary card (Agenda + upcoming) */}
         {filteredMemberId && selectedMember && (
           <div className="mb-8 border border-foreground/20 rounded-md p-5 lg:hidden">

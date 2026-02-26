@@ -179,16 +179,10 @@ export default function NewGroupPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
+      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-12">
-          <Link
-            href="/"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            &larr; Inicio
-          </Link>
-          <h1 className="mt-4 font-[family-name:var(--font-display)] text-3xl sm:text-4xl uppercase">
+          <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl uppercase">
             Nuevo grupo
           </h1>
           <p className="mt-3 text-muted-foreground">

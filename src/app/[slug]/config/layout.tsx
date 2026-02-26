@@ -3,17 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession, signOut } from "next-auth/react";
 import { GroupProvider, useGroup } from "@/lib/group-context";
 
-function AdminNav() {
+function GroupSubNav() {
   const { slug, groupName, loading, error } = useGroup();
-  const { data: session } = useSession();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const navLinks = [
-    { href: `/${slug}/config`, label: "Inicio", exact: true },
     { href: `/${slug}/config/members`, label: "Miembros" },
     { href: `/${slug}/config/roles`, label: "Roles" },
     { href: `/${slug}/config/configuration`, label: "Configuración" },
@@ -31,7 +28,7 @@ function AdminNav() {
     return (
       <nav className="border-b border-border">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-14 items-center">
+          <div className="flex h-12 items-center">
             <span className="text-muted-foreground text-sm">Cargando...</span>
           </div>
         </div>
@@ -43,7 +40,7 @@ function AdminNav() {
     return (
       <nav className="border-b border-border">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-14 items-center">
+          <div className="flex h-12 items-center">
             <span className="text-destructive text-sm">Grupo no encontrado</span>
           </div>
         </div>
@@ -52,21 +49,16 @@ function AdminNav() {
   }
 
   return (
-    <nav className="border-b border-border sticky top-0 z-40 bg-background">
+    <nav className="border-b border-border bg-background sticky top-14 z-40">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-14 items-center justify-between">
-          {/* Breadcrumb */}
+        <div className="flex h-12 items-center justify-between">
           <div className="flex items-center gap-2.5 min-w-0">
             <Link
-              href="/"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
+              href={`/${slug}/config`}
+              className="text-sm font-medium text-foreground truncate uppercase tracking-wide hover:opacity-80 transition-opacity"
             >
-              ← Grupos
-            </Link>
-            <span className="text-muted-foreground">/</span>
-            <span className="text-sm font-medium text-foreground truncate uppercase tracking-wide">
               {groupName}
-            </span>
+            </Link>
           </div>
 
           {/* Desktop nav */}
@@ -87,29 +79,13 @@ function AdminNav() {
                 </Link>
               );
             })}
-            {session?.user && (
-              <div className="flex items-center gap-2 ml-4 pl-4 border-l border-border">
-                {session.user.image && (
-                  <img src={session.user.image} alt="" className="h-6 w-6 rounded-full" />
-                )}
-                <span className="text-xs text-muted-foreground max-w-[100px] truncate">
-                  {session.user.name}
-                </span>
-                <button
-                  onClick={() => signOut({ callbackUrl: "/login" })}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Salir
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Mobile menu button */}
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
             className="md:hidden p-2.5 text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Menú"
+            aria-label="Menú de sección"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {mobileOpen ? (
@@ -141,23 +117,6 @@ function AdminNav() {
                 </Link>
               );
             })}
-            {session?.user && (
-              <div className="border-t border-border mt-2 pt-3 px-3 flex items-center gap-3">
-                {session.user.image && (
-                  <img src={session.user.image} alt="" className="h-7 w-7 rounded-full" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm truncate">{session.user.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">{session.user.email}</p>
-                </div>
-                <button
-                  onClick={() => signOut({ callbackUrl: "/login" })}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                >
-                  Salir
-                </button>
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -172,7 +131,7 @@ export default function AdminLayout({
 }) {
   return (
     <GroupProvider>
-      <AdminNav />
+      <GroupSubNav />
       <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         {children}
       </main>

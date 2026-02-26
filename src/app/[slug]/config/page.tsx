@@ -54,7 +54,7 @@ export default function AdminHome() {
           {groupName}
         </h1>
         <p className="mt-3 text-muted-foreground">
-          Genera cronogramas justos y rotacionales para tu grupo.
+          Genera cronogramas rotacionales para tu grupo.
         </p>
       </div>
 

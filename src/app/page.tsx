@@ -155,23 +155,14 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
-        {/* Header */}
-        <div className="mb-12 flex items-start justify-between">
-          <div>
-            <h1 className="font-[family-name:var(--font-display)] text-4xl sm:text-5xl uppercase">
-              Cronogramas
-            </h1>
-            <p className="mt-3 text-muted-foreground">
-              Tus grupos y próximas asignaciones.
-            </p>
-          </div>
-          <Link
-            href="/settings"
-            className="shrink-0 rounded-md border border-border px-4 py-2 text-sm hover:border-foreground transition-colors"
-          >
-            Ajustes
-          </Link>
+      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+        <div className="mb-12">
+          <h1 className="font-[family-name:var(--font-display)] text-4xl sm:text-5xl uppercase">
+            Inicio
+          </h1>
+          <p className="mt-3 text-muted-foreground">
+            Tus grupos y próximas asignaciones.
+          </p>
         </div>
 
         <div className="border-t border-border pt-8 lg:grid lg:grid-cols-[1fr_1px_1fr] lg:gap-8">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 
 interface Holiday {
@@ -82,23 +82,15 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
+      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="mb-12 flex items-start justify-between">
-          <div>
-            <h1 className="font-[family-name:var(--font-display)] text-4xl sm:text-5xl uppercase">
-              Ajustes
-            </h1>
-            <p className="mt-3 text-muted-foreground">
-              Configura tu perfil y fechas de ausencia.
-            </p>
-          </div>
-          <Link
-            href="/"
-            className="shrink-0 rounded-md border border-border px-4 py-2 text-sm hover:border-foreground transition-colors"
-          >
-            ← Inicio
-          </Link>
+        <div className="mb-12">
+          <h1 className="font-[family-name:var(--font-display)] text-4xl sm:text-5xl uppercase">
+            Ajustes
+          </h1>
+          <p className="mt-3 text-muted-foreground">
+            Configura tu perfil y fechas de ausencia.
+          </p>
         </div>
 
         {/* Profile section */}
@@ -120,22 +112,16 @@ export default function SettingsPage() {
                 <p className="text-sm text-muted-foreground">{session.user.email}</p>
               </div>
             </div>
-            <div className="mt-6 flex gap-3">
-              {(session.user as { isAdmin?: boolean }).isAdmin && (
+            {(session.user as { isAdmin?: boolean }).isAdmin && (
+              <div className="mt-6">
                 <Link
                   href="/admin"
                   className="rounded-md border border-border px-4 py-2 text-sm hover:border-foreground transition-colors"
                 >
                   Panel de administración
                 </Link>
-              )}
-              <button
-                onClick={() => signOut({ callbackUrl: "/login" })}
-                className="rounded-md border border-border px-4 py-2 text-sm text-destructive hover:border-destructive transition-colors"
-              >
-                Cerrar sesión
-              </button>
-            </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -200,13 +186,7 @@ export default function SettingsPage() {
 
           {loading ? (
             <p className="text-sm text-muted-foreground">Cargando...</p>
-          ) : holidays.length === 0 ? (
-            <div className="border-t border-dashed border-border py-10 text-center">
-              <p className="text-sm text-muted-foreground">
-                No tienes fechas de ausencia configuradas.
-              </p>
-            </div>
-          ) : (
+          ) : holidays.length === 0 ? null : (
             <div className="divide-y divide-border">
               {holidays.map((h) => (
                 <div key={h.id} className="py-4 first:pt-0 flex items-center justify-between gap-3">
