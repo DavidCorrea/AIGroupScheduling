@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { groupCollaborators, groups, users } from "@/db/schema";
+import { groupCollaborators, groups, users, members } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireAuth, hasGroupAccess } from "@/lib/api-helpers";
 
@@ -108,6 +108,24 @@ export async function POST(
     return NextResponse.json(
       { error: "El usuario ya es dueño del grupo" },
       { status: 409 }
+    );
+  }
+
+  // Must be a member of the group (linked by userId) to be added as collaborator
+  const groupMember = (await db
+    .select({ id: members.id })
+    .from(members)
+    .where(
+      and(
+        eq(members.groupId, groupId),
+        eq(members.userId, userId)
+      )
+    ))[0];
+
+  if (!groupMember) {
+    return NextResponse.json(
+      { error: "Solo se pueden agregar como colaboradores a miembros del grupo" },
+      { status: 400 }
     );
   }
 

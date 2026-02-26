@@ -29,6 +29,7 @@ export default function CollaboratorsPage() {
   const { groupId, loading: groupLoading } = useGroup();
   const [owner, setOwner] = useState<Owner | null>(null);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [memberUserIds, setMemberUserIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   // Search state
@@ -39,10 +40,20 @@ export default function CollaboratorsPage() {
 
   const fetchData = useCallback(async () => {
     if (!groupId) return;
-    const res = await fetch(`/api/groups/${groupId}/collaborators`);
-    const data = await res.json();
+    const [collabRes, membersRes] = await Promise.all([
+      fetch(`/api/groups/${groupId}/collaborators`),
+      fetch(`/api/members?groupId=${groupId}`),
+    ]);
+    const data = await collabRes.json();
+    const members = await membersRes.json();
     setOwner(data.owner);
     setCollaborators(data.collaborators);
+    const ids = new Set(
+      (members as { userId: string | null }[])
+        .filter((m) => m.userId != null)
+        .map((m) => m.userId as string)
+    );
+    setMemberUserIds(ids);
     setLoading(false);
   }, [groupId]);
 
@@ -61,19 +72,21 @@ export default function CollaboratorsPage() {
     searchTimeout.current = setTimeout(async () => {
       const res = await fetch(`/api/users/search?q=${encodeURIComponent(searchQuery)}`);
       const results = await res.json();
-      // Filter out owner and existing collaborators
       const existingIds = new Set([
         owner?.id,
         ...collaborators.map((c) => c.userId),
       ]);
-      const filtered = results.filter((u: UserSearchResult) => !existingIds.has(u.id));
+      const filtered = results.filter(
+        (u: UserSearchResult) =>
+          !existingIds.has(u.id) && memberUserIds.has(u.id)
+      );
       setSearchResults(filtered);
       setShowDropdown(filtered.length > 0);
     }, 300);
     return () => {
       if (searchTimeout.current) clearTimeout(searchTimeout.current);
     };
-  }, [searchQuery, owner, collaborators]);
+  }, [searchQuery, owner, collaborators, memberUserIds]);
 
   const addCollaborator = async (user: UserSearchResult) => {
     if (!groupId) return;
@@ -146,7 +159,7 @@ export default function CollaboratorsPage() {
                 onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
                 onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
                 className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground"
-                placeholder="Buscar usuario por email o nombre..."
+                placeholder="Buscar miembro del grupo por email o nombre..."
               />
               {showDropdown && (
                 <div className="absolute z-10 top-full mt-1 w-full rounded-md border border-border bg-background shadow-sm max-h-60 overflow-y-auto">
