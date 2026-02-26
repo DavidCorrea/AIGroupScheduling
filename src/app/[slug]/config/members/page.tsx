@@ -35,17 +35,6 @@ export default function MembersPage() {
     if (groupId) fetchData();
   }, [groupId, fetchData]);
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("¿Estás seguro de que deseas eliminar este miembro?")) return;
-    const res = await fetch(`/api/members/${id}`, { method: "DELETE" });
-    if (!res.ok) {
-      const data = await res.json();
-      alert(data.error || "Error al eliminar el miembro");
-      return;
-    }
-    fetchData();
-  };
-
   if (groupLoading || loading) {
     return <p className="text-sm text-muted-foreground">Cargando...</p>;
   }
@@ -73,51 +62,34 @@ export default function MembersPage() {
             Agregar miembro
           </Link>
           {members.map((member) => (
-              <div
-                key={member.id}
-                className="rounded-lg border border-border bg-card p-4 flex flex-col justify-center gap-3 h-20"
-              >
-                <div className="flex items-center justify-between gap-3 min-w-0">
-                  <div className="flex items-center gap-3 min-w-0">
-                    {member.image ? (
-                      <img
-                        src={member.image}
-                        alt=""
-                        className="h-10 w-10 rounded-full shrink-0"
-                      />
-                    ) : (
-                      <div className="h-10 w-10 rounded-full bg-muted shrink-0 flex items-center justify-center text-lg text-muted-foreground">
-                        {member.name.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <h3 className="font-medium truncate">{member.name}</h3>
-                      {member.memberEmail && (
-                        <p className="text-xs text-muted-foreground truncate">
-                          {member.memberEmail}
-                        </p>
-                      )}
-                    </div>
+            <Link
+              key={member.id}
+              href={`/${slug}/config/members/${member.id}`}
+              className="rounded-lg border border-border bg-card p-4 flex flex-col justify-center gap-3 h-20 hover:border-foreground transition-colors"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                {member.image ? (
+                  <img
+                    src={member.image}
+                    alt=""
+                    className="h-10 w-10 rounded-full shrink-0"
+                  />
+                ) : (
+                  <div className="h-10 w-10 rounded-full bg-muted shrink-0 flex items-center justify-center text-lg text-muted-foreground">
+                    {member.name.charAt(0).toUpperCase()}
                   </div>
-                  <div className="flex gap-1.5 shrink-0">
-                    <Link
-                      href={`/${slug}/config/members/${member.id}`}
-                      className="rounded-md border border-border p-2 text-sm hover:border-foreground transition-colors"
-                      aria-label="Editar"
-                    >
-                      ✏️
-                    </Link>
-                    <button
-                      onClick={() => handleDelete(member.id)}
-                      className="rounded-md border border-border p-2 text-sm text-destructive hover:border-destructive transition-colors"
-                      aria-label="Eliminar"
-                    >
-                      🗑️
-                    </button>
-                  </div>
+                )}
+                <div className="min-w-0">
+                  <h3 className="font-medium truncate">{member.name}</h3>
+                  {member.memberEmail && (
+                    <p className="text-xs text-muted-foreground truncate">
+                      {member.memberEmail}
+                    </p>
+                  )}
                 </div>
               </div>
-            ))}
+            </Link>
+          ))}
         </div>
       </section>
     </div>

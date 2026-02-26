@@ -160,6 +160,17 @@ export default function EditMemberPage() {
     router.push(`/${slug}/config/members`);
   };
 
+  const handleDelete = async () => {
+    if (!confirm("¿Estás seguro de que deseas eliminar este miembro?")) return;
+    const res = await fetch(`/api/members/${member!.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json();
+      setFormError(data.error || "Error al eliminar el miembro");
+      return;
+    }
+    router.push(`/${slug}/config/members`);
+  };
+
   if (groupLoading || loading) {
     return <p className="text-sm text-muted-foreground">Cargando...</p>;
   }
@@ -261,7 +272,7 @@ export default function EditMemberPage() {
             <p className="text-sm text-destructive">{formError}</p>
           )}
 
-          <div className="flex gap-2 pt-1">
+          <div className="flex flex-wrap gap-2 pt-1">
             <button
               type="submit"
               disabled={!memberName.trim()}
@@ -275,6 +286,13 @@ export default function EditMemberPage() {
             >
               Cancelar
             </Link>
+            <button
+              type="button"
+              onClick={handleDelete}
+              className="rounded-md border border-border px-5 py-2.5 text-sm text-destructive hover:border-destructive hover:bg-destructive/10 transition-colors"
+            >
+              Eliminar
+            </button>
           </div>
         </form>
       </section>
