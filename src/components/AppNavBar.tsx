@@ -67,7 +67,7 @@ export default function AppNavBar() {
                       <img
                         src={session.user.image}
                         alt=""
-                        className="h-6 w-6 rounded-full"
+                        className="h-6 w-6 rounded-full object-cover object-center shrink-0 transition-none"
                       />
                     )}
                     <span className="text-xs max-w-[100px] truncate">
@@ -146,7 +146,7 @@ export default function AppNavBar() {
                       <img
                         src={session.user.image}
                         alt=""
-                        className="h-7 w-7 rounded-full"
+                        className="h-7 w-7 rounded-full object-cover object-center shrink-0 transition-none"
                       />
                     )}
                     <div className="min-w-0 flex-1">
