@@ -10,7 +10,7 @@ function GroupSubNav() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const navLinks = [
+  const navLinks: { href: string; label: string; exact?: boolean }[] = [
     { href: `/${slug}/config/members`, label: "Miembros" },
     { href: `/${slug}/config/roles`, label: "Roles" },
     { href: `/${slug}/config/configuration`, label: "Configuración" },
