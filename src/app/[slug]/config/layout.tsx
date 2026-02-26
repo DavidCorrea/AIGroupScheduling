@@ -2,12 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { GroupProvider, useGroup } from "@/lib/group-context";
+import { UnsavedConfigProvider, useUnsavedConfig } from "@/lib/unsaved-config-context";
 
 function GroupSubNav() {
   const { slug, groupName, loading, error } = useGroup();
   const pathname = usePathname();
+  const router = useRouter();
+  const { dirty: configDirty } = useUnsavedConfig();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const navLinks: { href: string; label: string; exact?: boolean }[] = [
@@ -22,6 +25,20 @@ function GroupSubNav() {
   const isActive = (href: string, exact?: boolean) => {
     if (exact) return pathname === href;
     return pathname.startsWith(href);
+  };
+
+  const isConfigPage = pathname?.endsWith("/configuration") ?? false;
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string): boolean => {
+    if (isConfigPage && configDirty && href !== pathname) {
+      e.preventDefault();
+      if (window.confirm("Hay cambios sin guardar. ¿Salir de todas formas?")) {
+        setMobileOpen(false);
+        router.push(href);
+        return true;
+      }
+      return false;
+    }
+    return true;
   };
 
   if (loading) {
@@ -55,6 +72,7 @@ function GroupSubNav() {
           <div className="flex items-center gap-2.5 min-w-0">
             <Link
               href={`/${slug}/config`}
+              onClick={(e) => handleNavClick(e, `/${slug}/config`)}
               className="text-sm font-medium text-foreground truncate uppercase tracking-wide hover:opacity-80 transition-opacity"
             >
               {groupName}
@@ -69,6 +87,7 @@ function GroupSubNav() {
                 <Link
                   key={link.href}
                   href={link.href}
+                  onClick={(e) => handleNavClick(e, link.href)}
                   className={`px-3 py-1.5 text-sm transition-colors ${
                     active
                       ? "text-foreground font-medium"
@@ -106,7 +125,9 @@ function GroupSubNav() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  onClick={() => setMobileOpen(false)}
+                  onClick={(e) => {
+                    if (handleNavClick(e, link.href)) setMobileOpen(false);
+                  }}
                   className={`block px-3 py-2.5 text-sm transition-colors ${
                     active
                       ? "text-foreground font-medium"
@@ -131,10 +152,12 @@ export default function AdminLayout({
 }) {
   return (
     <GroupProvider>
-      <GroupSubNav />
-      <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        {children}
-      </main>
+      <UnsavedConfigProvider>
+        <GroupSubNav />
+        <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+          {children}
+        </main>
+      </UnsavedConfigProvider>
     </GroupProvider>
   );
 }

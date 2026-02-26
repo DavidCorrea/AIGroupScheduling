@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   DndContext,
   type DragEndEvent,
@@ -13,20 +13,22 @@ import {
   SortableContext,
   useSortable,
   verticalListSortingStrategy,
+  horizontalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useGroup } from "@/lib/group-context";
 import { buildColumnOrderPayload } from "@/lib/column-order";
+import { useUnsavedConfig } from "@/lib/unsaved-config-context";
 
 function PriorityEditor({
   roles,
   existingPriorities,
-  onSave,
+  onApply,
 }: {
   roles: Role[];
   existingPriorities: DayRolePriority[];
-  onSave: (priorities: { roleId: number; priority: number }[]) => void;
+  onApply: (priorities: { roleId: number; priority: number }[]) => void;
 }) {
   const [orderedRoles, setOrderedRoles] = useState(() => {
     if (existingPriorities.length > 0) {
@@ -94,31 +96,23 @@ function PriorityEditor({
       ))}
       <button
         onClick={() =>
-          onSave(orderedRoles.map((r, i) => ({ roleId: r.id, priority: i })))
+          onApply(orderedRoles.map((r, i) => ({ roleId: r.id, priority: i })))
         }
         className="mt-2 w-full sm:w-auto rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
       >
-        Guardar orden
+        Aplicar
       </button>
     </div>
   );
 }
 
 function ColumnOrderEditor({
-  roles,
-  onSave,
+  orderedRoles,
+  onOrderChange,
 }: {
-  roles: Role[];
-  onSave: (order: { id: number; displayOrder: number }[]) => void;
+  orderedRoles: Role[];
+  onOrderChange: (roles: Role[]) => void;
 }) {
-  const [orderedRoles, setOrderedRoles] = useState(() =>
-    [...roles].sort((a, b) => a.displayOrder - b.displayOrder)
-  );
-
-  useEffect(() => {
-    setOrderedRoles([...roles].sort((a, b) => a.displayOrder - b.displayOrder));
-  }, [roles]);
-
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(TouchSensor, {
@@ -132,7 +126,7 @@ function ColumnOrderEditor({
     const oldIndex = orderedRoles.findIndex((r) => r.id === active.id);
     const newIndex = orderedRoles.findIndex((r) => r.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
-    setOrderedRoles((prev) => arrayMove(prev, oldIndex, newIndex));
+    onOrderChange(arrayMove(orderedRoles, oldIndex, newIndex));
   };
 
   const moveUp = (index: number) => {
@@ -142,7 +136,7 @@ function ColumnOrderEditor({
       newOrder[index],
       newOrder[index - 1],
     ];
-    setOrderedRoles(newOrder);
+    onOrderChange(newOrder);
   };
 
   const moveDown = (index: number) => {
@@ -152,17 +146,39 @@ function ColumnOrderEditor({
       newOrder[index + 1],
       newOrder[index],
     ];
-    setOrderedRoles(newOrder);
+    onOrderChange(newOrder);
   };
 
   return (
     <div className="space-y-2">
+      {/* Desktop: horizontal row */}
+      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        <SortableContext
+          items={orderedRoles.map((r) => r.id)}
+          strategy={horizontalListSortingStrategy}
+        >
+          <div className="hidden md:flex flex-wrap items-center gap-2">
+            {orderedRoles.map((role, index) => (
+              <SortableChip
+                key={role.id}
+                role={role}
+                index={index}
+                total={orderedRoles.length}
+                onMoveLeft={() => moveUp(index)}
+                onMoveRight={() => moveDown(index)}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
+
+      {/* Mobile: vertical table */}
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <SortableContext
           items={orderedRoles.map((r) => r.id)}
           strategy={verticalListSortingStrategy}
         >
-          <div className="overflow-x-auto">
+          <div className="md:hidden overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b border-border">
@@ -196,12 +212,84 @@ function ColumnOrderEditor({
           </div>
         </SortableContext>
       </DndContext>
+    </div>
+  );
+}
+
+function SortableChip({
+  role,
+  index,
+  total,
+  onMoveLeft,
+  onMoveRight,
+}: {
+  role: Role;
+  index: number;
+  total: number;
+  onMoveLeft: () => void;
+  onMoveRight: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: role.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm transition-colors hover:bg-muted/30 shrink-0 ${
+        isDragging ? "opacity-50 bg-muted/50 shadow" : ""
+      }`}
+    >
       <button
-        onClick={() => onSave(buildColumnOrderPayload(orderedRoles))}
-        className="mt-2 w-full sm:w-auto rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+        ref={setActivatorNodeRef}
+        type="button"
+        className="touch-manipulation p-1 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing rounded focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+        aria-label="Arrastrar para reordenar"
+        {...attributes}
+        {...listeners}
       >
-        Guardar orden
+        <span className="inline-block text-base" aria-hidden="true">
+          ≡
+        </span>
       </button>
+      <span className="text-muted-foreground font-medium w-5 text-right tabular-nums">
+        {index + 1}
+      </span>
+      <span className="font-medium min-w-0 truncate max-w-[8rem]">
+        {role.name}
+      </span>
+      <div className="flex items-center gap-0.5">
+        <button
+          type="button"
+          onClick={onMoveLeft}
+          disabled={index === 0}
+          aria-label="Mover a la izquierda"
+          className="p-1.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors rounded focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+        >
+          ←
+        </button>
+        <button
+          type="button"
+          onClick={onMoveRight}
+          disabled={index === total - 1}
+          aria-label="Mover a la derecha"
+          className="p-1.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors rounded focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+        >
+          →
+        </button>
+      </div>
     </div>
   );
 }
@@ -313,14 +401,70 @@ interface DayRolePriority {
   roleName: string;
 }
 
+function DayOptionsGroup<T extends { id: number; dayOfWeek: string }>({
+  days,
+  isSelected,
+  onToggle,
+  title,
+  description,
+}: {
+  days: T[];
+  isSelected: (day: T) => boolean;
+  onToggle: (day: T) => void;
+  title: string;
+  description: string;
+}) {
+  return (
+    <section className="space-y-4">
+      <div>
+        <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">{title}</h2>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+      <div className="rounded-lg border border-border w-full lg:w-fit max-w-full">
+        <div className="flex flex-col lg:flex-row lg:flex-wrap gap-0">
+          {days.map((day) => (
+            <button
+              key={day.id}
+              type="button"
+              onClick={() => onToggle(day)}
+              className={`w-full lg:w-auto rounded-none px-4 py-3 text-sm transition-colors text-left border-r border-b border-border first:border-l-0 last:border-r-0 last:border-b-0 lg:border-b-0 ${
+                isSelected(day)
+                  ? "bg-primary/5 text-foreground font-medium"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {day.dayOfWeek}
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function ConfigurationPage() {
   const { groupId, loading: groupLoading } = useGroup();
+  const { setDirty } = useUnsavedConfig();
   const [roles, setRoles] = useState<Role[]>([]);
   const [days, setDays] = useState<ScheduleDay[]>([]);
   const [priorities, setPriorities] = useState<DayRolePriority[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Priority editing
+  // Initial state (last saved) for dirty check
+  const [initialDays, setInitialDays] = useState<ScheduleDay[]>([]);
+  const [initialOrder, setInitialOrder] = useState<number[]>([]);
+  const [initialPrioritiesByDay, setInitialPrioritiesByDay] = useState<
+    Record<number, { roleId: number; priority: number }[]>
+  >({});
+
+  // Local editable state
+  const [localDays, setLocalDays] = useState<ScheduleDay[]>([]);
+  const [orderedRoles, setOrderedRoles] = useState<Role[]>([]);
+  const [localPrioritiesByDay, setLocalPrioritiesByDay] = useState<
+    Record<number, { roleId: number; priority: number }[]>
+  >({});
+
+  // Priority editing UI
   const [editingPriorityDay, setEditingPriorityDay] = useState<number | null>(
     null
   );
@@ -332,9 +476,37 @@ export default function ConfigurationPage() {
       fetch(`/api/configuration/days?groupId=${groupId}`),
       fetch(`/api/configuration/priorities?groupId=${groupId}`),
     ]);
-    setRoles(await rolesRes.json());
-    setDays(await daysRes.json());
-    setPriorities(await prioritiesRes.json());
+    const rolesData = await rolesRes.json();
+    const daysData = await daysRes.json();
+    const prioritiesData = await prioritiesRes.json();
+    setRoles(rolesData);
+    setDays(daysData);
+    setPriorities(prioritiesData);
+
+    const sortedRoles = [...rolesData].sort(
+      (a: Role, b: Role) => a.displayOrder - b.displayOrder
+    );
+    setInitialDays(daysData);
+    setInitialOrder(sortedRoles.map((r: Role) => r.id));
+    setInitialPrioritiesByDay(() => {
+      const byDay: Record<number, { roleId: number; priority: number }[]> = {};
+      for (const p of prioritiesData) {
+        if (!byDay[p.scheduleDayId]) byDay[p.scheduleDayId] = [];
+        byDay[p.scheduleDayId].push({ roleId: p.roleId, priority: p.priority });
+      }
+      return byDay;
+    });
+
+    setLocalDays(daysData);
+    setOrderedRoles(sortedRoles);
+    setLocalPrioritiesByDay(() => {
+      const byDay: Record<number, { roleId: number; priority: number }[]> = {};
+      for (const p of prioritiesData) {
+        if (!byDay[p.scheduleDayId]) byDay[p.scheduleDayId] = [];
+        byDay[p.scheduleDayId].push({ roleId: p.roleId, priority: p.priority });
+      }
+      return byDay;
+    });
     setLoading(false);
   }, [groupId]);
 
@@ -342,43 +514,141 @@ export default function ConfigurationPage() {
     if (groupId) fetchData();
   }, [groupId, fetchData]);
 
-  const toggleDay = async (day: ScheduleDay) => {
-    await fetch(`/api/configuration/days?groupId=${groupId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: day.id, active: !day.active }),
-    });
-    fetchData();
+  const dirty = useMemo(() => {
+    const daysEqual =
+      localDays.length === initialDays.length &&
+      localDays.every(
+        (d, i) =>
+          initialDays[i] &&
+          d.id === initialDays[i].id &&
+          d.active === initialDays[i].active &&
+          d.isRehearsal === initialDays[i].isRehearsal
+      );
+    const orderEqual =
+      orderedRoles.length === initialOrder.length &&
+      orderedRoles.every((r, i) => r.id === initialOrder[i]);
+    const prioritiesEqual = (() => {
+      const dayIds = new Set([
+        ...Object.keys(initialPrioritiesByDay).map(Number),
+        ...Object.keys(localPrioritiesByDay).map(Number),
+      ]);
+      for (const dayId of dayIds) {
+        const a = initialPrioritiesByDay[dayId] ?? [];
+        const b = localPrioritiesByDay[dayId] ?? [];
+        if (
+          a.length !== b.length ||
+          a.some((p, i) => p.roleId !== b[i]?.roleId || p.priority !== b[i]?.priority)
+        )
+          return false;
+      }
+      return true;
+    })();
+    return !daysEqual || !orderEqual || !prioritiesEqual;
+  }, [
+    localDays,
+    initialDays,
+    orderedRoles,
+    initialOrder,
+    localPrioritiesByDay,
+    initialPrioritiesByDay,
+  ]);
+
+  useEffect(() => {
+    setDirty(dirty);
+  }, [dirty, setDirty]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
+
+  const toggleDay = (day: ScheduleDay) => {
+    setLocalDays((prev) =>
+      prev.map((d) =>
+        d.id === day.id ? { ...d, active: !d.active } : d
+      )
+    );
   };
 
-  const toggleRehearsal = async (day: ScheduleDay) => {
-    await fetch(`/api/configuration/days?groupId=${groupId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: day.id, isRehearsal: !day.isRehearsal }),
-    });
-    fetchData();
+  const toggleRehearsal = (day: ScheduleDay) => {
+    setLocalDays((prev) =>
+      prev.map((d) =>
+        d.id === day.id ? { ...d, isRehearsal: !d.isRehearsal } : d
+      )
+    );
   };
 
-  const savePriorities = async (
+  const handlePrioritiesApply = (
     scheduleDayId: number,
     rolePriorities: { roleId: number; priority: number }[]
   ) => {
-    await fetch(`/api/configuration/priorities?groupId=${groupId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scheduleDayId, priorities: rolePriorities }),
-    });
+    setLocalPrioritiesByDay((prev) => ({
+      ...prev,
+      [scheduleDayId]: rolePriorities,
+    }));
     setEditingPriorityDay(null);
-    fetchData();
   };
 
-  const clearPriorities = async (scheduleDayId: number) => {
-    await fetch(`/api/configuration/priorities?scheduleDayId=${scheduleDayId}&groupId=${groupId}`, {
-      method: "DELETE",
+  const clearPrioritiesLocal = (scheduleDayId: number) => {
+    setLocalPrioritiesByDay((prev) => {
+      const next = { ...prev };
+      next[scheduleDayId] = [];
+      return next;
     });
     setEditingPriorityDay(null);
-    fetchData();
+  };
+
+  const saveAll = async () => {
+    if (!groupId) return;
+    for (const day of localDays) {
+      const initial = initialDays.find((d) => d.id === day.id);
+      if (!initial) continue;
+      if (day.active !== initial.active || day.isRehearsal !== initial.isRehearsal) {
+        await fetch(`/api/configuration/days?groupId=${groupId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: day.id,
+            active: day.active,
+            isRehearsal: day.isRehearsal,
+          }),
+        });
+      }
+    }
+    const orderDirty =
+      orderedRoles.length !== initialOrder.length ||
+      orderedRoles.some((r, i) => r.id !== initialOrder[i]);
+    if (orderDirty) {
+      await fetch(`/api/configuration/roles?groupId=${groupId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order: buildColumnOrderPayload(orderedRoles) }),
+      });
+    }
+    const allDayIds = new Set([
+      ...Object.keys(initialPrioritiesByDay).map(Number),
+      ...Object.keys(localPrioritiesByDay).map(Number),
+    ]);
+    for (const scheduleDayId of allDayIds) {
+      const initialP = initialPrioritiesByDay[scheduleDayId] ?? [];
+      const localP = localPrioritiesByDay[scheduleDayId] ?? [];
+      const same =
+        initialP.length === localP.length &&
+        initialP.every(
+          (p, i) => p.roleId === localP[i]?.roleId && p.priority === localP[i]?.priority
+        );
+      if (same) continue;
+      await fetch(`/api/configuration/priorities?groupId=${groupId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scheduleDayId, priorities: localP }),
+      });
+    }
+    await fetchData();
   };
 
   if (groupLoading || loading) {
@@ -394,59 +664,26 @@ export default function ConfigurationPage() {
         </p>
       </div>
 
-      {/* Schedule Days + Rehearsal Days side by side on desktop */}
-      <div className="border-t border-border pt-8 lg:grid lg:grid-cols-2 lg:gap-12 space-y-12 lg:space-y-0">
-        <section className="space-y-4">
-          <div>
-            <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">Días activos</h2>
-            <p className="text-sm text-muted-foreground">
-              Selecciona qué días de la semana se incluyen en el cronograma.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {days.map((day) => (
-              <button
-                key={day.id}
-                onClick={() => toggleDay(day)}
-                className={`rounded-full px-4 py-2 text-sm border transition-colors ${
-                  day.active
-                    ? "border-foreground text-foreground bg-transparent"
-                    : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
-                }`}
-              >
-                {day.dayOfWeek}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <div>
-            <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">Días de ensayo</h2>
-            <p className="text-sm text-muted-foreground">
-              Selecciona qué días de la semana son días de ensayo. Las fechas de ensayo aparecen en el cronograma pero no tienen asignaciones de miembros.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {days.map((day) => (
-              <button
-                key={day.id}
-                onClick={() => toggleRehearsal(day)}
-                className={`rounded-full px-4 py-2 text-sm border transition-colors ${
-                  day.isRehearsal
-                    ? "border-foreground text-foreground bg-transparent"
-                    : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
-                }`}
-              >
-                {day.dayOfWeek}
-              </button>
-            ))}
-          </div>
-        </section>
+      {/* Schedule Days: separate sections, shared DayOptionsGroup component */}
+      <div className="border-t border-border pt-8 space-y-8">
+        <DayOptionsGroup
+          days={localDays}
+          isSelected={(day) => day.active}
+          onToggle={toggleDay}
+          title="Días activos"
+          description="Selecciona qué días de la semana se incluyen en el cronograma."
+        />
+        <DayOptionsGroup
+          days={localDays}
+          isSelected={(day) => day.isRehearsal}
+          onToggle={toggleRehearsal}
+          title="Días de ensayo"
+          description="Selecciona qué días de la semana son días de ensayo. Las fechas de ensayo aparecen en el cronograma pero no tienen asignaciones de miembros."
+        />
       </div>
 
-      {/* Column Order + Role Priorities side by side on desktop */}
-      <div className="border-t border-border pt-8 lg:grid lg:grid-cols-[1fr_2fr] lg:gap-12 space-y-12 lg:space-y-0">
+      {/* Column order: own section */}
+      <div className="border-t border-border pt-8">
         <section className="space-y-4">
           <div>
             <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">Orden de columnas</h2>
@@ -455,18 +692,14 @@ export default function ConfigurationPage() {
             </p>
           </div>
           <ColumnOrderEditor
-            roles={roles}
-            onSave={async (order) => {
-              await fetch(`/api/configuration/roles?groupId=${groupId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ order }),
-              });
-              fetchData();
-            }}
+            orderedRoles={orderedRoles}
+            onOrderChange={setOrderedRoles}
           />
         </section>
+      </div>
 
+      {/* Prioridades de roles por día: own section */}
+      <div className="border-t border-border pt-8">
         <section className="space-y-4">
           <div>
             <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">Prioridades de roles por día</h2>
@@ -476,12 +709,20 @@ export default function ConfigurationPage() {
           </div>
 
           <div className="divide-y divide-border">
-            {days
+            {localDays
               .filter((d) => d.active)
               .map((day) => {
-                const dayPriorities = priorities.filter(
-                  (p) => p.scheduleDayId === day.id
-                );
+                const dayPrioritiesRaw = localPrioritiesByDay[day.id] ?? [];
+                const dayPriorities: DayRolePriority[] = dayPrioritiesRaw
+                  .sort((a, b) => a.priority - b.priority)
+                  .map((p, i) => ({
+                    id: i,
+                    scheduleDayId: day.id,
+                    roleId: p.roleId,
+                    priority: p.priority,
+                    dayOfWeek: day.dayOfWeek,
+                    roleName: roles.find((r) => r.id === p.roleId)?.name ?? "",
+                  }));
                 const isEditing = editingPriorityDay === day.id;
 
                 return (
@@ -506,7 +747,7 @@ export default function ConfigurationPage() {
                             </button>
                             {dayPriorities.length > 0 && (
                               <button
-                                onClick={() => clearPriorities(day.id)}
+                                onClick={() => clearPrioritiesLocal(day.id)}
                                 className="text-sm text-destructive hover:opacity-80 transition-opacity"
                               >
                                 Limpiar
@@ -521,7 +762,7 @@ export default function ConfigurationPage() {
                       <PriorityEditor
                         roles={roles}
                         existingPriorities={dayPriorities}
-                        onSave={(rp) => savePriorities(day.id, rp)}
+                        onApply={(rp) => handlePrioritiesApply(day.id, rp)}
                       />
                     ) : dayPriorities.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
@@ -529,7 +770,7 @@ export default function ConfigurationPage() {
                           .sort((a, b) => a.priority - b.priority)
                           .map((p) => (
                             <span
-                              key={p.id}
+                              key={`${p.roleId}-${p.priority}`}
                               className="rounded-full border border-border px-3 py-1 text-xs"
                             >
                               {p.priority + 1}. {p.roleName}
@@ -546,6 +787,17 @@ export default function ConfigurationPage() {
               })}
           </div>
         </section>
+      </div>
+
+      <div className="border-t border-border pt-8 flex justify-end">
+        <button
+          type="button"
+          onClick={saveAll}
+          disabled={!dirty}
+          className="rounded-md bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50 disabled:pointer-events-none"
+        >
+          Guardar cambios
+        </button>
       </div>
 
     </div>
