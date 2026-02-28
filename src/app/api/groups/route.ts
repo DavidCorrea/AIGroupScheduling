@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { groups, groupCollaborators, members, users, recurringEvents, weekdays, roles } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
-import { seedDefaults } from "@/lib/seed";
 import { requireAuth } from "@/lib/api-helpers";
 
 export async function GET(request: NextRequest) {
@@ -145,12 +144,12 @@ export async function POST(request: NextRequest) {
           active: d.active ?? true,
           type: d.type ?? "assignable",
           label: (d.label && String(d.label).trim()) ? String(d.label).trim() : "Evento",
+          startTimeUtc: "00:00",
+          endTimeUtc: "23:59",
           groupId: group.id,
         });
       }
     }
-  } else {
-    await seedDefaults(group.id);
   }
 
   if (Array.isArray(rolesList) && rolesList.length > 0) {

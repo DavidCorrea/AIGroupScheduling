@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { recurringEvents, weekdays, scheduleDate } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { seedDefaults } from "@/lib/seed";
 import { dayIndex } from "@/lib/constants";
 import { extractGroupId, requireGroupAccess } from "@/lib/api-helpers";
 
@@ -10,7 +9,6 @@ export async function GET(request: NextRequest) {
   const groupId = extractGroupId(request);
   if (groupId instanceof NextResponse) return groupId;
 
-  await seedDefaults(groupId);
   const allDays = await db
     .select({
       id: recurringEvents.id,

@@ -9,7 +9,6 @@ import { eq, and } from "drizzle-orm";
 import { generateSchedule } from "@/lib/scheduler";
 import { getScheduleDates, getDayNameFromDateString } from "@/lib/dates";
 import { loadScheduleConfig, getPreviousAssignments } from "@/lib/schedule-helpers";
-import { seedDefaults } from "@/lib/seed";
 import { requireGroupAccess } from "@/lib/api-helpers";
 import { logScheduleAction } from "@/lib/audit-log";
 
@@ -36,8 +35,6 @@ export async function POST(request: NextRequest) {
   const accessResult = await requireGroupAccess(request);
   if (accessResult.error) return accessResult.error;
   const { groupId } = accessResult;
-
-  await seedDefaults(groupId);
 
   const body = await request.json();
   const { months } = body; // Array of { month, year }
