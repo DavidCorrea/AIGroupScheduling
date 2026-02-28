@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { members, memberRoles, memberAvailability, users, scheduleEntries } from "@/db/schema";
+import { members, memberRoles, memberAvailability, users, scheduleDateAssignments } from "@/db/schema";
 import { eq, and, ne } from "drizzle-orm";
 import { requireAuth } from "@/lib/api-helpers";
+
+function normalizeHHMM(v: unknown): string | null {
+  if (v == null) return null;
+  const s = String(v).trim();
+  const m = /^(\d{1,2}):(\d{2})$/.exec(s);
+  if (!m) return null;
+  const h = Math.min(23, Math.max(0, parseInt(m[1], 10)));
+  const min = Math.min(59, Math.max(0, parseInt(m[2], 10)));
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+}
 
 export async function GET(
   _request: NextRequest,
@@ -39,7 +49,11 @@ export async function GET(
     .where(eq(memberRoles.memberId, memberId));
 
   const availability = await db
-    .select()
+    .select({
+      weekdayId: memberAvailability.weekdayId,
+      startTimeUtc: memberAvailability.startTimeUtc,
+      endTimeUtc: memberAvailability.endTimeUtc,
+    })
     .from(memberAvailability)
     .where(eq(memberAvailability.memberId, memberId));
 
@@ -53,7 +67,12 @@ export async function GET(
     image: member.userImage,
     userName: member.userName,
     roleIds: roles.map((r) => r.roleId),
-    availableDayIds: availability.map((a) => a.scheduleDayId),
+    availability: availability.map((a) => ({
+      weekdayId: a.weekdayId,
+      startTimeUtc: a.startTimeUtc ?? "00:00",
+      endTimeUtc: a.endTimeUtc ?? "23:59",
+    })),
+    availableDayIds: [...new Set(availability.map((a) => a.weekdayId))],
   });
 }
 
@@ -67,7 +86,7 @@ export async function PUT(
   const { id } = await params;
   const memberId = parseInt(id, 10);
   const body = await request.json();
-  const { name, email, userId, roleIds, availableDayIds } = body;
+  const { name, email, userId, roleIds, availableDayIds, availability: availabilityBody } = body;
 
   const existing = (await db
     .select()
@@ -174,12 +193,31 @@ export async function PUT(
     }
   }
 
-  if (availableDayIds !== undefined) {
+  if (availableDayIds !== undefined || availabilityBody !== undefined) {
     await db.delete(memberAvailability)
       .where(eq(memberAvailability.memberId, memberId));
-    for (const dayId of availableDayIds) {
+
+    const toInsert: { memberId: number; weekdayId: number; startTimeUtc: string; endTimeUtc: string }[] = [];
+
+    if (Array.isArray(availabilityBody) && availabilityBody.length > 0) {
+      for (const a of availabilityBody) {
+        const weekdayId = a.weekdayId != null ? Number(a.weekdayId) : NaN;
+        if (!Number.isInteger(weekdayId) || weekdayId < 1) continue;
+        const start = normalizeHHMM(a.startTimeUtc) ?? "00:00";
+        const end = normalizeHHMM(a.endTimeUtc) ?? "23:59";
+        toInsert.push({ memberId, weekdayId, startTimeUtc: start, endTimeUtc: end });
+      }
+    } else if (Array.isArray(availableDayIds)) {
+      for (const dayId of availableDayIds) {
+        const weekdayId = Number(dayId);
+        if (!Number.isInteger(weekdayId) || weekdayId < 1) continue;
+        toInsert.push({ memberId, weekdayId, startTimeUtc: "00:00", endTimeUtc: "23:59" });
+      }
+    }
+
+    for (const row of toInsert) {
       await db.insert(memberAvailability)
-        .values({ memberId, scheduleDayId: dayId });
+        .values(row);
     }
   }
 
@@ -205,7 +243,11 @@ export async function PUT(
     .where(eq(memberRoles.memberId, memberId));
 
   const updatedAvailability = await db
-    .select()
+    .select({
+      weekdayId: memberAvailability.weekdayId,
+      startTimeUtc: memberAvailability.startTimeUtc,
+      endTimeUtc: memberAvailability.endTimeUtc,
+    })
     .from(memberAvailability)
     .where(eq(memberAvailability.memberId, memberId));
 
@@ -219,7 +261,12 @@ export async function PUT(
     image: updated?.userImage ?? null,
     userName: updated?.userName ?? null,
     roleIds: updatedRoles.map((r) => r.roleId),
-    availableDayIds: updatedAvailability.map((a) => a.scheduleDayId),
+    availability: updatedAvailability.map((a) => ({
+      weekdayId: a.weekdayId,
+      startTimeUtc: a.startTimeUtc ?? "00:00",
+      endTimeUtc: a.endTimeUtc ?? "23:59",
+    })),
+    availableDayIds: [...new Set(updatedAvailability.map((a) => a.weekdayId))],
   });
 }
 
@@ -244,9 +291,9 @@ export async function DELETE(
 
   // Check if member has schedule assignments
   const assignments = await db
-    .select({ id: scheduleEntries.id })
-    .from(scheduleEntries)
-    .where(eq(scheduleEntries.memberId, memberId))
+    .select({ id: scheduleDateAssignments.id })
+    .from(scheduleDateAssignments)
+    .where(eq(scheduleDateAssignments.memberId, memberId))
     .limit(1);
 
   if (assignments.length > 0) {

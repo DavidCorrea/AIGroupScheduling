@@ -5,6 +5,14 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useGroup } from "@/lib/group-context";
 import { OptionToggleGroup } from "@/components/OptionToggleGroup";
+import AvailabilityWeekGrid from "@/components/AvailabilityWeekGrid";
+import { utcTimeToLocalDisplay, localTimeToUtc } from "@/lib/timezone-utils";
+import { DAY_ORDER } from "@/lib/constants";
+
+/** Canonical 7 weekdays for availability grid (id/weekdayId 1–7 match DB weekdays table). */
+const AVAILABILITY_WEEKDAYS: { id: number; weekdayId: number; dayOfWeek: string }[] = DAY_ORDER.map(
+  (dayOfWeek, i) => ({ id: i + 1, weekdayId: i + 1, dayOfWeek })
+);
 
 interface Role {
   id: number;
@@ -12,10 +20,16 @@ interface Role {
   requiredCount: number;
 }
 
-interface ScheduleDay {
+interface WeekdayOption {
   id: number;
+  weekdayId: number;
   dayOfWeek: string;
-  active: boolean;
+}
+
+interface AvailabilitySlot {
+  weekdayId: number;
+  startTimeUtc: string;
+  endTimeUtc: string;
 }
 
 interface Member {
@@ -24,7 +38,7 @@ interface Member {
   memberEmail: string | null;
   userId: string | null;
   roleIds: number[];
-  availableDayIds: number[];
+  availability: AvailabilitySlot[];
 }
 
 export default function EditMemberPage() {
@@ -35,14 +49,15 @@ export default function EditMemberPage() {
   const { groupId, loading: groupLoading } = useGroup();
   const [member, setMember] = useState<Member | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
-  const [days, setDays] = useState<ScheduleDay[]>([]);
+  const [days, setDays] = useState<WeekdayOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
   const [memberName, setMemberName] = useState("");
   const [memberEmail, setMemberEmail] = useState("");
   const [selectedRoles, setSelectedRoles] = useState<number[]>([]);
-  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  /** Per-weekday availability: key = weekdayId, value = array of blocks in local "HH:MM" */
+  const [availabilityLocal, setAvailabilityLocal] = useState<Record<number, { startLocal: string; endLocal: string }[]>>({});
   const [formError, setFormError] = useState("");
   const [linkCheck, setLinkCheck] = useState<{ canLink: true; user: { id: string; name: string | null; email: string } } | { canLink: false } | null>(null);
   const [linkLoading, setLinkLoading] = useState(false);
@@ -56,10 +71,9 @@ export default function EditMemberPage() {
       return;
     }
     const q = `?groupId=${groupId}`;
-    const [memberRes, rolesRes, daysRes] = await Promise.all([
+    const [memberRes, rolesRes] = await Promise.all([
       fetch(`/api/members/${memberId}`),
       fetch(`/api/configuration/roles${q}`),
-      fetch(`/api/configuration/days${q}`),
     ]);
     if (!memberRes.ok) {
       setNotFound(true);
@@ -71,13 +85,21 @@ export default function EditMemberPage() {
     setMemberName(memberData.name);
     setMemberEmail(memberData.memberEmail ?? "");
     setSelectedRoles([...memberData.roleIds]);
-    setSelectedDays([...memberData.availableDayIds]);
+    const avail: Record<number, { startLocal: string; endLocal: string }[]> = {};
+    for (const a of memberData.availability ?? []) {
+      const wid = a.weekdayId;
+      if (!avail[wid]) avail[wid] = [];
+      avail[wid].push({
+        startLocal: utcTimeToLocalDisplay(a.startTimeUtc ?? "00:00"),
+        endLocal: utcTimeToLocalDisplay(a.endTimeUtc ?? "23:59"),
+      });
+    }
+    setAvailabilityLocal(avail);
     setRoles(await rolesRes.json());
-    setDays(await daysRes.json());
+    setDays(AVAILABILITY_WEEKDAYS);
     setLoading(false);
   }, [groupId, id]);
 
-  // When member has email but no userId, check if we can link to a Google account
   useEffect(() => {
     if (!member || !member.memberEmail?.trim() || member.userId) {
       setLinkCheck(null);
@@ -128,17 +150,19 @@ export default function EditMemberPage() {
     );
   };
 
-  const toggleDay = (dayId: number) => {
-    setSelectedDays((prev) =>
-      prev.includes(dayId) ? prev.filter((id) => id !== dayId) : [...prev, dayId]
-    );
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
 
     if (!memberName.trim()) return;
+
+    const availability = Object.entries(availabilityLocal).flatMap(([weekdayId, blocks]) =>
+      blocks.map(({ startLocal, endLocal }) => ({
+        weekdayId: parseInt(weekdayId, 10),
+        startTimeUtc: localTimeToUtc(startLocal),
+        endTimeUtc: localTimeToUtc(endLocal),
+      }))
+    );
 
     const res = await fetch(`/api/members/${member!.id}`, {
       method: "PUT",
@@ -147,7 +171,7 @@ export default function EditMemberPage() {
         name: memberName.trim(),
         email: memberEmail.trim() || null,
         roleIds: selectedRoles,
-        availableDayIds: selectedDays,
+        availability,
       }),
     });
 
@@ -257,14 +281,14 @@ export default function EditMemberPage() {
           </div>
 
           <div>
-            <OptionToggleGroup
-              items={days}
-              getKey={(d) => d.id}
-              getLabel={(d) => d.dayOfWeek}
-              isSelected={(d) => selectedDays.includes(d.id)}
-              onToggle={(d) => toggleDay(d.id)}
-              title="Días disponibles"
-              description="Selecciona en qué días de la semana está disponible este miembro."
+            <h3 className="text-sm font-medium text-foreground mb-2">
+              Días y horarios disponibles
+            </h3>
+            <AvailabilityWeekGrid
+              days={days}
+              availability={availabilityLocal}
+              onChange={setAvailabilityLocal}
+              gridHeight={220}
             />
           </div>
 

@@ -32,7 +32,11 @@ export async function GET(request: NextRequest) {
       .where(eq(memberRoles.memberId, member.id));
 
     const availability = await db
-      .select()
+      .select({
+        weekdayId: memberAvailability.weekdayId,
+        startTimeUtc: memberAvailability.startTimeUtc,
+        endTimeUtc: memberAvailability.endTimeUtc,
+      })
       .from(memberAvailability)
       .where(eq(memberAvailability.memberId, member.id));
 
@@ -46,7 +50,12 @@ export async function GET(request: NextRequest) {
       image: member.userImage,
       userName: member.userName,
       roleIds: roles.map((r) => r.roleId),
-      availableDayIds: availability.map((a) => a.scheduleDayId),
+      availability: availability.map((a) => ({
+        weekdayId: a.weekdayId,
+        startTimeUtc: a.startTimeUtc ?? "00:00",
+        endTimeUtc: a.endTimeUtc ?? "23:59",
+      })),
+      availableDayIds: [...new Set(availability.map((a) => a.weekdayId))],
     };
   }));
 
@@ -116,10 +125,26 @@ export async function POST(request: NextRequest) {
       .values({ memberId: member.id, roleId });
   }
 
-  // Assign availability
-  for (const dayId of availableDayIds) {
+  // Assign availability (default all-day 00:00–23:59 UTC when using availableDayIds)
+  const availabilityList = Array.isArray(body.availability) && body.availability.length > 0
+    ? body.availability
+    : (body.availableDayIds ?? []).map((weekdayId: number) => ({
+        weekdayId,
+        startTimeUtc: "00:00",
+        endTimeUtc: "23:59",
+      }));
+
+  for (const a of availabilityList) {
+    const weekdayId = a.weekdayId != null ? Number(a.weekdayId) : NaN;
+    if (!Number.isInteger(weekdayId) || weekdayId < 1) continue;
+    const start = typeof a.startTimeUtc === "string" && /^\d{1,2}:\d{2}$/.test(a.startTimeUtc.trim())
+      ? a.startTimeUtc.trim()
+      : "00:00";
+    const end = typeof a.endTimeUtc === "string" && /^\d{1,2}:\d{2}$/.test(a.endTimeUtc.trim())
+      ? a.endTimeUtc.trim()
+      : "23:59";
     await db.insert(memberAvailability)
-      .values({ memberId: member.id, scheduleDayId: dayId });
+      .values({ memberId: member.id, weekdayId, startTimeUtc: start, endTimeUtc: end });
   }
 
   return NextResponse.json(
@@ -130,7 +155,7 @@ export async function POST(request: NextRequest) {
       image: linkedUser?.image ?? null,
       userName: linkedUser?.name ?? null,
       roleIds,
-      availableDayIds,
+      availability: availabilityList,
     },
     { status: 201 }
   );

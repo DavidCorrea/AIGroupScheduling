@@ -5,6 +5,14 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useGroup } from "@/lib/group-context";
 import { OptionToggleGroup } from "@/components/OptionToggleGroup";
+import AvailabilityWeekGrid from "@/components/AvailabilityWeekGrid";
+import { localTimeToUtc } from "@/lib/timezone-utils";
+import { DAY_ORDER } from "@/lib/constants";
+
+/** Canonical 7 weekdays for availability grid (weekdayId 1–7 match DB weekdays table). */
+const AVAILABILITY_WEEKDAYS: { id: number; weekdayId: number; dayOfWeek: string }[] = DAY_ORDER.map(
+  (dayOfWeek, i) => ({ id: i + 1, weekdayId: i + 1, dayOfWeek })
+);
 
 interface Role {
   id: number;
@@ -12,10 +20,10 @@ interface Role {
   requiredCount: number;
 }
 
-interface ScheduleDay {
+interface WeekdayOption {
   id: number;
+  weekdayId: number;
   dayOfWeek: string;
-  active: boolean;
 }
 
 export default function NewMemberPage() {
@@ -24,24 +32,21 @@ export default function NewMemberPage() {
   const router = useRouter();
   const { groupId, loading: groupLoading } = useGroup();
   const [roles, setRoles] = useState<Role[]>([]);
-  const [days, setDays] = useState<ScheduleDay[]>([]);
+  const [days, setDays] = useState<WeekdayOption[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [memberName, setMemberName] = useState("");
   const [memberEmail, setMemberEmail] = useState("");
   const [selectedRoles, setSelectedRoles] = useState<number[]>([]);
-  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const [availabilityLocal, setAvailabilityLocal] = useState<Record<number, { startLocal: string; endLocal: string }[]>>({});
   const [formError, setFormError] = useState("");
 
   const fetchData = useCallback(async () => {
     if (!groupId) return;
     const q = `?groupId=${groupId}`;
-    const [rolesRes, daysRes] = await Promise.all([
-      fetch(`/api/configuration/roles${q}`),
-      fetch(`/api/configuration/days${q}`),
-    ]);
+    const rolesRes = await fetch(`/api/configuration/roles${q}`);
     setRoles(await rolesRes.json());
-    setDays(await daysRes.json());
+    setDays(AVAILABILITY_WEEKDAYS);
     setLoading(false);
   }, [groupId]);
 
@@ -55,17 +60,19 @@ export default function NewMemberPage() {
     );
   };
 
-  const toggleDay = (dayId: number) => {
-    setSelectedDays((prev) =>
-      prev.includes(dayId) ? prev.filter((id) => id !== dayId) : [...prev, dayId]
-    );
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
 
     if (!memberName.trim()) return;
+
+    const availability = Object.entries(availabilityLocal).flatMap(([weekdayId, blocks]) =>
+      blocks.map(({ startLocal, endLocal }) => ({
+        weekdayId: parseInt(weekdayId, 10),
+        startTimeUtc: localTimeToUtc(startLocal),
+        endTimeUtc: localTimeToUtc(endLocal),
+      }))
+    );
 
     const res = await fetch(`/api/members?groupId=${groupId}`, {
       method: "POST",
@@ -74,7 +81,7 @@ export default function NewMemberPage() {
         name: memberName.trim(),
         email: memberEmail.trim() || null,
         roleIds: selectedRoles,
-        availableDayIds: selectedDays,
+        availability,
       }),
     });
 
@@ -143,14 +150,14 @@ export default function NewMemberPage() {
           </div>
 
           <div>
-            <OptionToggleGroup
-              items={days}
-              getKey={(d) => d.id}
-              getLabel={(d) => d.dayOfWeek}
-              isSelected={(d) => selectedDays.includes(d.id)}
-              onToggle={(d) => toggleDay(d.id)}
-              title="Días disponibles"
-              description="Selecciona en qué días de la semana está disponible este miembro."
+            <h3 className="text-sm font-medium text-foreground mb-2">
+              Días y horarios disponibles
+            </h3>
+            <AvailabilityWeekGrid
+              days={days}
+              availability={availabilityLocal}
+              onChange={setAvailabilityLocal}
+              gridHeight={220}
             />
           </div>
 
