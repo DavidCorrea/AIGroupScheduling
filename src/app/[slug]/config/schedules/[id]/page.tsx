@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useGroup } from "@/lib/group-context";
 
 interface ScheduleEntry {
   id: number;
-  scheduleId: number;
+  scheduleDateId: number;
   date: string;
   roleId: number;
   memberId: number;
@@ -14,9 +14,18 @@ interface ScheduleEntry {
   roleName: string;
 }
 
-interface DateNote {
+interface ScheduleDateInfo {
   id: number;
-  scheduleId: number;
+  date: string;
+  type: "assignable" | "for_everyone";
+  label: string | null;
+  note: string | null;
+  recurringEventId?: number | null;
+  recurringEventLabel?: string | null;
+  entries: ScheduleEntry[];
+}
+
+interface DateNote {
   date: string;
   description: string;
 }
@@ -35,11 +44,6 @@ interface HolidayConflict {
   memberName: string;
 }
 
-interface ExtraDate {
-  date: string;
-  type: string;
-}
-
 interface AuditLogEntry {
   id: number;
   action: string;
@@ -54,13 +58,11 @@ interface ScheduleDetail {
   year: number;
   status: string;
   entries: ScheduleEntry[];
-  notes: DateNote[];
-  rehearsalDates: string[];
+  scheduleDates: ScheduleDateInfo[];
   roles: RoleInfo[];
   prevScheduleId: number | null;
   nextScheduleId: number | null;
   holidayConflicts?: HolidayConflict[];
-  extraDates?: ExtraDate[];
   auditLog?: AuditLogEntry[];
 }
 
@@ -73,10 +75,12 @@ interface Member {
 
 interface ScheduleDay {
   id: number;
+  weekdayId: number;
   dayOfWeek: string;
   active: boolean;
-  isRehearsal: boolean;
-  groupId: number;
+  type?: string;
+  label?: string | null;
+  groupId?: number;
 }
 
 const MONTH_NAMES = [
@@ -103,6 +107,48 @@ function formatDate(dateStr: string): string {
     day: "numeric",
     timeZone: "UTC",
   });
+}
+
+/** Format date as "Domingo, 1" (weekday long + day of month). */
+function formatDateWeekdayDay(dateStr: string): string {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const weekday = date.toLocaleDateString("es-ES", {
+    weekday: "long",
+    timeZone: "UTC",
+  });
+  const dayNum = date.getUTCDate();
+  return `${weekday.charAt(0).toUpperCase() + weekday.slice(1)}, ${dayNum}`;
+}
+
+/** Format a date as "d mes" (e.g. "3 mar") in Spanish. */
+function formatDayMonth(dateStr: string): string {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.toLocaleDateString("es-ES", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+}
+
+/** Format a date range for a week (e.g. "3 - 9 mar" or "28 feb - 6 mar"). */
+function formatDateRange(startDateStr: string, endDateStr: string): string {
+  const start = formatDayMonth(startDateStr);
+  const end = formatDayMonth(endDateStr);
+  return `${start} – ${end}`;
+}
+
+/** Full calendar date range for a week of the month (independent of filters). Week 1 = days 1-7, week 2 = 8-14, etc. */
+function getWeekDateRange(year: number, month: number, weekNumber: number): { start: string; end: string } {
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const startDay = (weekNumber - 1) * 7 + 1;
+  const endDay = Math.min(weekNumber * 7, lastDay);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return {
+    start: `${year}-${pad(month)}-${pad(startDay)}`,
+    end: `${year}-${pad(month)}-${pad(endDay)}`,
+  };
 }
 
 /** Get the Spanish weekday name (capitalized, e.g. "Lunes") for a date string. */
@@ -168,9 +214,22 @@ export default function SchedulePreviewPage() {
 
   const [showPastDates, setShowPastDates] = useState(false);
 
-  // Add extra date form
+  // Collapsed week sections (week numbers in the set are collapsed)
+  const [collapsedWeeks, setCollapsedWeeks] = useState<Set<number>>(new Set());
+  const initialCollapseAppliedForRef = useRef<number | null>(null);
+  const toggleWeek = useCallback((weekNumber: number) => {
+    setCollapsedWeeks((prev) => {
+      const next = new Set(prev);
+      if (next.has(weekNumber)) next.delete(weekNumber);
+      else next.add(weekNumber);
+      return next;
+    });
+  }, []);
+
+  // Add date form
   const [extraDateValue, setExtraDateValue] = useState("");
-  const [extraDateType, setExtraDateType] = useState<"regular" | "rehearsal">("regular");
+  const [extraDateType, setExtraDateType] = useState<"assignable" | "for_everyone">("assignable");
+  const [extraDateLabel, setExtraDateLabel] = useState("Ensayo");
   const [showAddDate, setShowAddDate] = useState(false);
 
   // Rebuild flow
@@ -233,7 +292,12 @@ export default function SchedulePreviewPage() {
   }, [schedule]);
 
   const rehearsalSet = useMemo(
-    () => new Set(schedule?.rehearsalDates ?? []),
+    () =>
+      new Set(
+        (schedule?.scheduleDates ?? [])
+          .filter((d) => String(d.type).toLowerCase() === "for_everyone")
+          .map((d) => d.date)
+      ),
     [schedule]
   );
   const conflictSet = useMemo(
@@ -244,25 +308,31 @@ export default function SchedulePreviewPage() {
     [schedule]
   );
   const noteMap = useMemo(
-    () => new Map((schedule?.notes ?? []).map((n) => [n.date, n.description])),
+    () =>
+      new Map(
+        (schedule?.scheduleDates ?? [])
+          .filter((sd) => sd.note != null && sd.note.trim() !== "")
+          .map((sd) => [sd.date, sd.note!])
+      ),
     [schedule]
   );
-  const extraDateSet = useMemo(
-    () => new Set((schedule?.extraDates ?? []).map((d) => d.date)),
+  const scheduleDateMap = useMemo(
+    () =>
+      new Map(
+        (schedule?.scheduleDates ?? []).map((d) => [d.date, d])
+      ),
     [schedule]
   );
   const allDates = useMemo(() => {
     if (!schedule) return [];
-    const entryDates = [...new Set(schedule.entries.map((e) => e.date))];
-    const extraDates = (schedule.extraDates ?? []).map((d) => d.date);
-    return [...new Set([...entryDates, ...schedule.rehearsalDates, ...extraDates])].sort();
+    return [...schedule.scheduleDates.map((d) => d.date)].sort();
   }, [schedule]);
 
-  // Map dayOfWeek name -> scheduleDayId for availability lookups
-  const dayOfWeekToId = useMemo(() => {
+  // Map dayOfWeek name -> weekdayId for availability lookups (member.availableDayIds are weekday ids)
+  const dayOfWeekToWeekdayId = useMemo(() => {
     const map = new Map<string, number>();
     for (const d of scheduleDays) {
-      map.set(d.dayOfWeek, d.id);
+      map.set(d.dayOfWeek, d.weekdayId);
     }
     return map;
   }, [scheduleDays]);
@@ -292,6 +362,13 @@ export default function SchedulePreviewPage() {
     setEditState(new Map(state));
     setInitialState(new Map(state));
   }, [schedule, roleOrder, allDates, rehearsalSet]);
+
+  // Helper: display label for a date (recurring event label when linked, else stored label, else default)
+  const getDateDisplayLabel = (date: string): string => {
+    const d = scheduleDateMap.get(date);
+    if (!d) return "";
+    return d.recurringEventLabel ?? d.label ?? (d.type === "for_everyone" ? "Ensayo" : "Evento");
+  };
 
   // Check if there are unsaved changes
   const isDirty = useMemo(() => {
@@ -359,6 +436,7 @@ export default function SchedulePreviewPage() {
         action: "add_date",
         date: extraDateValue,
         type: extraDateType,
+        label: extraDateType === "for_everyone" ? extraDateLabel : undefined,
       }),
     });
     if (res.ok) {
@@ -371,18 +449,8 @@ export default function SchedulePreviewPage() {
     }
   };
 
-  const handleRemoveExtraDate = async (date: string) => {
-    if (!confirm("¿Eliminar esta fecha adicional y sus asignaciones?")) return;
-    const res = await fetch(`/api/schedules/${params.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "remove_extra_date", date }),
-    });
-    if (res.ok) fetchData();
-  };
-
   const handleRemoveDate = async (date: string) => {
-    if (!confirm("¿Eliminar esta fecha y todas sus asignaciones? Puedes restaurarla con una reconstrucción.")) return;
+    if (!confirm("¿Eliminar esta fecha y todas sus asignaciones?")) return;
     const res = await fetch(`/api/schedules/${params.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -443,9 +511,36 @@ export default function SchedulePreviewPage() {
     return allDates.filter((d) => d >= todayISO);
   }, [allDates, showPastDates, todayISO]);
 
+  // Group visible dates by week of month (Semana 1 = days 1-7, Semana 2 = 8-14, etc.)
+  const visibleDatesByWeek = useMemo(() => {
+    const weekMap = new Map<number, string[]>();
+    for (const date of visibleDates) {
+      const dayOfMonth = parseInt(date.slice(8, 10), 10);
+      const weekNum = Math.ceil(dayOfMonth / 7);
+      if (!weekMap.has(weekNum)) weekMap.set(weekNum, []);
+      weekMap.get(weekNum)!.push(date);
+    }
+    return [...weekMap.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([weekNumber, dates]) => ({ weekNumber, dates }));
+  }, [visibleDates]);
+
+  // Default: all weeks collapsed except the one containing today (once per schedule load)
+  useEffect(() => {
+    if (!schedule?.id || visibleDatesByWeek.length === 0) return;
+    if (initialCollapseAppliedForRef.current === schedule.id) return;
+    initialCollapseAppliedForRef.current = schedule.id;
+    const weekWithToday = visibleDatesByWeek.find((w) => w.dates.includes(todayISO))?.weekNumber;
+    const allWeekNumbers = visibleDatesByWeek.map((w) => w.weekNumber);
+    const toCollapse = weekWithToday != null
+      ? allWeekNumbers.filter((n) => n !== weekWithToday)
+      : allWeekNumbers;
+    setCollapsedWeeks(new Set(toCollapse));
+  }, [schedule?.id, visibleDatesByWeek, todayISO]);
+
   const startEditNote = (date: string) => {
-    const existing = schedule?.notes.find((n) => n.date === date);
-    setNoteText(existing?.description ?? "");
+    const existing = schedule?.scheduleDates.find((sd) => sd.date === date);
+    setNoteText(existing?.note ?? "");
     setEditingNote(date);
   };
 
@@ -472,12 +567,11 @@ export default function SchedulePreviewPage() {
 
   // Helper: check if a member is available on a given date
   const isMemberAvailable = (member: Member, date: string): boolean => {
-    // If the member has no availability configured at all, consider them available everywhere
     if (member.availableDayIds.length === 0) return true;
     const dayName = getDayOfWeek(date);
-    const scheduleDayId = dayOfWeekToId.get(dayName);
-    if (scheduleDayId == null) return true; // day not configured, allow
-    return member.availableDayIds.includes(scheduleDayId);
+    const weekdayId = dayOfWeekToWeekdayId.get(dayName);
+    if (weekdayId == null) return true;
+    return member.availableDayIds.includes(weekdayId);
   };
 
   // Helper: get eligible members for a role slot
@@ -506,10 +600,9 @@ export default function SchedulePreviewPage() {
           m.roleIds.includes(role.id)
       );
     }
-    // For extra dates, skip availability check — admin explicitly added the date
-    const isExtra = extraDateSet.has(date);
+    // For dates in the schedule, skip availability check when explicitly added (all dates are in schedule_date)
     return members.filter(
-      (m) => m.roleIds.includes(role.id) && (isExtra || isMemberAvailable(m, date))
+      (m) => m.roleIds.includes(role.id) && isMemberAvailable(m, date)
     );
   };
 
@@ -671,27 +764,39 @@ export default function SchedulePreviewPage() {
               <label className="block text-xs text-muted-foreground mb-1">Tipo</label>
               <div className="flex gap-1">
                 <button
-                  onClick={() => setExtraDateType("regular")}
+                  onClick={() => setExtraDateType("assignable")}
                   className={`rounded-md px-3 py-2 text-sm border transition-colors ${
-                    extraDateType === "regular"
+                    extraDateType === "assignable"
                       ? "border-foreground text-foreground"
                       : "border-border text-muted-foreground"
                   }`}
                 >
-                  Asignación
+                  Asignación por roles
                 </button>
                 <button
-                  onClick={() => setExtraDateType("rehearsal")}
+                  onClick={() => setExtraDateType("for_everyone")}
                   className={`rounded-md px-3 py-2 text-sm border transition-colors ${
-                    extraDateType === "rehearsal"
+                    extraDateType === "for_everyone"
                       ? "border-foreground text-foreground"
                       : "border-border text-muted-foreground"
                   }`}
                 >
-                  Ensayo
+                  Para todos
                 </button>
               </div>
             </div>
+            {extraDateType === "for_everyone" && (
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1">Etiqueta</label>
+                <input
+                  type="text"
+                  value={extraDateLabel}
+                  onChange={(e) => setExtraDateLabel(e.target.value)}
+                  placeholder="Ej. Ensayo, Picnic"
+                  className="rounded-md border border-border bg-transparent px-3 py-2 text-sm w-40"
+                />
+              </div>
+            )}
             <button
               onClick={handleAddExtraDate}
               disabled={!extraDateValue}
@@ -719,8 +824,37 @@ export default function SchedulePreviewPage() {
       )}
 
       {/* Mobile card view */}
-      <div className="md:hidden space-y-4">
-        {visibleDates.map((date) => {
+      <div className="md:hidden space-y-8">
+        {visibleDatesByWeek.map(({ weekNumber, dates }) => {
+          const isCollapsed = collapsedWeeks.has(weekNumber);
+          return (
+          <section
+            key={weekNumber}
+            className="border border-border rounded-lg bg-muted/10 overflow-hidden"
+          >
+            <button
+              type="button"
+              onClick={() => toggleWeek(weekNumber)}
+              className="w-full px-4 py-2.5 border-b border-border bg-muted/20 flex items-center justify-between gap-2 text-left hover:bg-muted/30 transition-colors"
+              aria-expanded={!isCollapsed}
+            >
+              <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                Semana {weekNumber}
+                <span className="normal-case font-normal tracking-normal text-muted-foreground/90">
+                  {" · "}
+                  {formatDateRange(
+                    getWeekDateRange(schedule.year, schedule.month, weekNumber).start,
+                    getWeekDateRange(schedule.year, schedule.month, weekNumber).end
+                  )}
+                </span>
+              </h2>
+              <span className="text-muted-foreground shrink-0" aria-hidden>
+                {isCollapsed ? "▶" : "▼"}
+              </span>
+            </button>
+            {!isCollapsed && (
+            <div className="p-4 space-y-4">
+        {dates.map((date) => {
           const isRehearsal = rehearsalSet.has(date);
           const note = noteMap.get(date);
 
@@ -731,85 +865,76 @@ export default function SchedulePreviewPage() {
             >
               {/* Date header */}
               <div className="px-4 py-3 border-b border-border">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">{formatDate(date)}</span>
-                    {extraDateSet.has(date) && (
-                      <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">Extra</span>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-medium text-sm">{formatDateWeekdayDay(date)}</span>
+                    {!isRehearsal && getDateDisplayLabel(date) && (
+                      <span className="text-xs text-muted-foreground italic">
+                        {getDateDisplayLabel(date)}
+                      </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    {isRehearsal && (
-                      <span className="text-xs text-muted-foreground italic">Ensayo</span>
-                    )}
-                    {extraDateSet.has(date) ? (
-                      <button
-                        onClick={() => handleRemoveExtraDate(date)}
-                        className="text-xs text-destructive hover:opacity-80"
-                        title="Eliminar fecha extra"
-                      >
-                        ✕
-                      </button>
+                  <div className="flex items-center gap-3">
+                    {editingNote === date ? (
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="text"
+                          value={noteText}
+                          onChange={(e) => setNoteText(e.target.value)}
+                          className="w-32 rounded-md border border-border bg-transparent px-3 py-1.5 text-xs"
+                          placeholder="Agregar nota..."
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveNote(date);
+                            if (e.key === "Escape") setEditingNote(null);
+                          }}
+                        />
+                        <button
+                          onClick={() => saveNote(date)}
+                          className="text-xs text-accent px-2 py-1.5 hover:opacity-80 transition-opacity"
+                        >
+                          Guardar
+                        </button>
+                      </div>
                     ) : (
-                      <button
-                        onClick={() => handleRemoveDate(date)}
-                        className="text-xs text-destructive hover:opacity-80"
-                        title="Eliminar fecha"
-                      >
-                        ✕
-                      </button>
+                      <>
+                        {note ? (
+                          <span
+                            className="text-xs text-accent cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => startEditNote(date)}
+                          >
+                            {note}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => startEditNote(date)}
+                            className="text-xs text-muted-foreground hover:text-accent transition-colors"
+                          >
+                            + nota
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleRemoveDate(date)}
+                          className="text-xs text-destructive hover:opacity-80"
+                          title="Eliminar fecha"
+                        >
+                          Eliminar
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
-                {/* Note editing */}
-                {editingNote === date ? (
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      type="text"
-                      value={noteText}
-                      onChange={(e) => setNoteText(e.target.value)}
-                      className="flex-1 rounded-md border border-border bg-transparent px-3 py-1.5 text-xs"
-                      placeholder="Agregar nota..."
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") saveNote(date);
-                        if (e.key === "Escape") setEditingNote(null);
-                      }}
-                    />
-                    <button
-                      onClick={() => saveNote(date)}
-                      className="text-xs text-accent px-2 py-1.5 hover:opacity-80 transition-opacity"
-                    >
-                      Guardar
-                    </button>
-                  </div>
-                ) : (
-                  <div className="mt-1">
-                    {note ? (
-                      <span
-                        className="text-xs text-accent cursor-pointer hover:opacity-80 transition-opacity"
-                        onClick={() => startEditNote(date)}
-                      >
-                        {note}
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => startEditNote(date)}
-                        className="text-xs text-muted-foreground hover:text-accent transition-colors"
-                      >
-                        + nota
-                      </button>
-                    )}
-                  </div>
-                )}
               </div>
 
-              {/* Role entries */}
-              {isRehearsal ? (
-                <div className="px-4 py-3 text-sm text-muted-foreground italic text-center">
-                  Ensayo
+              {/* For-everyone event: label centered across the card */}
+              {isRehearsal && (
+                <div className="px-4 py-3 text-sm text-muted-foreground italic text-center border-b border-border">
+                  {getDateDisplayLabel(date) || "Ensayo"}
                 </div>
-              ) : (
+              )}
+
+              {/* Role entries (assignable dates only) */}
+              {!isRehearsal && (
                 <div className="divide-y divide-border/50">
                   {roleOrder.map((role) => {
                     const existingEntries = schedule.entries.filter(
@@ -834,11 +959,42 @@ export default function SchedulePreviewPage() {
               )}
             </div>
           );
+            })}
+            </div>
+            )}
+          </section>
+          );
         })}
       </div>
 
-      {/* Desktop table view */}
-      <div className="hidden md:block overflow-x-auto">
+      {/* Desktop table view: one table per week */}
+      <div className="hidden md:block space-y-8">
+        {visibleDatesByWeek.map(({ weekNumber, dates }) => {
+          const isCollapsed = collapsedWeeks.has(weekNumber);
+          return (
+          <section key={weekNumber} className="border border-border rounded-lg overflow-hidden bg-muted/5">
+            <button
+              type="button"
+              onClick={() => toggleWeek(weekNumber)}
+              className="w-full px-4 py-2.5 border-b border-border bg-muted/20 flex items-center justify-between gap-2 text-left hover:bg-muted/30 transition-colors"
+              aria-expanded={!isCollapsed}
+            >
+              <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                Semana {weekNumber}
+                <span className="normal-case font-normal tracking-normal text-muted-foreground/90">
+                  {" · "}
+                  {formatDateRange(
+                    getWeekDateRange(schedule.year, schedule.month, weekNumber).start,
+                    getWeekDateRange(schedule.year, schedule.month, weekNumber).end
+                  )}
+                </span>
+              </h2>
+              <span className="text-muted-foreground shrink-0" aria-hidden>
+                {isCollapsed ? "▶" : "▼"}
+              </span>
+            </button>
+            {!isCollapsed && (
+            <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
             <tr className="border-b border-border">
@@ -853,10 +1009,13 @@ export default function SchedulePreviewPage() {
                   {role.name}
                 </th>
               ))}
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                Acciones
+              </th>
             </tr>
           </thead>
           <tbody>
-            {visibleDates.map((date) => {
+            {dates.map((date) => {
               const isRehearsal = rehearsalSet.has(date);
               const note = noteMap.get(date);
 
@@ -866,32 +1025,12 @@ export default function SchedulePreviewPage() {
                   className={`border-b border-border ${isRehearsal ? "bg-muted/20" : "hover:bg-muted/30"} transition-colors`}
                 >
                   <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      {formatDate(date)}
-                      {isRehearsal && (
-                        <span className="text-xs text-muted-foreground italic">
-                          Ensayo
-                        </span>
-                      )}
-                      {extraDateSet.has(date) ? (
-                        <>
-                          <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">Extra</span>
-                          <button
-                            onClick={() => handleRemoveExtraDate(date)}
-                            className="text-xs text-destructive hover:opacity-80"
-                            title="Eliminar fecha extra"
-                          >
-                            ✕
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          onClick={() => handleRemoveDate(date)}
-                          className="text-xs text-destructive hover:opacity-80"
-                          title="Eliminar fecha"
-                        >
-                          ✕
-                        </button>
+                    <div>
+                      <div>{formatDateWeekdayDay(date)}</div>
+                      {!isRehearsal && getDateDisplayLabel(date) && (
+                        <div className="text-xs text-muted-foreground italic mt-0.5">
+                          {getDateDisplayLabel(date)}
+                        </div>
                       )}
                     </div>
                     {editingNote === date ? (
@@ -940,7 +1079,7 @@ export default function SchedulePreviewPage() {
                       colSpan={roleOrder.length}
                       className="px-4 py-3 text-sm text-muted-foreground italic text-center"
                     >
-                      Ensayo
+                      {getDateDisplayLabel(date) || "Ensayo"}
                     </td>
                   ) : (
                     roleOrder.map((role) => {
@@ -960,11 +1099,25 @@ export default function SchedulePreviewPage() {
                       );
                     })
                   )}
+                  <td className="px-4 py-3 text-sm">
+                    <button
+                      onClick={() => handleRemoveDate(date)}
+                      className="text-xs text-destructive hover:opacity-80"
+                      title="Eliminar fecha"
+                    >
+                      Eliminar
+                    </button>
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+            </div>
+            )}
+          </section>
+          );
+        })}
       </div>
 
       {/* Audit log */}
