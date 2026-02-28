@@ -1,6 +1,14 @@
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import {
+  formatDateLong,
+  formatDateShort,
+  formatDateWeekdayDay,
+  formatDayMonth,
+  formatDateRange,
+  getWeekdayName,
+} from "@/lib/timezone-utils";
 
 export interface ScheduleEntry {
   id: number;
@@ -87,55 +95,6 @@ const MONTH_NAMES = [
   "Diciembre",
 ];
 
-function formatDateLong(dateStr: string): string {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.toLocaleDateString("es-ES", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-}
-
-function formatDateShort(dateStr: string): string {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.toLocaleDateString("es-ES", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-}
-
-/** Format date as "Domingo, 1" (weekday long + day of month). */
-function formatDateWeekdayDay(dateStr: string): string {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  const weekday = date.toLocaleDateString("es-ES", {
-    weekday: "long",
-    timeZone: "UTC",
-  });
-  const dayNum = date.getUTCDate();
-  return `${weekday.charAt(0).toUpperCase() + weekday.slice(1)}, ${dayNum}`;
-}
-
-/** Format "d mes" for date range. */
-function formatDayMonth(dateStr: string): string {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.toLocaleDateString("es-ES", {
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  });
-}
-
-function formatDateRange(startDateStr: string, endDateStr: string): string {
-  return `${formatDayMonth(startDateStr)} – ${formatDayMonth(endDateStr)}`;
-}
-
 /** Group dates by week of month (Semana 1 = days 1-7, etc.). */
 function groupDatesByWeek(dates: string[]): { weekNumber: number; dates: string[] }[] {
   const weekMap = new Map<number, string[]>();
@@ -168,33 +127,25 @@ function getWeekDateRange(year: number, month: number, weekNumber: number): { st
  */
 function getMondayOfWeek(dateStr: string): string {
   const [year, month, day] = dateStr.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  const dow = date.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  const date = new Date(year, month - 1, day);
+  const dow = date.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
   const diff = dow === 0 ? 6 : dow - 1; // days since Monday
-  date.setUTCDate(date.getUTCDate() - diff);
-  return date.toISOString().slice(0, 10);
-}
-
-/**
- * Get the Spanish weekday name (lowercase) for a date string.
- */
-function getWeekdayName(dateStr: string): string {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.toLocaleDateString("es-ES", {
-    weekday: "long",
-    timeZone: "UTC",
-  });
+  date.setDate(date.getDate() - diff);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 /**
  * Get a friendly relative label in Spanish for the distance between today and a target date.
+ * Uses user's local date for today and target.
  */
 function getRelativeLabel(targetStr: string, todayStr: string): string {
   const [ty, tm, td] = todayStr.split("-").map(Number);
   const [dy, dm, dd] = targetStr.split("-").map(Number);
-  const todayDate = new Date(Date.UTC(ty, tm - 1, td));
-  const targetDate = new Date(Date.UTC(dy, dm - 1, dd));
+  const todayDate = new Date(ty, tm - 1, td);
+  const targetDate = new Date(dy, dm - 1, dd);
   const diffMs = targetDate.getTime() - todayDate.getTime();
   const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
@@ -208,7 +159,7 @@ function getRelativeLabel(targetStr: string, todayStr: string): string {
 }
 
 /**
- * Get today's date as YYYY-MM-DD in local timezone.
+ * Get today's date as YYYY-MM-DD in user's local timezone.
  */
 function getTodayISO(): string {
   const now = new Date();
@@ -1162,7 +1113,7 @@ export default function SharedScheduleView({
                                       .filter(Boolean)
                                       .join(" ")}
                                   >
-                                    <td className="px-4 py-4 text-sm font-medium whitespace-nowrap">
+                                    <td className="px-4 py-4 text-sm font-medium whitespace-nowrap align-middle">
                                       <div>{formatDateWeekdayDay(date)}</div>
                                       {!isRehearsal && getDateDisplayLabel(date) && (
                                         <div className="text-xs text-muted-foreground italic font-normal mt-0.5">
@@ -1200,7 +1151,7 @@ export default function SharedScheduleView({
                                         return (
                                           <td
                                             key={role.id}
-                                            className="px-4 py-4 text-sm align-top"
+                                            className="px-4 py-4 text-sm align-middle"
                                           >
                                             {roleEntries.length === 0 ? (
                                               <span className="text-muted-foreground/40">
@@ -1214,16 +1165,19 @@ export default function SharedScheduleView({
                                                 )}
                                               </span>
                                             ) : (
-                                              <ul className="list-disc list-inside text-xs font-medium space-y-0.5 min-w-0">
-                                                {roleEntries.map((e) => (
-                                                  <li key={e.id} className="inline-flex items-center gap-0.5">
-                                                    {e.memberName}
-                                                    {hasConflict(date, e.memberId) && (
-                                                      <span className="text-amber-500 shrink-0" title="Conflicto con vacaciones">⚠</span>
-                                                    )}
-                                                  </li>
-                                                ))}
-                                              </ul>
+                                              <span className="text-xs font-medium">
+                                                {[...roleEntries]
+                                                  .sort((a, b) => a.memberName.localeCompare(b.memberName, "es"))
+                                                  .map((e, i) => (
+                                                    <span key={e.id} className="inline-flex items-center gap-0.5">
+                                                      {i > 0 && <span className="text-muted-foreground">, </span>}
+                                                      {e.memberName}
+                                                      {hasConflict(date, e.memberId) && (
+                                                        <span className="text-amber-500 shrink-0" title="Conflicto con vacaciones">⚠</span>
+                                                      )}
+                                                    </span>
+                                                  ))}
+                                              </span>
                                             )}
                                           </td>
                                         );
@@ -1334,12 +1288,12 @@ export default function SharedScheduleView({
                                       )}
                                     </span>
                                   ) : (
-                                    <span className="flex flex-wrap items-center gap-x-1 gap-y-0.5">
+                                    <span className="text-sm">
                                       {[...members]
                                         .sort((a, b) => a.name.localeCompare(b.name, "es"))
                                         .map((m, i) => (
                                           <span key={i} className="inline-flex items-center gap-0.5">
-                                            {i > 0 && <span className="text-muted-foreground">, </span>}
+                                            {i > 0 && ", "}
                                             {m.name}
                                             {m.hasConflict && (
                                               <span className="text-amber-500 shrink-0" title="Conflicto con vacaciones">⚠</span>
