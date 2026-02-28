@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { dayRolePriorities, scheduleDays, roles } from "@/db/schema";
+import { eventRolePriorities, recurringEvents, weekdays, roles } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { extractGroupId } from "@/lib/api-helpers";
 
@@ -8,28 +8,37 @@ export async function GET(request: NextRequest) {
   const groupId = extractGroupId(request);
   if (groupId instanceof NextResponse) return groupId;
 
-  const allDays = await db
-    .select()
-    .from(scheduleDays)
-    .where(eq(scheduleDays.groupId, groupId));
+  const allRecurring = await db
+    .select({
+      id: recurringEvents.id,
+      weekdayId: recurringEvents.weekdayId,
+      dayOfWeek: weekdays.name,
+      active: recurringEvents.active,
+      type: recurringEvents.type,
+      label: recurringEvents.label,
+      groupId: recurringEvents.groupId,
+    })
+    .from(recurringEvents)
+    .innerJoin(weekdays, eq(recurringEvents.weekdayId, weekdays.id))
+    .where(eq(recurringEvents.groupId, groupId));
+  const assignableDays = allRecurring.filter((d) => d.type === "assignable");
+
   const allRoles = await db
     .select()
     .from(roles)
     .where(eq(roles.groupId, groupId));
 
-  const allPriorities = await db.select().from(dayRolePriorities);
+  const allPriorities = await db.select().from(eventRolePriorities);
 
-  // Filter priorities to only those belonging to this group's days and roles
-  const dayIds = new Set(allDays.map((d) => d.id));
+  const assignableIds = new Set(assignableDays.map((d) => d.id));
   const roleIds = new Set(allRoles.map((r) => r.id));
   const filtered = allPriorities.filter(
-    (p) => dayIds.has(p.scheduleDayId) && roleIds.has(p.roleId)
+    (p) => assignableIds.has(p.recurringEventId) && roleIds.has(p.roleId)
   );
 
-  // Enrich with names
   const enriched = filtered.map((p) => ({
     ...p,
-    dayOfWeek: allDays.find((d) => d.id === p.scheduleDayId)?.dayOfWeek ?? "Unknown",
+    dayOfWeek: assignableDays.find((d) => d.id === p.recurringEventId)?.dayOfWeek ?? "Unknown",
     roleName: allRoles.find((r) => r.id === p.roleId)?.name ?? "Unknown",
   }));
 
@@ -38,90 +47,85 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { scheduleDayId, roleId, priority } = body;
+  const { recurringEventId, roleId, priority } = body;
 
-  if (!scheduleDayId || !roleId || priority === undefined) {
+  if (!recurringEventId || !roleId || priority === undefined) {
     return NextResponse.json(
-      { error: "scheduleDayId, roleId, and priority are required" },
+      { error: "recurringEventId, roleId, and priority are required" },
       { status: 400 }
     );
   }
 
-  // Check if priority already exists for this day+role combo
   const existing = (await db
     .select()
-    .from(dayRolePriorities)
+    .from(eventRolePriorities)
     .where(
       and(
-        eq(dayRolePriorities.scheduleDayId, scheduleDayId),
-        eq(dayRolePriorities.roleId, roleId)
+        eq(eventRolePriorities.recurringEventId, recurringEventId),
+        eq(eventRolePriorities.roleId, roleId)
       )
     ))[0];
 
   if (existing) {
-    // Update
-    await db.update(dayRolePriorities)
+    await db.update(eventRolePriorities)
       .set({ priority })
-      .where(eq(dayRolePriorities.id, existing.id));
+      .where(eq(eventRolePriorities.id, existing.id));
 
     return NextResponse.json({ ...existing, priority });
   }
 
-  // Create
   const created = (await db
-    .insert(dayRolePriorities)
-    .values({ scheduleDayId, roleId, priority })
+    .insert(eventRolePriorities)
+    .values({ recurringEventId, roleId, priority })
     .returning())[0];
 
   return NextResponse.json(created, { status: 201 });
 }
 
 /**
- * PUT: Bulk update priorities for a specific day.
- * Body: { scheduleDayId, priorities: [{ roleId, priority }] }
+ * PUT: Bulk update priorities for a specific recurring event.
+ * Body: { recurringEventId, priorities: [{ roleId, priority }] }
  */
 export async function PUT(request: NextRequest) {
   const body = await request.json();
-  const { scheduleDayId, priorities } = body;
+  const { recurringEventId, priorities } = body;
 
-  if (!scheduleDayId || !Array.isArray(priorities)) {
+  if (!recurringEventId || !Array.isArray(priorities)) {
     return NextResponse.json(
-      { error: "scheduleDayId and priorities array are required" },
+      { error: "recurringEventId and priorities array are required" },
       { status: 400 }
     );
   }
 
-  // Delete all existing priorities for this day
-  await db.delete(dayRolePriorities)
-    .where(eq(dayRolePriorities.scheduleDayId, scheduleDayId));
+  await db.delete(eventRolePriorities)
+    .where(eq(eventRolePriorities.recurringEventId, recurringEventId));
 
-  // Insert new priorities
   for (const { roleId, priority } of priorities) {
-    await db.insert(dayRolePriorities)
-      .values({ scheduleDayId, roleId, priority });
+    await db.insert(eventRolePriorities)
+      .values({ recurringEventId, roleId, priority });
   }
 
   const updated = await db
     .select()
-    .from(dayRolePriorities)
-    .where(eq(dayRolePriorities.scheduleDayId, scheduleDayId));
+    .from(eventRolePriorities)
+    .where(eq(eventRolePriorities.recurringEventId, recurringEventId));
 
   return NextResponse.json(updated);
 }
 
 export async function DELETE(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const scheduleDayId = searchParams.get("scheduleDayId");
+  const recurringEventId = searchParams.get("recurringEventId");
 
-  if (!scheduleDayId) {
+  if (!recurringEventId) {
     return NextResponse.json(
-      { error: "scheduleDayId query param is required" },
+      { error: "recurringEventId query param is required" },
       { status: 400 }
     );
   }
 
-  await db.delete(dayRolePriorities)
-    .where(eq(dayRolePriorities.scheduleDayId, parseInt(scheduleDayId, 10)));
+  await db.delete(eventRolePriorities)
+    .where(eq(eventRolePriorities.recurringEventId, parseInt(recurringEventId, 10)));
 
   return NextResponse.json({ success: true });
 }
