@@ -553,35 +553,35 @@ export default function EventForm({
             </select>
           </div>
 
-          {type === "assignable" && (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  Hora inicio
-                </label>
-                <input
-                  type="time"
-                  value={startTimeUtc}
-                  onChange={(e) => setStartTimeUtc(e.target.value)}
-                  className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm focus:outline-none focus:border-foreground"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Solo se asignan personas disponibles en este horario (tu zona horaria local).
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  Hora fin
-                </label>
-                <input
-                  type="time"
-                  value={endTimeUtc}
-                  onChange={(e) => setEndTimeUtc(e.target.value)}
-                  className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm focus:outline-none focus:border-foreground"
-                />
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Hora inicio
+              </label>
+              <input
+                type="time"
+                value={startTimeUtc}
+                onChange={(e) => setStartTimeUtc(e.target.value)}
+                className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm focus:outline-none focus:border-foreground"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                {type === "assignable"
+                  ? "Solo se asignan personas disponibles en este horario (tu zona horaria local)."
+                  : "Horario mostrado en el cronograma (tu zona horaria local)."}
+              </p>
             </div>
-          )}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Hora fin
+              </label>
+              <input
+                type="time"
+                value={endTimeUtc}
+                onChange={(e) => setEndTimeUtc(e.target.value)}
+                className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm focus:outline-none focus:border-foreground"
+              />
+            </div>
+          </div>
 
           {type === "assignable" && roles.length > 0 && (
             <div className="border-t border-border pt-6">
