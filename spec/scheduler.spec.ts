@@ -15,8 +15,11 @@ function makeMember(
   roleIds: number[],
   availableDays: string[] = ["Miércoles", "Viernes", "Domingo"],
   holidays: MemberInfo["holidays"] = [],
+  availabilityBlocksByDay?: MemberInfo["availabilityBlocksByDay"],
 ): MemberInfo {
-  return { id, name, roleIds, availableDays, holidays };
+  const m: MemberInfo = { id, name, roleIds, availableDays, holidays };
+  if (availabilityBlocksByDay) m.availabilityBlocksByDay = availabilityBlocksByDay;
+  return m;
 }
 
 const LEADER = makeRole(1, "Leader");
@@ -590,6 +593,386 @@ describe("Schedule generation", () => {
       expect(result.unfilledSlots[0]).toEqual(
         expect.objectContaining({ roleId: 2 }),
       );
+    });
+  });
+
+  describe("when events have a time window", () => {
+    it("assigns a member whose availability block overlaps the event window", () => {
+      const roles = [makeRole(1, "Leader")];
+      const members = [
+        makeMember(
+          1,
+          "Alice",
+          [1],
+          ["Miércoles"],
+          [],
+          { Miércoles: [{ startUtc: "09:00", endUtc: "12:00" }] },
+        ),
+      ];
+
+      const result = generateSchedule({
+        dates: ["2026-03-04"], // Wednesday
+        roles,
+        members,
+        dayEventTimeWindow: {
+          Miércoles: { startUtc: "09:00", endUtc: "12:00" },
+        },
+      });
+
+      expect(result.assignments).toEqual([
+        { date: "2026-03-04", roleId: 1, memberId: 1 },
+      ]);
+      expect(result.unfilledSlots).toEqual([]);
+    });
+
+    it("assigns a member when their block partially overlaps the event window", () => {
+      const roles = [makeRole(1, "Leader")];
+      const members = [
+        makeMember(
+          1,
+          "Alice",
+          [1],
+          ["Miércoles"],
+          [],
+          { Miércoles: [{ startUtc: "08:00", endUtc: "10:00" }] },
+        ),
+      ];
+
+      const result = generateSchedule({
+        dates: ["2026-03-04"],
+        roles,
+        members,
+        dayEventTimeWindow: {
+          Miércoles: { startUtc: "09:00", endUtc: "12:00" },
+        },
+      });
+
+      expect(result.assignments).toHaveLength(1);
+      expect(result.assignments[0].memberId).toBe(1);
+    });
+
+    it("does not assign a member when their availability does not overlap the event window", () => {
+      const roles = [makeRole(1, "Leader")];
+      const members = [
+        makeMember(
+          1,
+          "Alice",
+          [1],
+          ["Miércoles"],
+          [],
+          { Miércoles: [{ startUtc: "14:00", endUtc: "18:00" }] },
+        ),
+        makeMember(
+          2,
+          "Bob",
+          [1],
+          ["Miércoles"],
+          [],
+          { Miércoles: [{ startUtc: "09:00", endUtc: "12:00" }] },
+        ),
+      ];
+
+      const result = generateSchedule({
+        dates: ["2026-03-04"],
+        roles,
+        members,
+        dayEventTimeWindow: {
+          Miércoles: { startUtc: "09:00", endUtc: "12:00" },
+        },
+      });
+
+      expect(result.assignments).toEqual([
+        { date: "2026-03-04", roleId: 1, memberId: 2 },
+      ]);
+    });
+
+    it("does not assign a member who has no availability blocks on that day", () => {
+      const roles = [makeRole(1, "Leader")];
+      const members = [
+        makeMember(1, "Alice", [1], ["Miércoles"], [], {
+          Miércoles: [], // available on day but no time blocks
+        }),
+      ];
+
+      const result = generateSchedule({
+        dates: ["2026-03-04"],
+        roles,
+        members,
+        dayEventTimeWindow: {
+          Miércoles: { startUtc: "09:00", endUtc: "12:00" },
+        },
+      });
+
+      expect(result.assignments).toEqual([]);
+      expect(result.unfilledSlots).toEqual([{ date: "2026-03-04", roleId: 1 }]);
+    });
+
+    it("assigns a member when any of their multiple blocks overlaps the event window", () => {
+      const roles = [makeRole(1, "Leader")];
+      const members = [
+        makeMember(
+          1,
+          "Alice",
+          [1],
+          ["Miércoles"],
+          [],
+          {
+            Miércoles: [
+              { startUtc: "08:00", endUtc: "09:00" },
+              { startUtc: "11:00", endUtc: "13:00" },
+            ],
+          },
+        ),
+      ];
+
+      const result = generateSchedule({
+        dates: ["2026-03-04"],
+        roles,
+        members,
+        dayEventTimeWindow: {
+          Miércoles: { startUtc: "09:00", endUtc: "12:00" },
+        },
+      });
+
+      expect(result.assignments).toHaveLength(1);
+      expect(result.assignments[0].memberId).toBe(1);
+    });
+
+    it("ignores event time window for days not in dayEventTimeWindow", () => {
+      const roles = [makeRole(1, "Leader")];
+      const members = [
+        makeMember(
+          1,
+          "Alice",
+          [1],
+          ["Miércoles", "Viernes"],
+          [],
+          {
+            Miércoles: [{ startUtc: "09:00", endUtc: "12:00" }],
+            // Viernes not in availabilityBlocksByDay would fail if we required blocks for all days;
+            // but dayEventTimeWindow has only Miércoles, so Friday has no time filter.
+          },
+        ),
+      ];
+
+      const result = generateSchedule({
+        dates: ["2026-03-04", "2026-03-06"], // Wednesday, Friday
+        roles,
+        members,
+        dayEventTimeWindow: {
+          Miércoles: { startUtc: "09:00", endUtc: "12:00" },
+          // Viernes not in map → full day, no time filter
+        },
+      });
+
+      expect(result.assignments).toHaveLength(2);
+      expect(result.assignments.find((a) => a.date === "2026-03-04")?.memberId).toBe(1);
+      expect(result.assignments.find((a) => a.date === "2026-03-06")?.memberId).toBe(1);
+    });
+  });
+
+  describe("event time window edge cases", () => {
+    const wed = "2026-03-04";
+
+    it("does not overlap when block ends exactly when event starts", () => {
+      const roles = [makeRole(1, "Leader")];
+      const members = [
+        makeMember(
+          1,
+          "Alice",
+          [1],
+          ["Miércoles"],
+          [],
+          { Miércoles: [{ startUtc: "06:00", endUtc: "09:00" }] },
+        ),
+      ];
+      const result = generateSchedule({
+        dates: [wed],
+        roles,
+        members,
+        dayEventTimeWindow: { Miércoles: { startUtc: "09:00", endUtc: "12:00" } },
+      });
+      expect(result.assignments).toHaveLength(0);
+      expect(result.unfilledSlots).toEqual([{ date: wed, roleId: 1 }]);
+    });
+
+    it("does not overlap when block starts exactly when event ends", () => {
+      const roles = [makeRole(1, "Leader")];
+      const members = [
+        makeMember(
+          1,
+          "Alice",
+          [1],
+          ["Miércoles"],
+          [],
+          { Miércoles: [{ startUtc: "12:00", endUtc: "15:00" }] },
+        ),
+      ];
+      const result = generateSchedule({
+        dates: [wed],
+        roles,
+        members,
+        dayEventTimeWindow: { Miércoles: { startUtc: "09:00", endUtc: "12:00" } },
+      });
+      expect(result.assignments).toHaveLength(0);
+      expect(result.unfilledSlots).toEqual([{ date: wed, roleId: 1 }]);
+    });
+
+    it("overlaps when block is fully inside event window", () => {
+      const roles = [makeRole(1, "Leader")];
+      const members = [
+        makeMember(
+          1,
+          "Alice",
+          [1],
+          ["Miércoles"],
+          [],
+          { Miércoles: [{ startUtc: "10:00", endUtc: "11:00" }] },
+        ),
+      ];
+      const result = generateSchedule({
+        dates: [wed],
+        roles,
+        members,
+        dayEventTimeWindow: { Miércoles: { startUtc: "09:00", endUtc: "12:00" } },
+      });
+      expect(result.assignments).toEqual([{ date: wed, roleId: 1, memberId: 1 }]);
+    });
+
+    it("overlaps when event window is fully inside block", () => {
+      const roles = [makeRole(1, "Leader")];
+      const members = [
+        makeMember(
+          1,
+          "Alice",
+          [1],
+          ["Miércoles"],
+          [],
+          { Miércoles: [{ startUtc: "08:00", endUtc: "13:00" }] },
+        ),
+      ];
+      const result = generateSchedule({
+        dates: [wed],
+        roles,
+        members,
+        dayEventTimeWindow: { Miércoles: { startUtc: "09:00", endUtc: "12:00" } },
+      });
+      expect(result.assignments).toEqual([{ date: wed, roleId: 1, memberId: 1 }]);
+    });
+
+    it("overlaps when there is only a one-minute overlap", () => {
+      const roles = [makeRole(1, "Leader")];
+      const members = [
+        makeMember(
+          1,
+          "Alice",
+          [1],
+          ["Miércoles"],
+          [],
+          { Miércoles: [{ startUtc: "09:59", endUtc: "11:00" }] },
+        ),
+      ];
+      const result = generateSchedule({
+        dates: [wed],
+        roles,
+        members,
+        dayEventTimeWindow: { Miércoles: { startUtc: "09:00", endUtc: "10:00" } },
+      });
+      expect(result.assignments).toEqual([{ date: wed, roleId: 1, memberId: 1 }]);
+    });
+
+    it("overlaps for midnight-to-early-morning window", () => {
+      const roles = [makeRole(1, "Leader")];
+      const members = [
+        makeMember(
+          1,
+          "Alice",
+          [1],
+          ["Miércoles"],
+          [],
+          { Miércoles: [{ startUtc: "00:00", endUtc: "06:00" }] },
+        ),
+      ];
+      const result = generateSchedule({
+        dates: [wed],
+        roles,
+        members,
+        dayEventTimeWindow: { Miércoles: { startUtc: "00:00", endUtc: "06:00" } },
+      });
+      expect(result.assignments).toEqual([{ date: wed, roleId: 1, memberId: 1 }]);
+    });
+
+    it("does not assign when member has blocks only for a different day", () => {
+      const roles = [makeRole(1, "Leader")];
+      const members = [
+        makeMember(
+          1,
+          "Alice",
+          [1],
+          ["Miércoles", "Viernes"],
+          [],
+          {
+            Viernes: [{ startUtc: "09:00", endUtc: "12:00" }],
+            // No Miércoles key → no blocks on Wednesday
+          },
+        ),
+      ];
+      const result = generateSchedule({
+        dates: [wed],
+        roles,
+        members,
+        dayEventTimeWindow: { Miércoles: { startUtc: "09:00", endUtc: "12:00" } },
+      });
+      expect(result.assignments).toHaveLength(0);
+      expect(result.unfilledSlots).toEqual([{ date: wed, roleId: 1 }]);
+    });
+
+    it("when dayEventTimeWindow is empty, does not require availability blocks", () => {
+      const roles = [makeRole(1, "Leader")];
+      const members = [makeMember(1, "Alice", [1], ["Miércoles"])];
+
+      const result = generateSchedule({
+        dates: [wed],
+        roles,
+        members,
+        dayEventTimeWindow: {},
+      });
+
+      expect(result.assignments).toEqual([{ date: wed, roleId: 1, memberId: 1 }]);
+    });
+
+    it("when dayEventTimeWindow is omitted, does not require availability blocks", () => {
+      const roles = [makeRole(1, "Leader")];
+      const members = [makeMember(1, "Alice", [1], ["Miércoles"])];
+
+      const result = generateSchedule({
+        dates: [wed],
+        roles,
+        members,
+      });
+
+      expect(result.assignments).toEqual([{ date: wed, roleId: 1, memberId: 1 }]);
+    });
+
+    it("late evening block overlapping event window", () => {
+      const roles = [makeRole(1, "Leader")];
+      const members = [
+        makeMember(
+          1,
+          "Alice",
+          [1],
+          ["Miércoles"],
+          [],
+          { Miércoles: [{ startUtc: "20:00", endUtc: "23:59" }] },
+        ),
+      ];
+      const result = generateSchedule({
+        dates: [wed],
+        roles,
+        members,
+        dayEventTimeWindow: { Miércoles: { startUtc: "20:00", endUtc: "22:00" } },
+      });
+      expect(result.assignments).toEqual([{ date: wed, roleId: 1, memberId: 1 }]);
     });
   });
 });

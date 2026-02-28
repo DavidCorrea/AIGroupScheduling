@@ -1,9 +1,18 @@
 import { isConfigFormPageWithUnsavedGuard } from "@/lib/config-nav-guard";
 
 describe("Config nav guard (unsaved changes)", () => {
-  it("returns true for the configuration page so leaving shows a warning when dirty", () => {
-    expect(isConfigFormPageWithUnsavedGuard("/mygroup/config/configuration")).toBe(true);
-    expect(isConfigFormPageWithUnsavedGuard("/slug/config/configuration")).toBe(true);
+  it("returns true for the new event page so leaving shows a warning when dirty", () => {
+    expect(isConfigFormPageWithUnsavedGuard("/mygroup/config/events/new")).toBe(true);
+    expect(isConfigFormPageWithUnsavedGuard("/slug/config/events/new")).toBe(true);
+  });
+
+  it("returns true for the edit event page so leaving shows a warning when dirty", () => {
+    expect(isConfigFormPageWithUnsavedGuard("/mygroup/config/events/1")).toBe(true);
+    expect(isConfigFormPageWithUnsavedGuard("/slug/config/events/42")).toBe(true);
+  });
+
+  it("returns false for the events list page", () => {
+    expect(isConfigFormPageWithUnsavedGuard("/mygroup/config/events")).toBe(false);
   });
 
   it("returns true for the new role page so leaving shows a warning when dirty", () => {
