@@ -93,11 +93,22 @@ export const memberRoles = pgTable("member_roles", {
     .references(() => roles.id, { onDelete: "cascade" }),
 });
 
-export const scheduleDays = pgTable("schedule_days", {
+export const weekdays = pgTable("weekdays", {
   id: serial("id").primaryKey(),
-  dayOfWeek: text("day_of_week").notNull(),
+  name: text("name").notNull().unique(),
+  displayOrder: integer("display_order").notNull().default(0),
+});
+
+export const recurringEvents = pgTable("recurring_events", {
+  id: serial("id").primaryKey(),
+  weekdayId: integer("weekday_id")
+    .notNull()
+    .references(() => weekdays.id, { onDelete: "cascade" }),
   active: boolean("active").notNull().default(true),
-  isRehearsal: boolean("is_rehearsal").notNull().default(false),
+  type: text("type").notNull().default("assignable"), // "assignable" | "for_everyone"
+  label: text("label").notNull().default("Evento"),
+  startTimeUtc: text("start_time_utc").notNull().default("00:00"),
+  endTimeUtc: text("end_time_utc").notNull().default("23:59"),
   groupId: integer("group_id")
     .notNull()
     .references(() => groups.id, { onDelete: "cascade" }),
@@ -108,9 +119,11 @@ export const memberAvailability = pgTable("member_availability", {
   memberId: integer("member_id")
     .notNull()
     .references(() => members.id, { onDelete: "cascade" }),
-  scheduleDayId: integer("schedule_day_id")
+  weekdayId: integer("weekday_id")
     .notNull()
-    .references(() => scheduleDays.id, { onDelete: "cascade" }),
+    .references(() => weekdays.id, { onDelete: "cascade" }),
+  startTimeUtc: text("start_time_utc").notNull().default("00:00"),
+  endTimeUtc: text("end_time_utc").notNull().default("23:59"),
 });
 
 export const holidays = pgTable("holidays", {
@@ -141,44 +154,37 @@ export const schedules = pgTable("schedules", {
   uniqueIndex("schedules_group_month_year_unique").on(table.groupId, table.month, table.year),
 ]);
 
-export const scheduleEntries = pgTable("schedule_entries", {
+export const scheduleDate = pgTable(
+  "schedule_date",
+  {
+    id: serial("id").primaryKey(),
+    scheduleId: integer("schedule_id")
+      .notNull()
+      .references(() => schedules.id, { onDelete: "cascade" }),
+    date: text("date").notNull(),
+    type: text("type").notNull(), // "assignable" | "for_everyone"
+    label: text("label"),
+    note: text("note"),
+    recurringEventId: integer("recurring_event_id").references(() => recurringEvents.id, {
+      onDelete: "set null",
+    }),
+  },
+  (table) => [
+    uniqueIndex("schedule_date_schedule_id_date_unique").on(table.scheduleId, table.date),
+  ]
+);
+
+export const scheduleDateAssignments = pgTable("schedule_date_assignments", {
   id: serial("id").primaryKey(),
-  scheduleId: integer("schedule_id")
+  scheduleDateId: integer("schedule_date_id")
     .notNull()
-    .references(() => schedules.id, { onDelete: "cascade" }),
-  date: text("date").notNull(),
+    .references(() => scheduleDate.id, { onDelete: "cascade" }),
   roleId: integer("role_id")
     .notNull()
     .references(() => roles.id),
   memberId: integer("member_id")
     .notNull()
     .references(() => members.id),
-});
-
-export const scheduleDateNotes = pgTable("schedule_date_notes", {
-  id: serial("id").primaryKey(),
-  scheduleId: integer("schedule_id")
-    .notNull()
-    .references(() => schedules.id, { onDelete: "cascade" }),
-  date: text("date").notNull(),
-  description: text("description").notNull(),
-});
-
-export const scheduleRehearsalDates = pgTable("schedule_rehearsal_dates", {
-  id: serial("id").primaryKey(),
-  scheduleId: integer("schedule_id")
-    .notNull()
-    .references(() => schedules.id, { onDelete: "cascade" }),
-  date: text("date").notNull(),
-});
-
-export const scheduleExtraDates = pgTable("schedule_extra_dates", {
-  id: serial("id").primaryKey(),
-  scheduleId: integer("schedule_id")
-    .notNull()
-    .references(() => schedules.id, { onDelete: "cascade" }),
-  date: text("date").notNull(),
-  type: text("type").notNull(), // "regular" | "rehearsal"
 });
 
 export const scheduleAuditLog = pgTable("schedule_audit_log", {
@@ -195,11 +201,11 @@ export const scheduleAuditLog = pgTable("schedule_audit_log", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
-export const dayRolePriorities = pgTable("day_role_priorities", {
+export const eventRolePriorities = pgTable("event_role_priorities", {
   id: serial("id").primaryKey(),
-  scheduleDayId: integer("schedule_day_id")
+  recurringEventId: integer("recurring_event_id")
     .notNull()
-    .references(() => scheduleDays.id, { onDelete: "cascade" }),
+    .references(() => recurringEvents.id, { onDelete: "cascade" }),
   roleId: integer("role_id")
     .notNull()
     .references(() => roles.id, { onDelete: "cascade" }),
