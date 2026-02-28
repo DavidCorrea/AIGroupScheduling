@@ -25,6 +25,12 @@
 - `npm run db:migrate` — Apply pending migrations
 - `npm run db:studio` — Open Drizzle Studio to inspect the database
 
+### Deployments (Vercel)
+- **Migrations** run during build: `npm run build` runs `drizzle-kit migrate` then `next build`. The app uses `DATABASE_URL` from the environment (no `.env.local` on Vercel), so set **DATABASE_URL** in Vercel → Project → Settings → Environment Variables for Production (and Preview if you want migrations on preview deploys).
+- **If not all migrations ran** (e.g. build failed during migrate, or production DB was restored from an older backup), you have two options:
+  1. **Apply schema manually (recommended):** In Neon SQL editor, run the script `scripts/apply-missing-migrations-0012-0014.sql`. It applies 0012, 0013, 0014 and is idempotent (safe to run more than once). After that, the schema is correct; you do not need to run `db:migrate` for those three.
+  2. **Record 0012–0014 so migrate skips them:** If `npm run db:migrate` never completes or never marks 0012–0014 as applied, run once (after applying the schema with option 1): `DATABASE_URL='<production URL>' node scripts/record-migrations-0012-0014.mjs`. That inserts the three migration hashes into `drizzle.__drizzle_migrations` so future `db:migrate` runs (and Vercel builds) will skip them and apply only 0015+. `DATABASE_URL='<production connection string>' npm run db:migrate`. If the command prints NOTICEs but no success message and the schema still doesn’t change, the DB’s `drizzle.__drizzle_migrations` table likely already lists those migrations (so Drizzle skips them). Use option 1 in that case.
+
 ## User Authentication
 - **Google OAuth** via Auth.js v5 with JWT session strategy
 - **Users table**: Auth.js managed (id, name, email, emailVerified, image) plus `isAdmin` and `canCreateGroups` flags
