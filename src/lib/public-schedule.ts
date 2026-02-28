@@ -1,13 +1,12 @@
 import { db } from "./db";
 import {
   schedules,
-  scheduleEntries,
-  scheduleDateNotes,
-  scheduleRehearsalDates,
-  scheduleExtraDates,
+  scheduleDateAssignments,
+  scheduleDate,
   members,
   roles,
   groups,
+  recurringEvents,
 } from "@/db/schema";
 import { eq, and, or, lt, gt, asc, desc } from "drizzle-orm";
 import { getHolidayConflicts } from "./holiday-conflicts";
@@ -30,12 +29,18 @@ export async function buildPublicScheduleResponse(schedule: {
     .where(eq(groups.id, groupId))
     .then((rows) => rows[0]);
 
-  const entries = await db
-    .select()
-    .from(scheduleEntries)
-    .where(eq(scheduleEntries.scheduleId, id));
+  const entriesWithDate = await db
+    .select({
+      id: scheduleDateAssignments.id,
+      scheduleDateId: scheduleDateAssignments.scheduleDateId,
+      date: scheduleDate.date,
+      roleId: scheduleDateAssignments.roleId,
+      memberId: scheduleDateAssignments.memberId,
+    })
+    .from(scheduleDateAssignments)
+    .innerJoin(scheduleDate, eq(scheduleDateAssignments.scheduleDateId, scheduleDate.id))
+    .where(eq(scheduleDate.scheduleId, id));
 
-  // Get members (use members.name directly)
   const allMembers = await db
     .select({
       id: members.id,
@@ -54,7 +59,7 @@ export async function buildPublicScheduleResponse(schedule: {
     .filter((r) => r.dependsOnRoleId != null)
     .map((r) => r.id);
 
-  const enrichedEntries = entries.map((entry) => ({
+  const enrichedEntries = entriesWithDate.map((entry) => ({
     ...entry,
     memberName:
       allMembers.find((m) => m.id === entry.memberId)?.name ?? "Desconocido",
@@ -63,22 +68,32 @@ export async function buildPublicScheduleResponse(schedule: {
 
   const uniqueMembers = [
     ...new Map(
-      entries.map((e) => {
+      entriesWithDate.map((e) => {
         const member = allMembers.find((m) => m.id === e.memberId);
         return [e.memberId, { id: e.memberId, name: member?.name ?? "Desconocido" }];
       })
     ).values(),
   ].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
 
-  const notes = await db
-    .select()
-    .from(scheduleDateNotes)
-    .where(eq(scheduleDateNotes.scheduleId, id));
+  const scheduleDates = await db
+    .select({
+      date: scheduleDate.date,
+      type: scheduleDate.type,
+      label: scheduleDate.label,
+      note: scheduleDate.note,
+      recurringEventId: scheduleDate.recurringEventId,
+      recurringEventLabel: recurringEvents.label,
+      recurringEventStartTimeUtc: recurringEvents.startTimeUtc,
+      recurringEventEndTimeUtc: recurringEvents.endTimeUtc,
+    })
+    .from(scheduleDate)
+    .leftJoin(recurringEvents, eq(scheduleDate.recurringEventId, recurringEvents.id))
+    .where(eq(scheduleDate.scheduleId, id))
+    .orderBy(asc(scheduleDate.date));
 
-  const rehearsalDates = await db
-    .select()
-    .from(scheduleRehearsalDates)
-    .where(eq(scheduleRehearsalDates.scheduleId, id));
+  const notes = scheduleDates
+    .filter((sd) => sd.note != null && sd.note.trim() !== "")
+    .map((sd) => ({ date: sd.date, description: sd.note! }));
 
   // Find previous and next committed schedules for navigation (same group)
   const prevSchedule =
@@ -115,12 +130,10 @@ export async function buildPublicScheduleResponse(schedule: {
       .orderBy(asc(schedules.year), asc(schedules.month))
       .limit(1))[0] ?? null;
 
-  const holidayConflicts = await getHolidayConflicts(entries, groupId);
-
-  const extraDates = await db
-    .select()
-    .from(scheduleExtraDates)
-    .where(eq(scheduleExtraDates.scheduleId, id));
+  const holidayConflicts = await getHolidayConflicts(
+    entriesWithDate.map((e) => ({ date: e.date, memberId: e.memberId })),
+    groupId
+  );
 
   return {
     groupName: group?.name ?? undefined,
@@ -129,12 +142,20 @@ export async function buildPublicScheduleResponse(schedule: {
     entries: enrichedEntries,
     members: uniqueMembers,
     notes,
-    rehearsalDates: rehearsalDates.map((r) => r.date),
+    scheduleDates: scheduleDates.map((sd) => ({
+      date: sd.date,
+      type: String(sd.type).toLowerCase() === "for_everyone" ? "for_everyone" : "assignable",
+      label: sd.label,
+      note: sd.note,
+      recurringEventId: sd.recurringEventId ?? null,
+      recurringEventLabel: sd.recurringEventLabel ?? null,
+      recurringEventStartTimeUtc: sd.recurringEventStartTimeUtc ?? null,
+      recurringEventEndTimeUtc: sd.recurringEventEndTimeUtc ?? null,
+    })),
     dependentRoleIds,
     roles: allRoles,
     prevSchedule,
     nextSchedule,
     holidayConflicts,
-    extraDates: extraDates.map((d) => ({ date: d.date, type: d.type })),
   };
 }
