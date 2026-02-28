@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { GroupProvider, useGroup } from "@/lib/group-context";
 import { UnsavedConfigProvider, useUnsavedConfig } from "@/lib/unsaved-config-context";
+import { isConfigFormPageWithUnsavedGuard } from "@/lib/config-nav-guard";
 
 function GroupSubNav() {
   const { slug, groupName, loading, error } = useGroup();
@@ -27,9 +28,9 @@ function GroupSubNav() {
     return pathname.startsWith(href);
   };
 
-  const isConfigPage = pathname?.endsWith("/configuration") ?? false;
+  const isFormPageWithGuard = isConfigFormPageWithUnsavedGuard(pathname ?? null);
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string): boolean => {
-    if (isConfigPage && configDirty && href !== pathname) {
+    if (isFormPageWithGuard && configDirty && href !== pathname) {
       e.preventDefault();
       if (window.confirm("Hay cambios sin guardar. ¿Salir de todas formas?")) {
         setMobileOpen(false);

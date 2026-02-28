@@ -1,24 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import {
-  DndContext,
-  type DragEndEvent,
-  PointerSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-  horizontalListSortingStrategy,
-  arrayMove,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { useGroup } from "@/lib/group-context";
-import { buildColumnOrderPayload } from "@/lib/column-order";
 import { useUnsavedConfig } from "@/lib/unsaved-config-context";
 import { OptionToggleGroup } from "@/components/OptionToggleGroup";
 
@@ -107,276 +90,6 @@ function PriorityEditor({
   );
 }
 
-function ColumnOrderEditor({
-  orderedRoles,
-  onOrderChange,
-}: {
-  orderedRoles: Role[];
-  onOrderChange: (roles: Role[]) => void;
-}) {
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(TouchSensor, {
-      activationConstraint: { delay: 250, tolerance: 5 },
-    })
-  );
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = orderedRoles.findIndex((r) => r.id === active.id);
-    const newIndex = orderedRoles.findIndex((r) => r.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
-    onOrderChange(arrayMove(orderedRoles, oldIndex, newIndex));
-  };
-
-  const moveUp = (index: number) => {
-    if (index === 0) return;
-    const newOrder = [...orderedRoles];
-    [newOrder[index - 1], newOrder[index]] = [
-      newOrder[index],
-      newOrder[index - 1],
-    ];
-    onOrderChange(newOrder);
-  };
-
-  const moveDown = (index: number) => {
-    if (index === orderedRoles.length - 1) return;
-    const newOrder = [...orderedRoles];
-    [newOrder[index], newOrder[index + 1]] = [
-      newOrder[index + 1],
-      newOrder[index],
-    ];
-    onOrderChange(newOrder);
-  };
-
-  return (
-    <div className="space-y-2">
-      {/* Desktop: horizontal row */}
-      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        <SortableContext
-          items={orderedRoles.map((r) => r.id)}
-          strategy={horizontalListSortingStrategy}
-        >
-          <div className="hidden md:flex flex-wrap items-center gap-2">
-            {orderedRoles.map((role, index) => (
-              <SortableChip
-                key={role.id}
-                role={role}
-                index={index}
-                total={orderedRoles.length}
-                onMoveLeft={() => moveUp(index)}
-                onMoveRight={() => moveDown(index)}
-              />
-            ))}
-          </div>
-        </SortableContext>
-      </DndContext>
-
-      {/* Mobile: vertical table */}
-      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        <SortableContext
-          items={orderedRoles.map((r) => r.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          <div className="md:hidden overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="px-2 py-3 text-left text-xs font-medium uppercase tracking-widest text-muted-foreground w-10">
-                    <span className="sr-only">Arrastrar</span>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                    Posición
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                    Rol
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {orderedRoles.map((role, index) => (
-                  <SortableRow
-                    key={role.id}
-                    role={role}
-                    index={index}
-                    total={orderedRoles.length}
-                    onMoveUp={() => moveUp(index)}
-                    onMoveDown={() => moveDown(index)}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </SortableContext>
-      </DndContext>
-    </div>
-  );
-}
-
-function SortableChip({
-  role,
-  index,
-  total,
-  onMoveLeft,
-  onMoveRight,
-}: {
-  role: Role;
-  index: number;
-  total: number;
-  onMoveLeft: () => void;
-  onMoveRight: () => void;
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    setActivatorNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: role.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm transition-colors hover:bg-muted/30 shrink-0 ${
-        isDragging ? "opacity-50 bg-muted/50 shadow" : ""
-      }`}
-    >
-      <button
-        ref={setActivatorNodeRef}
-        type="button"
-        className="touch-manipulation p-1 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing rounded focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-        aria-label="Arrastrar para reordenar"
-        {...attributes}
-        {...listeners}
-      >
-        <span className="inline-block text-base" aria-hidden="true">
-          ≡
-        </span>
-      </button>
-      <span className="text-muted-foreground font-medium w-5 text-right tabular-nums">
-        {index + 1}
-      </span>
-      <span className="font-medium min-w-0 truncate max-w-[8rem]">
-        {role.name}
-      </span>
-      <div className="flex items-center gap-0.5">
-        <button
-          type="button"
-          onClick={onMoveLeft}
-          disabled={index === 0}
-          aria-label="Mover a la izquierda"
-          className="p-1.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors rounded focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-        >
-          ←
-        </button>
-        <button
-          type="button"
-          onClick={onMoveRight}
-          disabled={index === total - 1}
-          aria-label="Mover a la derecha"
-          className="p-1.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors rounded focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-        >
-          →
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function SortableRow({
-  role,
-  index,
-  total,
-  onMoveUp,
-  onMoveDown,
-}: {
-  role: Role;
-  index: number;
-  total: number;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    setActivatorNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: role.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
-  return (
-    <tr
-      ref={setNodeRef}
-      style={style}
-      className={`border-b border-border hover:bg-muted/30 transition-colors text-sm ${
-        isDragging ? "opacity-50 bg-muted/50" : ""
-      }`}
-    >
-      <td className="px-2 py-3 w-10">
-        <button
-          ref={setActivatorNodeRef}
-          type="button"
-          className="touch-manipulation p-1.5 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing rounded focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-          aria-label="Arrastrar para reordenar"
-          {...attributes}
-          {...listeners}
-        >
-          <span className="inline-block text-base" aria-hidden="true">
-            ≡
-          </span>
-        </button>
-      </td>
-      <td className="px-4 py-3 text-muted-foreground font-medium">
-        {index + 1}
-      </td>
-      <td className="px-4 py-3 font-medium">
-        {role.name}
-      </td>
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={onMoveUp}
-            disabled={index === 0}
-            aria-label="Subir"
-            className="p-2 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors rounded focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-          >
-            ↑
-          </button>
-          <button
-            type="button"
-            onClick={onMoveDown}
-            disabled={index === total - 1}
-            aria-label="Bajar"
-            className="p-2 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors rounded focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-          >
-            ↓
-          </button>
-        </div>
-      </td>
-    </tr>
-  );
-}
-
 interface Role {
   id: number;
   name: string;
@@ -412,14 +125,12 @@ export default function ConfigurationPage() {
 
   // Initial state (last saved) for dirty check
   const [initialDays, setInitialDays] = useState<ScheduleDay[]>([]);
-  const [initialOrder, setInitialOrder] = useState<number[]>([]);
   const [initialPrioritiesByDay, setInitialPrioritiesByDay] = useState<
     Record<number, { roleId: number; priority: number }[]>
   >({});
 
   // Local editable state
   const [localDays, setLocalDays] = useState<ScheduleDay[]>([]);
-  const [orderedRoles, setOrderedRoles] = useState<Role[]>([]);
   const [localPrioritiesByDay, setLocalPrioritiesByDay] = useState<
     Record<number, { roleId: number; priority: number }[]>
   >({});
@@ -443,11 +154,7 @@ export default function ConfigurationPage() {
     setDays(daysData);
     setPriorities(prioritiesData);
 
-    const sortedRoles = [...rolesData].sort(
-      (a: Role, b: Role) => a.displayOrder - b.displayOrder
-    );
     setInitialDays(daysData);
-    setInitialOrder(sortedRoles.map((r: Role) => r.id));
     setInitialPrioritiesByDay(() => {
       const byDay: Record<number, { roleId: number; priority: number }[]> = {};
       for (const p of prioritiesData) {
@@ -458,7 +165,6 @@ export default function ConfigurationPage() {
     });
 
     setLocalDays(daysData);
-    setOrderedRoles(sortedRoles);
     setLocalPrioritiesByDay(() => {
       const byDay: Record<number, { roleId: number; priority: number }[]> = {};
       for (const p of prioritiesData) {
@@ -484,9 +190,6 @@ export default function ConfigurationPage() {
           d.active === initialDays[i].active &&
           d.isRehearsal === initialDays[i].isRehearsal
       );
-    const orderEqual =
-      orderedRoles.length === initialOrder.length &&
-      orderedRoles.every((r, i) => r.id === initialOrder[i]);
     const prioritiesEqual = (() => {
       const dayIds = new Set([
         ...Object.keys(initialPrioritiesByDay).map(Number),
@@ -503,12 +206,10 @@ export default function ConfigurationPage() {
       }
       return true;
     })();
-    return !daysEqual || !orderEqual || !prioritiesEqual;
+    return !daysEqual || !prioritiesEqual;
   }, [
     localDays,
     initialDays,
-    orderedRoles,
-    initialOrder,
     localPrioritiesByDay,
     initialPrioritiesByDay,
   ]);
@@ -579,16 +280,6 @@ export default function ConfigurationPage() {
         });
       }
     }
-    const orderDirty =
-      orderedRoles.length !== initialOrder.length ||
-      orderedRoles.some((r, i) => r.id !== initialOrder[i]);
-    if (orderDirty) {
-      await fetch(`/api/configuration/roles?groupId=${groupId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order: buildColumnOrderPayload(orderedRoles) }),
-      });
-    }
     const allDayIds = new Set([
       ...Object.keys(initialPrioritiesByDay).map(Number),
       ...Object.keys(localPrioritiesByDay).map(Number),
@@ -620,7 +311,7 @@ export default function ConfigurationPage() {
       <div>
         <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl uppercase">Configuración</h1>
         <p className="mt-3 text-muted-foreground">
-          Configura días activos, ensayos, prioridades y orden de columnas.
+          Configura días activos, ensayos y prioridades.
         </p>
       </div>
 
@@ -644,22 +335,6 @@ export default function ConfigurationPage() {
           title="Días de ensayo"
           description="Selecciona qué días de la semana son días de ensayo. Las fechas de ensayo aparecen en el cronograma pero no tienen asignaciones de miembros."
         />
-      </div>
-
-      {/* Column order: own section */}
-      <div className="border-t border-border pt-8">
-        <section className="space-y-4">
-          <div>
-            <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">Orden de columnas</h2>
-            <p className="text-sm text-muted-foreground">
-              Configura el orden de visualización de las columnas de roles en todas las vistas de cronogramas.
-            </p>
-          </div>
-          <ColumnOrderEditor
-            orderedRoles={orderedRoles}
-            onOrderChange={setOrderedRoles}
-          />
-        </section>
       </div>
 
       {/* Prioridades de roles por día: own section */}

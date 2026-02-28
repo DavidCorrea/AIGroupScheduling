@@ -71,12 +71,15 @@
 ## Role Management
 - Dedicated `/:slug/config/roles` page for managing roles and exclusive groups
 - Roles: view, add, rename, delete, configure with required counts, dependencies, exclusive groups, and relevance flag
+- **New role** (`/config/roles/new`): create role (name only; default required count 1) and optionally assign group members to the role. Assignments are persisted on "Agregar rol".
+- **Edit role** (`/config/roles/[id]`): edit role fields and manage "Personas con este rol" (list of members with this role; add/remove via dropdown). Changes persisted only on "Actualizar".
+- **Unsaved changes**: On new or edit role page, leaving (nav link, Cancelar, or closing tab) shows a warning if there are unsaved changes. Uses `UnsavedConfigProvider`; config layout guards navigation when `configDirty` on roles form pages.
 - API routes: `/api/configuration/roles?groupId=N`, `/api/configuration/exclusive-groups?groupId=N`
 
 ## Configuration
 - **Active Days**: Toggle which days are included in schedules
 - **Rehearsal Days**: Toggle rehearsal days
-- **Column Order**: Configurable display order for role columns; shown in a table (Posición, Rol, Acciones) with drag-and-drop reordering via a handle (≡) and up/down buttons. On mobile, long-press the handle to drag (touch delay 250ms so scrolling is not blocked). Save with "Guardar orden". Uses @dnd-kit (core, sortable, utilities).
+- **Column Order**: Configurable display order for role columns; list of role names with up/down (or left/right on desktop) arrow buttons to reorder. Save with "Guardar orden".
 - **Role Priorities by Day**: Set fill order per day
 - API routes: `/api/configuration/days?groupId=N`, `/api/configuration/priorities?groupId=N`
 

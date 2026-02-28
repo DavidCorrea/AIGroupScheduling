@@ -21,7 +21,13 @@ export async function POST(request: NextRequest) {
   if (groupId instanceof NextResponse) return groupId;
 
   const body = await request.json();
-  const { name, requiredCount = 1 } = body;
+  const {
+    name,
+    requiredCount = 1,
+    dependsOnRoleId,
+    exclusiveGroupId,
+    isRelevant = false,
+  } = body;
 
   if (!name || typeof name !== "string" || name.trim().length === 0) {
     return NextResponse.json(
@@ -37,9 +43,19 @@ export async function POST(request: NextRequest) {
     .where(eq(roles.groupId, groupId)))[0];
   const nextOrder = (maxResult?.maxOrder ?? -1) + 1;
 
+  const insertValues: Record<string, unknown> = {
+    name: name.trim(),
+    requiredCount,
+    displayOrder: nextOrder,
+    groupId,
+    isRelevant: typeof isRelevant === "boolean" ? isRelevant : false,
+  };
+  if (dependsOnRoleId !== undefined) insertValues.dependsOnRoleId = dependsOnRoleId;
+  if (exclusiveGroupId !== undefined) insertValues.exclusiveGroupId = exclusiveGroupId;
+
   const role = (await db
     .insert(roles)
-    .values({ name: name.trim(), requiredCount, displayOrder: nextOrder, groupId })
+    .values(insertValues as typeof roles.$inferInsert)
     .returning())[0];
 
   return NextResponse.json(role, { status: 201 });
