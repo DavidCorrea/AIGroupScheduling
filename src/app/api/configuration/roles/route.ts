@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { roles, scheduleEntries, dayRolePriorities } from "@/db/schema";
+import { roles, scheduleDateAssignments, eventRolePriorities } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { extractGroupId } from "@/lib/api-helpers";
 
@@ -142,11 +142,11 @@ export async function DELETE(request: NextRequest) {
   }
 
   // Cascade: delete schedule entries referencing this role
-  await db.delete(scheduleEntries)
-    .where(eq(scheduleEntries.roleId, roleId));
+  await db.delete(scheduleDateAssignments)
+    .where(eq(scheduleDateAssignments.roleId, roleId));
 
-  await db.delete(dayRolePriorities)
-    .where(eq(dayRolePriorities.roleId, roleId));
+  await db.delete(eventRolePriorities)
+    .where(eq(eventRolePriorities.roleId, roleId));
 
   // Delete the role itself (member_roles cascade via schema)
   await db.delete(roles).where(eq(roles.id, roleId));

@@ -21,8 +21,8 @@ export default function AdminHome() {
       description: "Define roles, cantidades requeridas y grupos exclusivos.",
     },
     {
-      href: `/${slug}/config/configuration`,
-      label: "Configuración",
+      href: `/${slug}/config/events`,
+      label: "Eventos",
       description: "Configura días activos, ensayos, prioridades y orden de columnas.",
     },
     {

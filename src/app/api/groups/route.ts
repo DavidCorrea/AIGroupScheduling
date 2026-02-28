@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { groups, groupCollaborators, members, users, scheduleDays, roles } from "@/db/schema";
+import { groups, groupCollaborators, members, users, recurringEvents, weekdays, roles } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { seedDefaults } from "@/lib/seed";
 import { requireAuth } from "@/lib/api-helpers";
@@ -135,13 +135,19 @@ export async function POST(request: NextRequest) {
     .returning())[0];
 
   if (Array.isArray(days) && days.length > 0) {
+    const weekdayRows = await db.select().from(weekdays).orderBy(weekdays.displayOrder);
+    const nameToId = new Map(weekdayRows.map((w) => [w.name, w.id]));
     for (const d of days) {
-      await db.insert(scheduleDays).values({
-        dayOfWeek: d.dayOfWeek,
-        active: d.active,
-        isRehearsal: d.isRehearsal,
-        groupId: group.id,
-      });
+      const weekdayId = typeof d.weekdayId === "number" ? d.weekdayId : nameToId.get(d.dayOfWeek);
+      if (weekdayId != null) {
+        await db.insert(recurringEvents).values({
+          weekdayId,
+          active: d.active ?? true,
+          type: d.type ?? "assignable",
+          label: (d.label && String(d.label).trim()) ? String(d.label).trim() : "Evento",
+          groupId: group.id,
+        });
+      }
     }
   } else {
     await seedDefaults(group.id);

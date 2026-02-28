@@ -4,7 +4,8 @@
  */
 export function isConfigFormPageWithUnsavedGuard(pathname: string | null): boolean {
   if (!pathname) return false;
-  if (pathname.endsWith("/configuration")) return true;
+  if (pathname.includes("/config/events/new")) return true;
+  if (/\/config\/events\/\d+$/.test(pathname)) return true;
   if (pathname.includes("/config/roles/new")) return true;
   if (/\/config\/roles\/\d+$/.test(pathname)) return true;
   if (/\/config\/schedules$/.test(pathname)) return true;

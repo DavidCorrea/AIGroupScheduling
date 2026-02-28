@@ -45,7 +45,6 @@ export default function NewGroupPage() {
 
   // Days
   const [activeDays, setActiveDays] = useState<Set<string>>(new Set());
-  const [rehearsalDays, setRehearsalDays] = useState<Set<string>>(new Set());
 
   // Roles
   const [roles, setRoles] = useState<RoleEntry[]>([]);
@@ -66,15 +65,6 @@ export default function NewGroupPage() {
 
   const toggleActive = (day: string) => {
     setActiveDays((prev) => {
-      const next = new Set(prev);
-      if (next.has(day)) next.delete(day);
-      else next.add(day);
-      return next;
-    });
-  };
-
-  const toggleRehearsal = (day: string) => {
-    setRehearsalDays((prev) => {
       const next = new Set(prev);
       if (next.has(day)) next.delete(day);
       else next.add(day);
@@ -137,7 +127,7 @@ export default function NewGroupPage() {
     if (!name.trim() || !slug.trim()) return;
     setSubmitting(true);
 
-    const hasDayConfig = activeDays.size > 0 || rehearsalDays.size > 0;
+    const hasDayConfig = activeDays.size > 0;
 
     const body: Record<string, unknown> = {
       name: name.trim(),
@@ -148,7 +138,6 @@ export default function NewGroupPage() {
       body.days = ALL_DAYS.map((d) => ({
         dayOfWeek: d,
         active: activeDays.has(d),
-        isRehearsal: rehearsalDays.has(d),
       }));
     }
 
@@ -227,57 +216,30 @@ export default function NewGroupPage() {
             </div>
           </section>
 
-          {/* Active Days & Rehearsal Days */}
+          {/* Active Days */}
           <section className="border-t border-border pt-8">
-            <div className="lg:grid lg:grid-cols-2 lg:gap-12 space-y-8 lg:space-y-0">
-              <div>
-                <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">
-                  Días activos
-                </h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Días de la semana que se incluyen en el cronograma.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {ALL_DAYS.map((day) => (
-                    <button
-                      key={day}
-                      type="button"
-                      onClick={() => toggleActive(day)}
-                      className={`rounded-full px-4 py-2 text-sm border transition-colors ${
-                        activeDays.has(day)
-                          ? "border-foreground text-foreground bg-transparent"
-                          : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {day}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">
-                  Días de ensayo
-                </h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Aparecen en el cronograma pero sin asignaciones.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {ALL_DAYS.map((day) => (
-                    <button
-                      key={day}
-                      type="button"
-                      onClick={() => toggleRehearsal(day)}
-                      className={`rounded-full px-4 py-2 text-sm border transition-colors ${
-                        rehearsalDays.has(day)
-                          ? "border-foreground text-foreground bg-transparent"
-                          : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {day}
-                    </button>
-                  ))}
-                </div>
+            <div>
+              <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">
+                Días activos
+              </h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Días de la semana que se incluyen en el cronograma.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {ALL_DAYS.map((day) => (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => toggleActive(day)}
+                    className={`rounded-full px-4 py-2 text-sm border transition-colors ${
+                      activeDays.has(day)
+                        ? "border-foreground text-foreground bg-transparent"
+                        : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {day}
+                  </button>
+                ))}
               </div>
             </div>
           </section>

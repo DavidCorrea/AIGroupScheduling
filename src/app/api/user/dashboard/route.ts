@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import {
   members,
-  scheduleEntries,
+  scheduleDateAssignments,
+  scheduleDate,
   schedules,
   roles,
   groups,
 } from "@/db/schema";
-import { eq, and, gte } from "drizzle-orm";
+import { eq, and, gte, inArray } from "drizzle-orm";
 import { requireAuth } from "@/lib/api-helpers";
 
 export async function GET() {
@@ -53,25 +54,43 @@ export async function GET() {
       .where(and(eq(schedules.groupId, membership.groupId), eq(schedules.status, "committed")));
 
     for (const schedule of committedSchedules) {
-      const entries = await db
-        .select()
-        .from(scheduleEntries)
+      const scheduleDatesInRange = await db
+        .select({ id: scheduleDate.id, date: scheduleDate.date })
+        .from(scheduleDate)
         .where(
           and(
-            eq(scheduleEntries.scheduleId, schedule.id),
-            eq(scheduleEntries.memberId, membership.id),
-            gte(scheduleEntries.date, firstOfMonth)
+            eq(scheduleDate.scheduleId, schedule.id),
+            gte(scheduleDate.date, firstOfMonth)
+          )
+        );
+
+      const scheduleDateIds = scheduleDatesInRange.map((sd) => sd.id);
+      const dateByScheduleDateId = new Map(
+        scheduleDatesInRange.map((sd) => [sd.id, sd.date])
+      );
+      if (scheduleDateIds.length === 0) continue;
+
+      const entries = await db
+        .select()
+        .from(scheduleDateAssignments)
+        .where(
+          and(
+            inArray(scheduleDateAssignments.scheduleDateId, scheduleDateIds),
+            eq(scheduleDateAssignments.memberId, membership.id)
           )
         );
 
       for (const entry of entries) {
+        const date = dateByScheduleDateId.get(entry.scheduleDateId);
+        if (!date) continue;
+
         const role = (await db
           .select()
           .from(roles)
           .where(eq(roles.id, entry.roleId)))[0];
 
         allAssignments.push({
-          date: entry.date,
+          date,
           roleName: role?.name ?? "Desconocido",
           groupName: group.name,
           groupSlug: group.slug,
