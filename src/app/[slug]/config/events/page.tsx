@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useGroup } from "@/lib/group-context";
+import { utcTimeToLocalDisplay } from "@/lib/timezone-utils";
 
 interface ScheduleDay {
   id: number;
@@ -70,9 +71,11 @@ export default function EventsPage() {
             </Link>
             {days.map((day) => {
               const displayLabel = day.label?.trim() || "Evento";
-              const start = day.startTimeUtc ?? "00:00";
-              const end = day.endTimeUtc ?? "23:59";
-              const timeRange = start === "00:00" && end === "23:59" ? "Todo el día" : `${start}–${end}`;
+              const startUtc = day.startTimeUtc ?? "00:00";
+              const endUtc = day.endTimeUtc ?? "23:59";
+              const start = utcTimeToLocalDisplay(startUtc);
+              const end = utcTimeToLocalDisplay(endUtc);
+              const timeRange = startUtc === "00:00" && endUtc === "23:59" ? "Todo el día" : `${start}–${end}`;
               const typeLabel =
                 String(day.type).toLowerCase() === "for_everyone" ? "Para todos" : "Asignable";
 

@@ -3,6 +3,13 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useGroup } from "@/lib/group-context";
+import {
+  formatDateShort as formatDate,
+  formatDateWeekdayDay,
+  formatDayMonth,
+  formatDateRange,
+  getDayOfWeek,
+} from "@/lib/timezone-utils";
 
 interface ScheduleEntry {
   id: number;
@@ -98,50 +105,9 @@ const MONTH_NAMES = [
   "Diciembre",
 ];
 
-function formatDate(dateStr: string): string {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.toLocaleDateString("es-ES", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-}
-
-/** Format date as "Domingo, 1" (weekday long + day of month). */
-function formatDateWeekdayDay(dateStr: string): string {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  const weekday = date.toLocaleDateString("es-ES", {
-    weekday: "long",
-    timeZone: "UTC",
-  });
-  const dayNum = date.getUTCDate();
-  return `${weekday.charAt(0).toUpperCase() + weekday.slice(1)}, ${dayNum}`;
-}
-
-/** Format a date as "d mes" (e.g. "3 mar") in Spanish. */
-function formatDayMonth(dateStr: string): string {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.toLocaleDateString("es-ES", {
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  });
-}
-
-/** Format a date range for a week (e.g. "3 - 9 mar" or "28 feb - 6 mar"). */
-function formatDateRange(startDateStr: string, endDateStr: string): string {
-  const start = formatDayMonth(startDateStr);
-  const end = formatDayMonth(endDateStr);
-  return `${start} – ${end}`;
-}
-
 /** Full calendar date range for a week of the month (independent of filters). Week 1 = days 1-7, week 2 = 8-14, etc. */
 function getWeekDateRange(year: number, month: number, weekNumber: number): { start: string; end: string } {
-  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const lastDay = new Date(year, month, 0).getDate();
   const startDay = (weekNumber - 1) * 7 + 1;
   const endDay = Math.min(weekNumber * 7, lastDay);
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -149,17 +115,6 @@ function getWeekDateRange(year: number, month: number, weekNumber: number): { st
     start: `${year}-${pad(month)}-${pad(startDay)}`,
     end: `${year}-${pad(month)}-${pad(endDay)}`,
   };
-}
-
-/** Get the Spanish weekday name (capitalized, e.g. "Lunes") for a date string. */
-function getDayOfWeek(dateStr: string): string {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  const raw = date.toLocaleDateString("es-ES", {
-    weekday: "long",
-    timeZone: "UTC",
-  });
-  return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
 interface AuditDetailStructured {

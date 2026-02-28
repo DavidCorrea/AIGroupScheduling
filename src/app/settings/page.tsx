@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { formatDateRangeWithYear } from "@/lib/timezone-utils";
 
 interface Holiday {
   id: number;
@@ -71,14 +72,7 @@ export default function SettingsPage() {
     fetchHolidays();
   };
 
-  const formatDateRange = (start: string, end: string) => {
-    const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" };
-    const [sy, sm, sd] = start.split("-").map(Number);
-    const [ey, em, ed] = end.split("-").map(Number);
-    const s = new Date(Date.UTC(sy, sm - 1, sd)).toLocaleDateString("es-ES", opts);
-    const e = new Date(Date.UTC(ey, em - 1, ed)).toLocaleDateString("es-ES", opts);
-    return start === end ? s : `${s} — ${e}`;
-  };
+  const formatDateRange = (start: string, end: string) => formatDateRangeWithYear(start, end);
 
   return (
     <div className="min-h-screen bg-background text-foreground">

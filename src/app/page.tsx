@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { formatDateLong, formatDateShort } from "@/lib/timezone-utils";
 
 interface Group {
   id: number;
@@ -41,31 +42,11 @@ const MONTH_NAMES = [
   "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
 ];
 
-function formatDateLong(dateStr: string): string {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.toLocaleDateString("es-ES", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone: "UTC",
-  });
-}
-
-function formatDateShort(dateStr: string): string {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.toLocaleDateString("es-ES", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  });
-}
-
 function getRelativeLabel(dateStr: string, todayStr: string): string {
-  const d = new Date(dateStr + "T00:00:00Z");
-  const t = new Date(todayStr + "T00:00:00Z");
+  const [dy, dm, dd] = dateStr.split("-").map(Number);
+  const [ty, tm, td] = todayStr.split("-").map(Number);
+  const d = new Date(dy, dm - 1, dd);
+  const t = new Date(ty, tm - 1, td);
   const diff = Math.round((d.getTime() - t.getTime()) / 86400000);
   if (diff === 0) return "hoy";
   if (diff === 1) return "mañana";

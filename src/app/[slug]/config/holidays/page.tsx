@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useGroup } from "@/lib/group-context";
+import { formatDateRangeWithYear } from "@/lib/timezone-utils";
 
 interface MemberOption {
   id: number;
@@ -20,17 +21,7 @@ interface HolidayEntry {
 }
 
 function formatDateRange(start: string, end: string): string {
-  const opts: Intl.DateTimeFormatOptions = {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  };
-  const [sy, sm, sd] = start.split("-").map(Number);
-  const [ey, em, ed] = end.split("-").map(Number);
-  const s = new Date(Date.UTC(sy, sm - 1, sd)).toLocaleDateString("es-ES", opts);
-  const e = new Date(Date.UTC(ey, em - 1, ed)).toLocaleDateString("es-ES", opts);
-  return start === end ? s : `${s} — ${e}`;
+  return formatDateRangeWithYear(start, end);
 }
 
 export default function HolidaysPage() {
