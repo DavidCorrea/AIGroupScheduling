@@ -12,6 +12,11 @@ export interface MemberInfo {
   roleIds: number[];
   /** Days of the week this member is available (e.g., "Wednesday", "Friday", "Sunday") */
   availableDays: string[];
+  /**
+   * Optional: for each day name, the member's availability blocks (HH:MM UTC).
+   * When dayEventTimeWindow is used, a member is eligible only if at least one block overlaps the event window.
+   */
+  availabilityBlocksByDay?: Record<string, { startUtc: string; endUtc: string }[]>;
   /** Date ranges when the member is on holiday (ISO date strings "YYYY-MM-DD") */
   holidays: { startDate: string; endDate: string }[];
 }
@@ -37,6 +42,12 @@ export interface SchedulerInput {
    * Roles not listed use a default priority of Infinity (filled last).
    */
   dayRolePriorities?: Record<string, Record<number, number>>;
+  /**
+   * Optional: event time window per day of week (HH:MM UTC).
+   * When set for a day, only members with at least one availability block overlapping this window are eligible.
+   * Omitted or missing day = full day (00:00–23:59).
+   */
+  dayEventTimeWindow?: Record<string, { startUtc: string; endUtc: string }>;
 }
 
 export interface SchedulerOutput {

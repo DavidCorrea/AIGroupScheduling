@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { scheduleDateNotes } from "@/db/schema";
+import { scheduleDate } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "@/lib/api-helpers";
 import { logScheduleAction } from "@/lib/audit-log";
@@ -12,10 +12,14 @@ export async function GET(
   const { id } = await params;
   const scheduleId = parseInt(id, 10);
 
-  const notes = await db
-    .select()
-    .from(scheduleDateNotes)
-    .where(eq(scheduleDateNotes.scheduleId, scheduleId));
+  const rows = await db
+    .select({ date: scheduleDate.date, note: scheduleDate.note })
+    .from(scheduleDate)
+    .where(eq(scheduleDate.scheduleId, scheduleId));
+
+  const notes = rows
+    .filter((r) => r.note != null && r.note.trim() !== "")
+    .map((r) => ({ date: r.date, description: r.note! }));
 
   return NextResponse.json(notes);
 }
@@ -41,30 +45,28 @@ export async function POST(
 
   const existing = (await db
     .select()
-    .from(scheduleDateNotes)
+    .from(scheduleDate)
     .where(
       and(
-        eq(scheduleDateNotes.scheduleId, scheduleId),
-        eq(scheduleDateNotes.date, date)
+        eq(scheduleDate.scheduleId, scheduleId),
+        eq(scheduleDate.date, date)
       )
     ))[0];
 
-  if (existing) {
-    await db.update(scheduleDateNotes)
-      .set({ description: description.trim() })
-      .where(eq(scheduleDateNotes.id, existing.id));
-
-    await logScheduleAction(scheduleId, authResult.user.id, "note_saved", `Nota guardada para ${date}`);
-    return NextResponse.json({ ...existing, description: description.trim() });
+  if (!existing) {
+    return NextResponse.json(
+      { error: "La fecha no existe en el cronograma" },
+      { status: 404 }
+    );
   }
 
-  const note = (await db
-    .insert(scheduleDateNotes)
-    .values({ scheduleId, date, description: description.trim() })
-    .returning())[0];
+  await db
+    .update(scheduleDate)
+    .set({ note: description.trim() })
+    .where(eq(scheduleDate.id, existing.id));
 
   await logScheduleAction(scheduleId, authResult.user.id, "note_saved", `Nota guardada para ${date}`);
-  return NextResponse.json(note, { status: 201 });
+  return NextResponse.json({ date: existing.date, description: description.trim() });
 }
 
 export async function DELETE(
@@ -86,13 +88,27 @@ export async function DELETE(
     );
   }
 
-  await db.delete(scheduleDateNotes)
+  const existing = (await db
+    .select()
+    .from(scheduleDate)
     .where(
       and(
-        eq(scheduleDateNotes.scheduleId, scheduleId),
-        eq(scheduleDateNotes.date, date)
+        eq(scheduleDate.scheduleId, scheduleId),
+        eq(scheduleDate.date, date)
       )
+    ))[0];
+
+  if (!existing) {
+    return NextResponse.json(
+      { error: "Fecha no encontrada" },
+      { status: 404 }
     );
+  }
+
+  await db
+    .update(scheduleDate)
+    .set({ note: null })
+    .where(eq(scheduleDate.id, existing.id));
 
   await logScheduleAction(scheduleId, authResult.user.id, "note_deleted", `Nota eliminada para ${date}`);
   return NextResponse.json({ success: true });

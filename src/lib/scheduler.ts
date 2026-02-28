@@ -5,20 +5,34 @@ import {
   SchedulerInput,
   SchedulerOutput,
 } from "./scheduler.types";
+import { getDayNameFromDateString } from "./dates";
+
+/** Parse "HH:MM" to minutes since midnight (0–1439). */
+function parseTimeToMinutes(hhmm: string): number {
+  const [h, m] = (hhmm ?? "00:00").trim().split(":").map((x) => parseInt(x, 10) || 0);
+  return Math.min(1439, Math.max(0, h * 60 + m));
+}
+
+/** True if [aStart, aEnd) overlaps [bStart, bEnd) (times in HH:MM). */
+function timeRangesOverlap(
+  aStart: string,
+  aEnd: string,
+  bStart: string,
+  bEnd: string
+): boolean {
+  const aS = parseTimeToMinutes(aStart);
+  const aE = parseTimeToMinutes(aEnd);
+  const bS = parseTimeToMinutes(bStart);
+  const bE = parseTimeToMinutes(bEnd);
+  return aS < bE && bS < aE;
+}
 
 /**
  * Returns the capitalised Spanish day-of-week name for an ISO date string
- * (e.g. "2026-03-04" → "Miércoles").
- * Parses as UTC to avoid timezone-related day shifts.
+ * (e.g. "2026-03-04" → "Miércoles"). Uses shared date helper for consistency with schedule creation.
  */
 function getDayOfWeek(dateStr: string): string {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  const raw = date.toLocaleDateString("es-ES", {
-    weekday: "long",
-    timeZone: "UTC",
-  });
-  return raw.charAt(0).toUpperCase() + raw.slice(1);
+  return getDayNameFromDateString(dateStr);
 }
 
 /**
@@ -102,6 +116,7 @@ export function generateSchedule(input: SchedulerInput): SchedulerOutput {
     members,
     previousAssignments = [],
     dayRolePriorities,
+    dayEventTimeWindow,
   } = input;
 
   const assignments: ScheduleAssignment[] = [];
@@ -183,6 +198,21 @@ export function generateSchedule(input: SchedulerInput): SchedulerOutput {
           if (memberRolesOnDate.get(m.id)?.has(role.id)) return false;
           if (role.exclusiveGroupId) {
             if (memberGroupsOnDate.get(m.id)?.has(role.exclusiveGroupId)) return false;
+          }
+          // If event has a time window, member must have at least one availability block overlapping it
+          const eventWindow = dayEventTimeWindow?.[dayOfWeek];
+          if (eventWindow) {
+            const blocks = m.availabilityBlocksByDay?.[dayOfWeek];
+            if (!blocks?.length) return false;
+            const overlaps = blocks.some((block) =>
+              timeRangesOverlap(
+                eventWindow.startUtc,
+                eventWindow.endUtc,
+                block.startUtc,
+                block.endUtc
+              )
+            );
+            if (!overlaps) return false;
           }
           return true;
         };
