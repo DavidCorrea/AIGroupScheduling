@@ -1,0 +1,1 @@
+ALTER TABLE "recurring_events" ADD COLUMN "notes" text;

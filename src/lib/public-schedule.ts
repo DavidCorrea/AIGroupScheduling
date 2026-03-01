@@ -77,6 +77,7 @@ export async function buildPublicScheduleResponse(schedule: {
 
   const scheduleDates = await db
     .select({
+      id: scheduleDate.id,
       date: scheduleDate.date,
       type: scheduleDate.type,
       label: scheduleDate.label,
@@ -89,11 +90,11 @@ export async function buildPublicScheduleResponse(schedule: {
     .from(scheduleDate)
     .leftJoin(recurringEvents, eq(scheduleDate.recurringEventId, recurringEvents.id))
     .where(eq(scheduleDate.scheduleId, id))
-    .orderBy(asc(scheduleDate.date));
+    .orderBy(asc(scheduleDate.date), asc(scheduleDate.startTimeUtc));
 
   const notes = scheduleDates
     .filter((sd) => sd.note != null && sd.note.trim() !== "")
-    .map((sd) => ({ date: sd.date, description: sd.note! }));
+    .map((sd) => ({ scheduleDateId: sd.id, date: sd.date, description: sd.note! }));
 
   // Find previous and next committed schedules for navigation (same group)
   const prevSchedule =
@@ -143,6 +144,7 @@ export async function buildPublicScheduleResponse(schedule: {
     members: uniqueMembers,
     notes,
     scheduleDates: scheduleDates.map((sd) => ({
+      id: sd.id,
       date: sd.date,
       type: String(sd.type).toLowerCase() === "for_everyone" ? "for_everyone" : "assignable",
       label: sd.label,

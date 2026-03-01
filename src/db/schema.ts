@@ -112,6 +112,7 @@ export const recurringEvents = pgTable("recurring_events", {
   groupId: integer("group_id")
     .notNull()
     .references(() => groups.id, { onDelete: "cascade" }),
+  notes: text("notes"),
 });
 
 export const memberAvailability = pgTable("member_availability", {
@@ -154,27 +155,21 @@ export const schedules = pgTable("schedules", {
   uniqueIndex("schedules_group_month_year_unique").on(table.groupId, table.month, table.year),
 ]);
 
-export const scheduleDate = pgTable(
-  "schedule_date",
-  {
-    id: serial("id").primaryKey(),
-    scheduleId: integer("schedule_id")
-      .notNull()
-      .references(() => schedules.id, { onDelete: "cascade" }),
-    date: text("date").notNull(),
-    type: text("type").notNull(), // "assignable" | "for_everyone"
-    label: text("label"),
-    note: text("note"),
-    startTimeUtc: text("start_time_utc").notNull().default("00:00"),
-    endTimeUtc: text("end_time_utc").notNull().default("23:59"),
-    recurringEventId: integer("recurring_event_id").references(() => recurringEvents.id, {
-      onDelete: "set null",
-    }),
-  },
-  (table) => [
-    uniqueIndex("schedule_date_schedule_id_date_unique").on(table.scheduleId, table.date),
-  ]
-);
+export const scheduleDate = pgTable("schedule_date", {
+  id: serial("id").primaryKey(),
+  scheduleId: integer("schedule_id")
+    .notNull()
+    .references(() => schedules.id, { onDelete: "cascade" }),
+  date: text("date").notNull(),
+  type: text("type").notNull(), // "assignable" | "for_everyone"
+  label: text("label"),
+  note: text("note"),
+  startTimeUtc: text("start_time_utc").notNull().default("00:00"),
+  endTimeUtc: text("end_time_utc").notNull().default("23:59"),
+  recurringEventId: integer("recurring_event_id").references(() => recurringEvents.id, {
+    onDelete: "set null",
+  }),
+});
 
 export const scheduleDateAssignments = pgTable("schedule_date_assignments", {
   id: serial("id").primaryKey(),

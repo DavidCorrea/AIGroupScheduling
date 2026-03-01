@@ -37,7 +37,7 @@
      - Create a new `.sql` file under `src/db/migrations/` with the correct statements.
      - Update `src/db/migrations/meta/_journal.json` with the new entry.
      - Add a new snapshot under `src/db/migrations/meta/` for the next diff.
-  3. **Apply the migration**: run `npm run db:migrate` (or rely on build, which runs migrate). This applies pending migrations and records them in `drizzle.__drizzle_migrations`.
+  3. **Apply the migration**: run `npm run db:migrate` (or rely on build, which runs migrate). This applies pending migrations and records them in **`drizzle.__drizzle_migrations`** (schema `drizzle`, table `__drizzle_migrations`). To verify, query `SELECT * FROM drizzle.__drizzle_migrations ORDER BY created_at;` — do not query `__drizzle_migrations` without the schema, or you may see a different table.
 - If a schema change cannot be expressed by editing `schema.ts` alone (e.g. data backfill, or a one-off fix), document the reason and the manual steps in `PROJECT.md` or a script in `scripts/`, and still run `db:generate` after any schema change so snapshots stay in sync.
 
 # Git

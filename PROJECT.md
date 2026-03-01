@@ -26,38 +26,35 @@
 - `npm run db:studio` — Open Drizzle Studio to inspect the database
 
 ### Migrations (Drizzle)
-Migrations are managed with **drizzle-kit**. Do not create or edit migration `.sql` files or `meta/_journal.json` by hand; use the generate step so that `drizzle-kit migrate` works reliably.
+Migrations are managed with **drizzle-kit**. Use only **`npm run db:generate`** and **`npm run db:migrate`**; do not create or edit migration `.sql` files or `meta/_journal.json` by hand.
+
+**After a migration reset** (meta + migration files deleted, then `db:generate --name=initial`, then baseline SQL replaced with a no-op): clear the migrations table so the baseline can be recorded, then run migrate. Do this in **each** environment (local and production) that has the existing DB:
+
+```sql
+TRUNCATE drizzle.__drizzle_migrations;
+```
+
+Then run `npm run db:migrate`. You should get one row (the baseline). From then on, schema changes → `db:generate` → `db:migrate` as usual.
 
 **Creating a migration**
 1. Edit the schema in `src/db/schema.ts` (add/change/remove tables or columns).
-2. Run **`npm run db:generate`** (or `npx drizzle-kit generate`). When prompted for a name, use a short descriptive slug (e.g. `add_schedule_date_start_end_time_utc`). This will:
-   - Create a new `.sql` file under `src/db/migrations/` with the correct DDL.
-   - Update `src/db/migrations/meta/_journal.json` with the new migration entry.
-   - Add a new snapshot in `src/db/migrations/meta/` so the next generate can diff against it.
-3. Run **`npm run db:migrate`** to apply pending migrations (or let the build run it). Migrations are recorded in `drizzle.__drizzle_migrations` by hash.
+2. Run **`npm run db:generate`** with a short descriptive name (e.g. `--name=schedule_date_allow_multiple_per_date`). This creates the `.sql` file, updates `meta/_journal.json`, and adds a snapshot.
+3. Run **`npm run db:migrate`** to apply pending migrations. Migrations are recorded in `drizzle.__drizzle_migrations` by hash.
 
 **Applying migrations**
 - Locally: `npm run db:migrate` (requires `DATABASE_URL` in `.env` or `.env.local`).
-- On deploy: `npm run build` runs `drizzle-kit migrate` then `next build`, so migrations run automatically if `DATABASE_URL` is set in the environment.
+- On deploy: `npm run build` runs `drizzle-kit migrate` then `next build`, so migrations run automatically when `DATABASE_URL` is set.
 
-**If migrate doesn’t apply some migrations** (e.g. build failed mid-migrate, or DB was restored from backup): apply the missing schema manually using the idempotent scripts in `scripts/` (e.g. `apply-migration-0015.sql`), then run `node scripts/record-migrations-0012-0014.mjs` once so future migrate runs skip those by hash. See “If not all migrations ran” under Deployments (Vercel) below.
+**Config:** `drizzle.config.ts` sets `migrations.table` and `migrations.schema` so Drizzle uses the default `drizzle.__drizzle_migrations` table. Keep this so `db:migrate` behaves consistently.
 
-**One-time fix: missing snapshots for 0012–0015**  
-Migrations 0012–0015 were added by hand, so `meta/` has no snapshot for them (only 0000–0006). That makes `db:generate` diff against 0006 and produce a huge migration. To fix it once:
+**Checking applied migrations:** The log table is in the **`drizzle`** schema. Always query it with the schema name: `SELECT * FROM drizzle.__drizzle_migrations ORDER BY created_at;` If you query only `__drizzle_migrations`, PostgreSQL uses your `search_path` (often `public` first), so you may see a different table (e.g. `public.__drizzle_migrations`) or get no rows; the latest migration will appear only in `drizzle.__drizzle_migrations`. The **database** `created_at` is when each migration row was **inserted** (i.e. when that migration was applied in this DB). If you run `db:migrate` once and it applies several migrations (e.g. 13, 14, 15, 16), they will all get the same or nearly the same `created_at` (that run’s time, often 1ms apart). So seeing 13–16 with the same `created_at` means they were applied in a single run, not on different days. The **journal** (`meta/_journal.json`) has a `when` field per migration—that is the timestamp when the migration was **generated** (`db:generate`). It is not written to the DB. Some journal entries use `when` in **seconds** (10 digits) and others in **milliseconds** (13 digits); that inconsistency (e.g. from hand-edits or older tooling) is why journal `when` and DB `created_at` often don’t match and should not be compared directly.
 
-1. **Get the DB and migrate table in sync**  
-   - Apply the missing schema: run `scripts/apply-missing-migrations-0012-0014.sql` and `scripts/apply-migration-0015.sql` in your SQL editor (Neon, etc.) if the DB doesn’t have 0012–0015 yet.  
-   - Run `node scripts/record-migrations-0012-0014.mjs` so `drizzle.__drizzle_migrations` has 16 rows (0000–0015). Now `npm run db:migrate` will do nothing, as expected.
+**When a migration is recorded but didn't change the DB:** Sometimes a migration is applied and recorded but its SQL had no effect. Run that migration's SQL once in your SQL client if needed. For 0016 (allow multiple schedule_date per date), use: `ALTER TABLE "schedule_date" DROP CONSTRAINT IF EXISTS "schedule_date_schedule_id_date_unique";`
 
-2. **Create the 0015 snapshot so generate works**  
-   - Run `npm run db:generate -- --name=baseline_0015`. When drizzle-kit asks “create or rename” for any table, choose **create table** (first option) for each.  
-   - Run `node scripts/baseline-migration-snapshot.mjs`. It copies the new snapshot to `0015_snapshot.json`, removes the generated migration file and its journal entry, so the journal stays at 0000–0015 with a matching 0015 snapshot.
-
-After this, `db:generate` will diff against 0015 and future migrations will be small and correct.
+**If you had to fix an already-applied migration file** (e.g. wrong SQL): The DB stores a hash of the file. Drizzle does not have a command to “amend” or sync this. Do not delete migration rows (that can cause re-runs of other migrations). If the migration’s SQL was applied manually and you need the row in sync everywhere, run the INSERT once per environment (see migration 0016’s hash in docs or in the migration file’s SHA256). Otherwise leave as-is and rely on normal generate/migrate from here on.
 
 ### Deployments (Vercel)
-- **Migrations** run during build: `npm run build` runs `drizzle-kit migrate` then `next build`. The app uses `DATABASE_URL` from the environment (no `.env.local` on Vercel), so set **DATABASE_URL** in Vercel → Project → Settings → Environment Variables for Production (and Preview if you want migrations on preview deploys).
-- **If not all migrations ran** (e.g. build failed during migrate, or production DB was restored from backup): (1) Apply the missing schema in Neon SQL editor using the idempotent scripts in `scripts/` (e.g. `apply-missing-migrations-0012-0014.sql`, `apply-migration-0015.sql`). (2) If `drizzle-kit migrate` never marks those as applied, run once: `node scripts/record-migrations-0012-0014.mjs` so future migrate runs skip them by hash.
+- **Migrations** run during build: `npm run build` runs `drizzle-kit migrate` then `next build`. Set **DATABASE_URL** in Vercel → Project → Settings → Environment Variables (Production and optionally Preview).
 
 ## User Authentication
 - **Google OAuth** via Auth.js v5 with JWT session strategy

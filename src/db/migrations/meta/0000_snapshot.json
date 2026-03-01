@@ -1,5 +1,5 @@
 {
-  "id": "3ffdfba0-4826-4638-83e3-8046b1c819ba",
+  "id": "0a6b6455-b32f-4b3b-8ae1-53f4226eca0c",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -105,8 +105,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.day_role_priorities": {
-      "name": "day_role_priorities",
+    "public.event_role_priorities": {
+      "name": "event_role_priorities",
       "schema": "",
       "columns": {
         "id": {
@@ -115,8 +115,8 @@
           "primaryKey": true,
           "notNull": true
         },
-        "schedule_day_id": {
-          "name": "schedule_day_id",
+        "recurring_event_id": {
+          "name": "recurring_event_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
@@ -137,12 +137,12 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "day_role_priorities_schedule_day_id_schedule_days_id_fk": {
-          "name": "day_role_priorities_schedule_day_id_schedule_days_id_fk",
-          "tableFrom": "day_role_priorities",
-          "tableTo": "schedule_days",
+        "event_role_priorities_recurring_event_id_recurring_events_id_fk": {
+          "name": "event_role_priorities_recurring_event_id_recurring_events_id_fk",
+          "tableFrom": "event_role_priorities",
+          "tableTo": "recurring_events",
           "columnsFrom": [
-            "schedule_day_id"
+            "recurring_event_id"
           ],
           "columnsTo": [
             "id"
@@ -150,9 +150,9 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "day_role_priorities_role_id_roles_id_fk": {
-          "name": "day_role_priorities_role_id_roles_id_fk",
-          "tableFrom": "day_role_priorities",
+        "event_role_priorities_role_id_roles_id_fk": {
+          "name": "event_role_priorities_role_id_roles_id_fk",
+          "tableFrom": "event_role_priorities",
           "tableTo": "roles",
           "columnsFrom": [
             "role_id"
@@ -346,7 +346,13 @@
           "name": "user_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "member_id": {
+          "name": "member_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         },
         "start_date": {
           "name": "start_date",
@@ -381,6 +387,19 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        },
+        "holidays_member_id_members_id_fk": {
+          "name": "holidays_member_id_members_id_fk",
+          "tableFrom": "holidays",
+          "tableTo": "members",
+          "columnsFrom": [
+            "member_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -405,11 +424,25 @@
           "primaryKey": false,
           "notNull": true
         },
-        "schedule_day_id": {
-          "name": "schedule_day_id",
+        "weekday_id": {
+          "name": "weekday_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
+        },
+        "start_time_utc": {
+          "name": "start_time_utc",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'00:00'"
+        },
+        "end_time_utc": {
+          "name": "end_time_utc",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'23:59'"
         }
       },
       "indexes": {},
@@ -427,12 +460,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "member_availability_schedule_day_id_schedule_days_id_fk": {
-          "name": "member_availability_schedule_day_id_schedule_days_id_fk",
+        "member_availability_weekday_id_weekdays_id_fk": {
+          "name": "member_availability_weekday_id_weekdays_id_fk",
           "tableFrom": "member_availability",
-          "tableTo": "schedule_days",
+          "tableTo": "weekdays",
           "columnsFrom": [
-            "schedule_day_id"
+            "weekday_id"
           ],
           "columnsTo": [
             "id"
@@ -515,11 +548,23 @@
           "primaryKey": true,
           "notNull": true
         },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "user_id": {
           "name": "user_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "group_id": {
           "name": "group_id",
@@ -528,7 +573,29 @@
           "notNull": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "members_group_email_unique": {
+          "name": "members_group_email_unique",
+          "columns": [
+            {
+              "expression": "group_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "members_user_id_users_id_fk": {
           "name": "members_user_id_users_id_fk",
@@ -540,12 +607,105 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "set null",
           "onUpdate": "no action"
         },
         "members_group_id_groups_id_fk": {
           "name": "members_group_id_groups_id_fk",
           "tableFrom": "members",
+          "tableTo": "groups",
+          "columnsFrom": [
+            "group_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.recurring_events": {
+      "name": "recurring_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "weekday_id": {
+          "name": "weekday_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'assignable'"
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Evento'"
+        },
+        "start_time_utc": {
+          "name": "start_time_utc",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'00:00'"
+        },
+        "end_time_utc": {
+          "name": "end_time_utc",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'23:59'"
+        },
+        "group_id": {
+          "name": "group_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "recurring_events_weekday_id_weekdays_id_fk": {
+          "name": "recurring_events_weekday_id_weekdays_id_fk",
+          "tableFrom": "recurring_events",
+          "tableTo": "weekdays",
+          "columnsFrom": [
+            "weekday_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "recurring_events_group_id_groups_id_fk": {
+          "name": "recurring_events_group_id_groups_id_fk",
+          "tableFrom": "recurring_events",
           "tableTo": "groups",
           "columnsFrom": [
             "group_id"
@@ -654,8 +814,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.schedule_date_notes": {
-      "name": "schedule_date_notes",
+    "public.schedule_audit_log": {
+      "name": "schedule_audit_log",
       "schema": "",
       "columns": {
         "id": {
@@ -670,14 +830,26 @@
           "primaryKey": false,
           "notNull": true
         },
-        "date": {
-          "name": "date",
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "action": {
+          "name": "action",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "description": {
-          "name": "description",
+        "detail": {
+          "name": "detail",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -685,9 +857,9 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "schedule_date_notes_schedule_id_schedules_id_fk": {
-          "name": "schedule_date_notes_schedule_id_schedules_id_fk",
-          "tableFrom": "schedule_date_notes",
+        "schedule_audit_log_schedule_id_schedules_id_fk": {
+          "name": "schedule_audit_log_schedule_id_schedules_id_fk",
+          "tableFrom": "schedule_audit_log",
           "tableTo": "schedules",
           "columnsFrom": [
             "schedule_id"
@@ -697,64 +869,18 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.schedule_days": {
-      "name": "schedule_days",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
         },
-        "day_of_week": {
-          "name": "day_of_week",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "active": {
-          "name": "active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "is_rehearsal": {
-          "name": "is_rehearsal",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "group_id": {
-          "name": "group_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "schedule_days_group_id_groups_id_fk": {
-          "name": "schedule_days_group_id_groups_id_fk",
-          "tableFrom": "schedule_days",
-          "tableTo": "groups",
+        "schedule_audit_log_user_id_users_id_fk": {
+          "name": "schedule_audit_log_user_id_users_id_fk",
+          "tableFrom": "schedule_audit_log",
+          "tableTo": "users",
           "columnsFrom": [
-            "group_id"
+            "user_id"
           ],
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -764,8 +890,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.schedule_entries": {
-      "name": "schedule_entries",
+    "public.schedule_date": {
+      "name": "schedule_date",
       "schema": "",
       "columns": {
         "id": {
@@ -783,6 +909,96 @@
         "date": {
           "name": "date",
           "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "start_time_utc": {
+          "name": "start_time_utc",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'00:00'"
+        },
+        "end_time_utc": {
+          "name": "end_time_utc",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'23:59'"
+        },
+        "recurring_event_id": {
+          "name": "recurring_event_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "schedule_date_schedule_id_schedules_id_fk": {
+          "name": "schedule_date_schedule_id_schedules_id_fk",
+          "tableFrom": "schedule_date",
+          "tableTo": "schedules",
+          "columnsFrom": [
+            "schedule_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "schedule_date_recurring_event_id_recurring_events_id_fk": {
+          "name": "schedule_date_recurring_event_id_recurring_events_id_fk",
+          "tableFrom": "schedule_date",
+          "tableTo": "recurring_events",
+          "columnsFrom": [
+            "recurring_event_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.schedule_date_assignments": {
+      "name": "schedule_date_assignments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "schedule_date_id": {
+          "name": "schedule_date_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
@@ -801,12 +1017,12 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "schedule_entries_schedule_id_schedules_id_fk": {
-          "name": "schedule_entries_schedule_id_schedules_id_fk",
-          "tableFrom": "schedule_entries",
-          "tableTo": "schedules",
+        "schedule_date_assignments_schedule_date_id_schedule_date_id_fk": {
+          "name": "schedule_date_assignments_schedule_date_id_schedule_date_id_fk",
+          "tableFrom": "schedule_date_assignments",
+          "tableTo": "schedule_date",
           "columnsFrom": [
-            "schedule_id"
+            "schedule_date_id"
           ],
           "columnsTo": [
             "id"
@@ -814,9 +1030,9 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "schedule_entries_role_id_roles_id_fk": {
-          "name": "schedule_entries_role_id_roles_id_fk",
-          "tableFrom": "schedule_entries",
+        "schedule_date_assignments_role_id_roles_id_fk": {
+          "name": "schedule_date_assignments_role_id_roles_id_fk",
+          "tableFrom": "schedule_date_assignments",
           "tableTo": "roles",
           "columnsFrom": [
             "role_id"
@@ -827,9 +1043,9 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "schedule_entries_member_id_members_id_fk": {
-          "name": "schedule_entries_member_id_members_id_fk",
-          "tableFrom": "schedule_entries",
+        "schedule_date_assignments_member_id_members_id_fk": {
+          "name": "schedule_date_assignments_member_id_members_id_fk",
+          "tableFrom": "schedule_date_assignments",
           "tableTo": "members",
           "columnsFrom": [
             "member_id"
@@ -838,51 +1054,6 @@
             "id"
           ],
           "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.schedule_rehearsal_dates": {
-      "name": "schedule_rehearsal_dates",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "schedule_id": {
-          "name": "schedule_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "date": {
-          "name": "date",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "schedule_rehearsal_dates_schedule_id_schedules_id_fk": {
-          "name": "schedule_rehearsal_dates_schedule_id_schedules_id_fk",
-          "tableFrom": "schedule_rehearsal_dates",
-          "tableTo": "schedules",
-          "columnsFrom": [
-            "schedule_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
@@ -1017,6 +1188,20 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "is_admin": {
+          "name": "is_admin",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "can_create_groups": {
+          "name": "can_create_groups",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         }
       },
       "indexes": {},
@@ -1028,6 +1213,46 @@
           "nullsNotDistinct": false,
           "columns": [
             "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.weekdays": {
+      "name": "weekdays",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_order": {
+          "name": "display_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "weekdays_name_unique": {
+          "name": "weekdays_name_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "name"
           ]
         }
       },

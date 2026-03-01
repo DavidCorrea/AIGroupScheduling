@@ -12,6 +12,7 @@ import {
 
 export interface ScheduleEntry {
   id: number;
+  scheduleDateId?: number;
   date: string;
   roleId: number;
   memberId: number;
@@ -21,11 +22,13 @@ export interface ScheduleEntry {
 
 export interface DateNote {
   id?: number;
+  scheduleDateId?: number;
   date: string;
   description: string;
 }
 
 export interface ScheduleDateInfo {
+  id?: number;
   date: string;
   type: "assignable" | "for_everyone";
   label?: string | null;
@@ -111,6 +114,23 @@ function groupDatesByWeek(dates: string[]): { weekNumber: number; dates: string[
   return [...weekMap.entries()]
     .sort((a, b) => a[0] - b[0])
     .map(([weekNumber, dates]) => ({ weekNumber, dates }));
+}
+
+/** Group schedule dates by week of month (one row per event). */
+function groupScheduleDatesByWeek(
+  scheduleDates: ScheduleDateInfo[],
+  schedule: { year: number; month: number }
+): { weekNumber: number; scheduleDates: ScheduleDateInfo[] }[] {
+  const weekMap = new Map<number, ScheduleDateInfo[]>();
+  for (const sd of scheduleDates) {
+    const dayOfMonth = parseInt(sd.date.slice(8, 10), 10);
+    const weekNum = Math.ceil(dayOfMonth / 7);
+    if (!weekMap.has(weekNum)) weekMap.set(weekNum, []);
+    weekMap.get(weekNum)!.push(sd);
+  }
+  return [...weekMap.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([weekNumber, scheduleDates]) => ({ weekNumber, scheduleDates }));
 }
 
 /** Full calendar date range for a week of the month (independent of filters). Week 1 = days 1-7, week 2 = 8-14, etc. */
@@ -213,30 +233,30 @@ export default function SharedScheduleView({
     .filter((d) => String(d.type).toLowerCase() === "for_everyone")
     .map((d) => d.date);
   const scheduleDateMap = new Map(
-    scheduleDateList.map((d) => [d.date, d])
+    scheduleDateList.filter((d) => d.id != null).map((d) => [d.id!, d])
   );
+  const scheduleDateByDateMap = new Map<string, ScheduleDateInfo>();
+  for (const d of scheduleDateList) {
+    if (!scheduleDateByDateMap.has(d.date)) scheduleDateByDateMap.set(d.date, d);
+  }
 
-  /** Display label for a date: recurring event label when linked, else stored label, else default. */
-  const getDateDisplayLabel = (date: string): string => {
-    const d = scheduleDateMap.get(date);
-    if (!d) return "";
-    const label = d.recurringEventLabel ?? d.label ?? null;
+  /** Display label for a schedule date: recurring event label when linked, else stored label, else default. */
+  const getDateDisplayLabel = (sd: ScheduleDateInfo): string => {
+    const label = sd.recurringEventLabel ?? sd.label ?? null;
     if (label) return label;
-    return d.type === "for_everyone" ? "Ensayo" : "Evento";
+    return sd.type === "for_everyone" ? "Ensayo" : "Evento";
   };
 
-  /** Format recurring event time range in local time (e.g. "14:00 – 16:00"). Returns null if no times. */
-  const getDateDisplayTimeRange = (date: string): string | null => {
-    const d = scheduleDateMap.get(date);
-    if (!d) return null;
-    const startUtc = d.startTimeUtc ?? d.recurringEventStartTimeUtc;
-    const endUtc = d.endTimeUtc ?? d.recurringEventEndTimeUtc;
+  /** Format event time range in local time (e.g. "14:00 – 16:00"). Returns null if no times. */
+  const getDateDisplayTimeRange = (sd: ScheduleDateInfo): string | null => {
+    const startUtc = sd.startTimeUtc ?? sd.recurringEventStartTimeUtc;
+    const endUtc = sd.endTimeUtc ?? sd.recurringEventEndTimeUtc;
     if (!startUtc || !endUtc) return null;
     const parseHHMM = (s: string) => {
       const parts = s.split(":").map(Number);
       return [parts[0] ?? 0, parts[1] ?? 0];
     };
-    const [y, mo, day] = date.split("-").map(Number);
+    const [y, mo, day] = sd.date.split("-").map(Number);
     const [sh, sm] = parseHHMM(startUtc);
     const [eh, em] = parseHHMM(endUtc);
     const startDate = new Date(Date.UTC(y, mo - 1, day, sh, sm, 0));
@@ -320,6 +340,36 @@ export default function SharedScheduleView({
   );
 
   const noteMap = new Map(schedule.notes.map((n) => [n.date, n.description]));
+  const noteMapByScheduleDateId = new Map(
+    schedule.notes
+      .filter((n) => (n as { scheduleDateId?: number }).scheduleDateId != null)
+      .map((n) => [(n as { scheduleDateId: number }).scheduleDateId, n.description])
+  );
+  const getNoteForScheduleDate = (sd: ScheduleDateInfo): string | undefined =>
+    (sd.id != null ? noteMapByScheduleDateId.get(sd.id) : undefined) ?? noteMap.get(sd.date);
+
+  const visibleScheduleDates = useMemo(() => {
+    if (scheduleDateList.length === 0 || scheduleDateList.every((d) => d.id == null)) return [];
+    const list = scheduleDateList.filter((sd) => isDateVisible(sd.date));
+    return [...list].sort((a, b) => {
+      const d = a.date.localeCompare(b.date);
+      if (d !== 0) return d;
+      return (a.startTimeUtc ?? "00:00").localeCompare(b.startTimeUtc ?? "00:00");
+    });
+  }, [scheduleDateList, showPastDates, dayFilter, today]);
+
+  const filteredScheduleDates = useMemo(() => {
+    if (visibleScheduleDates.length === 0) return [];
+    if (!hasActiveFilter) return visibleScheduleDates;
+    return visibleScheduleDates.filter((sd) =>
+      filteredEntries.some(
+        (e) =>
+          e.date === sd.date &&
+          (e.scheduleDateId == null || e.scheduleDateId === sd.id)
+      )
+    );
+  }, [visibleScheduleDates, hasActiveFilter, filteredEntries]);
+
   const rehearsalSet = new Set(
     schedule.scheduleDates
       ? scheduleDateList.filter((d) => String(d.type).toLowerCase() === "for_everyone").map((d) => d.date)
@@ -397,6 +447,15 @@ export default function SharedScheduleView({
     ? filteredDates.filter((d) => d !== upcomingDate)
     : filteredDates;
 
+  const displayScheduleDates = useMemo(
+    () =>
+      upcomingDate
+        ? filteredScheduleDates.filter((sd) => sd.date !== upcomingDate)
+        : filteredScheduleDates,
+    [upcomingDate, filteredScheduleDates]
+  );
+  const tableScheduleDates = filteredScheduleDates;
+
   // List view: group dates by week of month for collapsible sections
   const tableDates = filteredRoleId ? filteredDates : allDates;
   const displayDatesByWeek = useMemo(
@@ -407,6 +466,23 @@ export default function SharedScheduleView({
     () => groupDatesByWeek(tableDates),
     [tableDates]
   );
+  const displayScheduleDatesByWeek = useMemo(
+    () => groupScheduleDatesByWeek(displayScheduleDates, { year: schedule.year, month: schedule.month }),
+    [displayScheduleDates, schedule.year, schedule.month]
+  );
+  const tableScheduleDatesByWeek = useMemo(
+    () => groupScheduleDatesByWeek(tableScheduleDates, { year: schedule.year, month: schedule.month }),
+    [tableScheduleDates, schedule.year, schedule.month]
+  );
+
+  const useScheduleDateRows = visibleScheduleDates.length > 0;
+
+  const getEntriesForScheduleDate = (sd: ScheduleDateInfo) =>
+    filteredEntries.filter(
+      (e) =>
+        e.date === sd.date &&
+        (e.scheduleDateId == null || e.scheduleDateId === sd.id)
+    );
 
   // Collapsed week sections (only in list view); default: expand only week containing today
   const [collapsedWeeks, setCollapsedWeeks] = useState<Set<number>>(new Set());
@@ -423,18 +499,24 @@ export default function SharedScheduleView({
   useEffect(() => {
     if (viewMode !== "list") return;
     const byWeek = filteredMemberId ? displayDatesByWeek : tableDatesByWeek;
-    if (byWeek.length === 0) return;
-    const key = `${schedule.year}-${schedule.month}-${filteredMemberId ?? "all"}-${filteredRoleId ?? "all"}`;
+    const byWeekSd = filteredMemberId ? displayScheduleDatesByWeek : tableScheduleDatesByWeek;
+    const weekData = useScheduleDateRows ? byWeekSd : byWeek;
+    if (weekData.length === 0) return;
+    const key = `${schedule.year}-${schedule.month}-${filteredMemberId ?? "all"}-${filteredRoleId ?? "all"}-${useScheduleDateRows}`;
     if (initialCollapseKeyRef.current === key) return;
     initialCollapseKeyRef.current = key;
     const todayStr = getTodayISO();
-    const weekWithToday = byWeek.find((w) => w.dates.includes(todayStr))?.weekNumber;
-    const allWeekNumbers = byWeek.map((w) => w.weekNumber);
+    const weekWithToday = useScheduleDateRows
+      ? (weekData as { weekNumber: number; scheduleDates: ScheduleDateInfo[] }[]).find((w) =>
+          w.scheduleDates.some((sd) => sd.date === todayStr)
+        )?.weekNumber
+      : (weekData as { weekNumber: number; dates: string[] }[]).find((w) => w.dates.includes(todayStr))?.weekNumber;
+    const allWeekNumbers = weekData.map((w) => w.weekNumber);
     const toCollapse = weekWithToday != null
       ? allWeekNumbers.filter((n) => n !== weekWithToday)
       : allWeekNumbers;
     setCollapsedWeeks(new Set(toCollapse));
-  }, [viewMode, schedule.year, schedule.month, filteredMemberId, filteredRoleId, displayDatesByWeek, tableDatesByWeek]);
+  }, [viewMode, schedule.year, schedule.month, filteredMemberId, filteredRoleId, displayDatesByWeek, tableDatesByWeek, displayScheduleDatesByWeek, tableScheduleDatesByWeek, useScheduleDateRows]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -678,9 +760,9 @@ export default function SharedScheduleView({
                     </span>
                   )}
                 </p>
-                {noteMap.get(upcomingDate) && (
+                {upcomingDate && getNoteForScheduleDate(scheduleDateByDateMap.get(upcomingDate) ?? { date: upcomingDate, type: "assignable" }) && (
                   <p className="text-xs text-accent mt-2">
-                    {noteMap.get(upcomingDate)}
+                    {getNoteForScheduleDate(scheduleDateByDateMap.get(upcomingDate) ?? { date: upcomingDate, type: "assignable" })}
                   </p>
                 )}
               </div>
@@ -725,9 +807,9 @@ export default function SharedScheduleView({
                     )}
                   </span>
                 </div>
-                {noteMap.get(upcomingDate) && (
+                {upcomingDate && getNoteForScheduleDate(scheduleDateByDateMap.get(upcomingDate) ?? { date: upcomingDate, type: "assignable" }) && (
                   <p className="text-xs text-accent mt-2">
-                    {noteMap.get(upcomingDate)}
+                    {getNoteForScheduleDate(scheduleDateByDateMap.get(upcomingDate) ?? { date: upcomingDate, type: "assignable" })}
                   </p>
                 )}
               </div>
@@ -737,7 +819,96 @@ export default function SharedScheduleView({
 
         {/* Mobile card view (list mode: weekly sections) */}
         <div className={`lg:hidden space-y-8 ${viewMode !== "list" ? "hidden" : ""}`}>
-          {displayDatesByWeek.map(({ weekNumber, dates }) => {
+          {useScheduleDateRows
+            ? displayScheduleDatesByWeek.map(({ weekNumber, scheduleDates }) => {
+                const isCollapsed = collapsedWeeks.has(weekNumber);
+                return (
+                  <section
+                    key={weekNumber}
+                    className="border border-border rounded-lg bg-muted/10 overflow-hidden"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleWeek(weekNumber)}
+                      className="w-full px-4 py-2.5 border-b border-border bg-muted/20 flex items-center justify-between gap-2 text-left hover:bg-muted/30 transition-colors"
+                      aria-expanded={!isCollapsed}
+                    >
+                      <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                        Semana {weekNumber}
+                        <span className="normal-case font-normal tracking-normal text-muted-foreground/90">
+                          {" · "}
+                          {formatDateRange(
+                            getWeekDateRange(schedule.year, schedule.month, weekNumber).start,
+                            getWeekDateRange(schedule.year, schedule.month, weekNumber).end
+                          )}
+                        </span>
+                      </h2>
+                      <span className="text-muted-foreground shrink-0" aria-hidden>{isCollapsed ? "▶" : "▼"}</span>
+                    </button>
+                    {!isCollapsed && (
+                      <div className="divide-y divide-border">
+                        {scheduleDates.map((sd) => {
+                          const isRehearsal = sd.type === "for_everyone";
+                          const entriesOnSd = getEntriesForScheduleDate(sd);
+                          const depRoleDate = filteredMemberId && entriesOnSd.some((e) => dependentRoleIdSet.has(e.roleId));
+                          const relevantRoleDate = filteredMemberId && entriesOnSd.some((e) => relevantRoleIdSet.has(e.roleId));
+                          const highlighted = depRoleDate || relevantRoleDate;
+                          const note = getNoteForScheduleDate(sd);
+                          return (
+                            <div key={sd.id ?? sd.date}>
+                              {isRehearsal ? (
+                                <button
+                                  type="button"
+                                  className={`w-full text-left px-4 py-3.5 text-sm ${isPast(sd.date) ? "opacity-50" : ""}`}
+                                  onClick={() => setSelectedDateForModal(sd.date)}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-medium">{formatDateWeekdayDay(sd.date)}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-muted-foreground italic shrink-0">{getDateDisplayLabel(sd) || "Ensayo"}</span>
+                                      <span className="text-xs text-muted-foreground shrink-0" aria-hidden>▸</span>
+                                    </div>
+                                  </div>
+                                  {getDateDisplayTimeRange(sd) && <p className="text-xs text-muted-foreground mt-0.5">{getDateDisplayTimeRange(sd)}</p>}
+                                  {note && <p className="text-xs text-accent mt-1">{note}</p>}
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className={`w-full text-left transition-all ${isPast(sd.date) ? "opacity-50" : ""} ${highlighted ? "bg-muted/30" : ""}`}
+                                  onClick={() => setSelectedDateForModal(sd.date)}
+                                >
+                                  <div className="px-4 py-3.5 text-sm">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex flex-col gap-0.5">
+                                        <span className="font-medium">{formatDateWeekdayDay(sd.date)}</span>
+                                        {getDateDisplayLabel(sd) && (
+                                          <>
+                                            <span className="text-xs text-muted-foreground italic">{getDateDisplayLabel(sd)}</span>
+                                            {getDateDisplayTimeRange(sd) && <span className="text-xs text-muted-foreground">{getDateDisplayTimeRange(sd)}</span>}
+                                          </>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        {depRoleDate && filteredMemberId && (
+                                          <span className="text-xs font-medium">★ {entriesOnSd.filter((e) => dependentRoleIdSet.has(e.roleId)).map((e) => e.roleName).join(", ")}</span>
+                                        )}
+                                        <span className="text-xs text-muted-foreground shrink-0" aria-hidden>▸</span>
+                                      </div>
+                                    </div>
+                                    {note && <p className="text-xs text-accent mt-1">{note}</p>}
+                                  </div>
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </section>
+                );
+              })
+            : displayDatesByWeek.map(({ weekNumber, dates }) => {
             const isCollapsed = collapsedWeeks.has(weekNumber);
             return (
               <section
@@ -767,6 +938,7 @@ export default function SharedScheduleView({
                 {!isCollapsed && (
                   <div className="divide-y divide-border">
                     {dates.map((date) => {
+                      const sd = scheduleDateByDateMap.get(date) ?? { date, type: "assignable" as const };
                       const isRehearsal = rehearsalSet.has(date);
                       const entriesOnDate = filteredEntries.filter(
                         (e) => e.date === date
@@ -789,20 +961,20 @@ export default function SharedScheduleView({
                                 <span className="font-medium">{formatDateWeekdayDay(date)}</span>
                                 <div className="flex items-center gap-2">
                                   <span className="text-xs text-muted-foreground italic shrink-0">
-                                    {getDateDisplayLabel(date) || "Ensayo"}
+                                    {getDateDisplayLabel(sd) || "Ensayo"}
                                   </span>
                                   <span className="text-xs text-muted-foreground shrink-0" aria-hidden>
                                     ▸
                                   </span>
                                 </div>
                               </div>
-                              {getDateDisplayTimeRange(date) && (
+                              {getDateDisplayTimeRange(sd) && (
                                 <p className="text-xs text-muted-foreground mt-0.5">
-                                  {getDateDisplayTimeRange(date)}
+                                  {getDateDisplayTimeRange(sd)}
                                 </p>
                               )}
-                              {noteMap.get(date) && (
-                                <p className="text-xs text-accent mt-1">{noteMap.get(date)}</p>
+                              {getNoteForScheduleDate(sd) && (
+                                <p className="text-xs text-accent mt-1">{getNoteForScheduleDate(sd)}</p>
                               )}
                             </button>
                           ) : (
@@ -817,14 +989,14 @@ export default function SharedScheduleView({
                                 <div className="flex items-center justify-between">
                                   <div className="flex flex-col gap-0.5">
                                     <span className="font-medium">{formatDateWeekdayDay(date)}</span>
-                                    {getDateDisplayLabel(date) && (
+                                    {getDateDisplayLabel(sd) && (
                                       <>
                                         <span className="text-xs text-muted-foreground italic">
-                                          {getDateDisplayLabel(date)}
+                                          {getDateDisplayLabel(sd)}
                                         </span>
-                                        {getDateDisplayTimeRange(date) && (
+                                        {getDateDisplayTimeRange(sd) && (
                                           <span className="text-xs text-muted-foreground">
-                                            {getDateDisplayTimeRange(date)}
+                                            {getDateDisplayTimeRange(sd)}
                                           </span>
                                         )}
                                       </>
@@ -841,8 +1013,8 @@ export default function SharedScheduleView({
                                     </span>
                                   </div>
                                 </div>
-                                {noteMap.get(date) && (
-                                  <p className="text-xs text-accent mt-1">{noteMap.get(date)}</p>
+                                {getNoteForScheduleDate(sd) && (
+                                  <p className="text-xs text-accent mt-1">{getNoteForScheduleDate(sd)}</p>
                                 )}
                               </div>
                             </button>
@@ -854,7 +1026,7 @@ export default function SharedScheduleView({
                 )}
               </section>
             );
-          })}
+          }); }
         </div>
 
         {/* Calendar grid view */}
@@ -979,8 +1151,9 @@ export default function SharedScheduleView({
                       </thead>
                       <tbody>
                         {dates.map((date) => {
+                          const sd = scheduleDateByDateMap.get(date) ?? { date, type: "assignable" as const };
                           const isRehearsal = rehearsalSet.has(date);
-                          const note = noteMap.get(date);
+                          const note = getNoteForScheduleDate(sd);
                           const depRoleDate = hasDependentRoleOnDate(date);
                           const relevantRoleDate = hasRelevantRoleOnDate(date);
                           const highlighted = depRoleDate || relevantRoleDate;
@@ -1004,14 +1177,14 @@ export default function SharedScheduleView({
                               >
                                 <div>
                                   <div className="font-medium">{formatDateWeekdayDay(date)}</div>
-                                  {!isRehearsal && getDateDisplayLabel(date) && (
+                                  {!isRehearsal && getDateDisplayLabel(sd) && (
                                     <div className="text-xs text-muted-foreground italic mt-0.5">
-                                      {getDateDisplayLabel(date)}
+                                      {getDateDisplayLabel(sd)}
                                     </div>
                                   )}
-                                  {!isRehearsal && getDateDisplayTimeRange(date) && (
+                                  {!isRehearsal && getDateDisplayTimeRange(sd) && (
                                     <div className="text-xs text-muted-foreground mt-0.5">
-                                      {getDateDisplayTimeRange(date)}
+                                      {getDateDisplayTimeRange(sd)}
                                     </div>
                                   )}
                                   {depRoleDate && (
@@ -1102,11 +1275,12 @@ export default function SharedScheduleView({
                             </thead>
                             <tbody>
                               {dates.map((date) => {
+                                const sd = scheduleDateByDateMap.get(date) ?? { date, type: "assignable" as const };
                                 const isRehearsal = rehearsalSet.has(date);
                                 const entriesOnDate = filteredEntries.filter(
                                   (e) => e.date === date
                                 );
-                                const note = noteMap.get(date);
+                                const note = getNoteForScheduleDate(sd);
 
                                 return (
                                   <tr
@@ -1122,14 +1296,14 @@ export default function SharedScheduleView({
                                   >
                                     <td className="px-4 py-4 text-sm font-medium whitespace-nowrap align-middle">
                                       <div>{formatDateWeekdayDay(date)}</div>
-                                      {!isRehearsal && getDateDisplayLabel(date) && (
+                                      {!isRehearsal && getDateDisplayLabel(sd) && (
                                         <div className="text-xs text-muted-foreground italic font-normal mt-0.5">
-                                          {getDateDisplayLabel(date)}
+                                          {getDateDisplayLabel(sd)}
                                         </div>
                                       )}
-                                      {!isRehearsal && getDateDisplayTimeRange(date) && (
+                                      {!isRehearsal && getDateDisplayTimeRange(sd) && (
                                         <div className="text-xs text-muted-foreground font-normal mt-0.5">
-                                          {getDateDisplayTimeRange(date)}
+                                          {getDateDisplayTimeRange(sd)}
                                         </div>
                                       )}
                                       {note && (
@@ -1143,10 +1317,10 @@ export default function SharedScheduleView({
                                         colSpan={visibleRoles.length}
                                         className="px-4 py-4 text-sm text-muted-foreground italic text-center"
                                       >
-                                        {getDateDisplayLabel(date) || "Ensayo"}
-                                        {getDateDisplayTimeRange(date) && (
+                                        {getDateDisplayLabel(sd) || "Ensayo"}
+                                        {getDateDisplayTimeRange(sd) && (
                                           <div className="text-xs mt-0.5 font-normal">
-                                            {getDateDisplayTimeRange(date)}
+                                            {getDateDisplayTimeRange(sd)}
                                           </div>
                                         )}
                                       </td>
@@ -1242,9 +1416,10 @@ export default function SharedScheduleView({
 
             {(() => {
               const date = selectedDateForModal;
+              const sd = scheduleDateByDateMap.get(date) ?? { date, type: "assignable" as const };
               const isRehearsal = rehearsalSet.has(date);
-              const label = getDateDisplayLabel(date) || (isRehearsal ? "Ensayo" : "");
-              const timeRange = getDateDisplayTimeRange(date);
+              const label = getDateDisplayLabel(sd) || (isRehearsal ? "Ensayo" : "");
+              const timeRange = getDateDisplayTimeRange(sd);
               const entriesOnDate = schedule.entries.filter((e) => e.date === date);
               const roleIdsOnDate = [...new Set(entriesOnDate.map((e) => e.roleId))];
               const rolesSorted = roleIdsOnDate
@@ -1259,7 +1434,8 @@ export default function SharedScheduleView({
                   if (bRelevant !== aRelevant) return bRelevant - aRelevant;
                   return (a.role?.displayOrder ?? 0) - (b.role?.displayOrder ?? 0);
                 });
-              const hasContent = label || timeRange || rolesSorted.length > 0 || noteMap.get(date);
+              const note = getNoteForScheduleDate(sd);
+              const hasContent = label || timeRange || rolesSorted.length > 0 || note;
 
               if (!hasContent) {
                 return <p className="text-sm text-muted-foreground">No hay detalles</p>;
@@ -1317,9 +1493,9 @@ export default function SharedScheduleView({
                       </table>
                     </div>
                   ) : null}
-                  {noteMap.get(date) && (
+                  {note && (
                     <p className="text-xs text-accent mt-3 pt-3 border-t border-border/50">
-                      {noteMap.get(date)}
+                      {note}
                     </p>
                   )}
                 </>

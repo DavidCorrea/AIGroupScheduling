@@ -91,7 +91,7 @@ export async function GET(
     .from(scheduleDate)
     .leftJoin(recurringEvents, eq(scheduleDate.recurringEventId, recurringEvents.id))
     .where(eq(scheduleDate.scheduleId, scheduleId))
-    .orderBy(asc(scheduleDate.date));
+    .orderBy(asc(scheduleDate.date), asc(scheduleDate.startTimeUtc));
 
   // Find previous and next schedules
   const { month, year, groupId } = schedule;
@@ -248,8 +248,8 @@ export async function PUT(
     return NextResponse.json({ success: true });
   }
 
-  // Assign a member to a dependent role on a specific date
-  if (body.action === "assign" && body.date && body.roleId && body.memberId) {
+  // Assign a member to a dependent role on a specific schedule date (event)
+  if (body.action === "assign" && body.roleId && body.memberId) {
     const role = (await db
       .select()
       .from(roles)
@@ -262,15 +262,30 @@ export async function PUT(
       );
     }
 
-    const sd = (await db
-      .select()
-      .from(scheduleDate)
-      .where(
-        and(
-          eq(scheduleDate.scheduleId, scheduleId),
-          eq(scheduleDate.date, body.date)
+    let sd: { id: number } | undefined;
+    if (body.scheduleDateId != null) {
+      const row = (await db
+        .select({ id: scheduleDate.id })
+        .from(scheduleDate)
+        .where(
+          and(
+            eq(scheduleDate.id, body.scheduleDateId),
+            eq(scheduleDate.scheduleId, scheduleId)
+          )
+        ))[0];
+      sd = row;
+    } else if (body.date) {
+      sd = (await db
+        .select({ id: scheduleDate.id })
+        .from(scheduleDate)
+        .where(
+          and(
+            eq(scheduleDate.scheduleId, scheduleId),
+            eq(scheduleDate.date, body.date)
+          )
         )
-      ))[0];
+        .orderBy(asc(scheduleDate.startTimeUtc)))[0];
+    }
 
     if (!sd) {
       return NextResponse.json(
@@ -356,7 +371,7 @@ export async function PUT(
     return NextResponse.json({ success: true });
   }
 
-  // Bulk update entries: replaces all entries for the schedule
+  // Bulk update entries: replaces all entries for the schedule. Entries keyed by scheduleDateId.
   if (body.action === "bulk_update" && Array.isArray(body.entries)) {
     const allRoles = await db
       .select()
@@ -370,7 +385,7 @@ export async function PUT(
       .select({ id: scheduleDate.id, date: scheduleDate.date })
       .from(scheduleDate)
       .where(eq(scheduleDate.scheduleId, scheduleId));
-    const dateToSdId = new Map(scheduleDatesForSchedule.map((sd) => [sd.date, sd.id]));
+    const validSdIds = new Set(scheduleDatesForSchedule.map((sd) => sd.id));
 
     const oldEntriesWithDate = await db
       .select({
@@ -384,14 +399,25 @@ export async function PUT(
       .innerJoin(scheduleDate, eq(scheduleDateAssignments.scheduleDateId, scheduleDate.id))
       .where(eq(scheduleDate.scheduleId, scheduleId));
 
-    const regularEntries: Array<{ date: string; roleId: number; memberId: number | null }> = [];
-    const dependentEntries: Array<{ date: string; roleId: number; memberId: number | null }> = [];
+    const regularEntries: Array<{ scheduleDateId: number; roleId: number; memberId: number | null }> = [];
+    const dependentEntries: Array<{ scheduleDateId: number; roleId: number; memberId: number | null }> = [];
 
     for (const entry of body.entries) {
+      const scheduleDateId =
+        entry.scheduleDateId ??
+        (typeof entry.date === "string"
+          ? scheduleDatesForSchedule.find((sd) => sd.date === entry.date)?.id
+          : undefined);
+      if (scheduleDateId == null || !validSdIds.has(scheduleDateId)) continue;
+      const e = {
+        scheduleDateId,
+        roleId: entry.roleId,
+        memberId: entry.memberId ?? null,
+      };
       if (dependentRoleIdSet.has(entry.roleId)) {
-        dependentEntries.push(entry);
+        dependentEntries.push(e);
       } else {
-        regularEntries.push(entry);
+        regularEntries.push(e);
       }
     }
 
@@ -404,16 +430,11 @@ export async function PUT(
 
     const toInsert = [...regularEntries, ...dependentEntries]
       .filter((e) => e.memberId != null)
-      .map((e) => {
-        const scheduleDateId = dateToSdId.get(e.date);
-        if (!scheduleDateId) return null;
-        return {
-          scheduleDateId,
-          roleId: e.roleId,
-          memberId: e.memberId!,
-        };
-      })
-      .filter(Boolean) as { scheduleDateId: number; roleId: number; memberId: number }[];
+      .map((e) => ({
+        scheduleDateId: e.scheduleDateId,
+        roleId: e.roleId,
+        memberId: e.memberId!,
+      }));
 
     if (toInsert.length > 0) {
       await db.insert(scheduleDateAssignments).values(toInsert);
@@ -429,7 +450,7 @@ export async function PUT(
     const oldBySlot = new Map<string, number>();
     const oldSlotCount = new Map<string, number>();
     for (const e of oldEntriesWithDate) {
-      const baseKey = `${e.date}|${e.roleId}`;
+      const baseKey = `${e.scheduleDateId}|${e.roleId}`;
       const idx = oldSlotCount.get(baseKey) ?? 0;
       oldBySlot.set(`${baseKey}|${idx}`, e.memberId);
       oldSlotCount.set(baseKey, idx + 1);
@@ -438,19 +459,27 @@ export async function PUT(
     const newBySlot = new Map<string, number | null>();
     const newSlotCount = new Map<string, number>();
     for (const e of body.entries) {
-      const baseKey = `${e.date}|${e.roleId}`;
+      const scheduleDateId =
+        e.scheduleDateId ??
+        (typeof e.date === "string"
+          ? scheduleDatesForSchedule.find((sd) => sd.date === e.date)?.id
+          : undefined);
+      if (scheduleDateId == null) continue;
+      const baseKey = `${scheduleDateId}|${e.roleId}`;
       const idx = newSlotCount.get(baseKey) ?? 0;
       newBySlot.set(`${baseKey}|${idx}`, e.memberId ?? null);
       newSlotCount.set(baseKey, idx + 1);
     }
 
+    const dateBySdId = new Map(scheduleDatesForSchedule.map((sd) => [sd.id, sd.date]));
     const changes: { date: string; role: string; from: string | null; to: string | null }[] = [];
     const allKeys = new Set([...oldBySlot.keys(), ...newBySlot.keys()]);
     for (const key of allKeys) {
       const oldMid = oldBySlot.get(key) ?? null;
       const newMid = newBySlot.get(key) ?? null;
       if (oldMid !== newMid) {
-        const [date, roleIdStr] = key.split("|");
+        const [sdIdStr, roleIdStr] = key.split("|");
+        const date = dateBySdId.get(parseInt(sdIdStr, 10)) ?? "?";
         changes.push({
           date,
           role: roleMap.get(parseInt(roleIdStr, 10)) ?? "?",
@@ -491,8 +520,13 @@ export async function PUT(
           eq(scheduleDate.type, "assignable")
         )
       );
-    const allRegularDates = assignableDatesRows.map((r) => r.date).sort();
-    const dateToSdIdRebuild = new Map(assignableDatesRows.map((r) => [r.date, r.id]));
+    const allRegularDates = [...new Set(assignableDatesRows.map((r) => r.date))].sort();
+    const dateToSdIdsRebuild = new Map<string, number[]>();
+    for (const r of assignableDatesRows) {
+      const list = dateToSdIdsRebuild.get(r.date) ?? [];
+      list.push(r.id);
+      dateToSdIdsRebuild.set(r.date, list);
+    }
 
     // Only dates from today onwards
     const futureDates = allRegularDates.filter((d) => d >= today);
@@ -611,17 +645,17 @@ export async function PUT(
     }
 
     if (result.assignments.length > 0) {
-      const toInsert = result.assignments
-        .map((a) => {
-          const scheduleDateId = dateToSdIdRebuild.get(a.date);
-          if (!scheduleDateId) return null;
-          return {
+      const toInsert: { scheduleDateId: number; roleId: number; memberId: number }[] = [];
+      for (const a of result.assignments) {
+        const sdIds = dateToSdIdsRebuild.get(a.date) ?? [];
+        for (const scheduleDateId of sdIds) {
+          toInsert.push({
             scheduleDateId,
             roleId: a.roleId,
             memberId: a.memberId,
-          };
-        })
-        .filter(Boolean) as { scheduleDateId: number; roleId: number; memberId: number }[];
+          });
+        }
+      }
       if (toInsert.length > 0) {
         await db.insert(scheduleDateAssignments).values(toInsert);
       }
@@ -638,7 +672,7 @@ export async function PUT(
     return NextResponse.json({ success: true });
   }
 
-  // Add a date (one more schedule_date row)
+  // Add a date (one more schedule_date row; multiple events per calendar day allowed)
   if (body.action === "add_date" && body.date) {
     const dateStr = body.date as string;
     const type = (body.type as string) ?? "assignable";
@@ -653,23 +687,6 @@ export async function PUT(
       return NextResponse.json(
         { error: "La fecha debe estar dentro del mes del cronograma" },
         { status: 400 }
-      );
-    }
-
-    const existing = (await db
-      .select()
-      .from(scheduleDate)
-      .where(
-        and(
-          eq(scheduleDate.scheduleId, scheduleId),
-          eq(scheduleDate.date, dateStr)
-        )
-      ))[0];
-
-    if (existing) {
-      return NextResponse.json(
-        { error: "Esa fecha ya existe en el cronograma" },
-        { status: 409 }
       );
     }
 
@@ -690,22 +707,35 @@ export async function PUT(
     return NextResponse.json({ success: true });
   }
 
-  // Update a schedule date (time and/or note)
-  if (body.action === "update_date" && body.date) {
-    const dateStr = body.date as string;
+  // Update a schedule date (time and/or note). Identify by scheduleDateId (preferred) or date.
+  if (body.action === "update_date") {
     const startTimeUtc = body.startTimeUtc as string | undefined;
     const endTimeUtc = body.endTimeUtc as string | undefined;
     const note = body.note as string | undefined;
 
-    const sd = (await db
-      .select()
-      .from(scheduleDate)
-      .where(
-        and(
-          eq(scheduleDate.scheduleId, scheduleId),
-          eq(scheduleDate.date, dateStr)
+    let sd: { id: number; date: string } | undefined;
+    if (body.scheduleDateId != null) {
+      sd = (await db
+        .select({ id: scheduleDate.id, date: scheduleDate.date })
+        .from(scheduleDate)
+        .where(
+          and(
+            eq(scheduleDate.id, body.scheduleDateId),
+            eq(scheduleDate.scheduleId, scheduleId)
+          )
+        ))[0];
+    } else if (body.date) {
+      sd = (await db
+        .select({ id: scheduleDate.id, date: scheduleDate.date })
+        .from(scheduleDate)
+        .where(
+          and(
+            eq(scheduleDate.scheduleId, scheduleId),
+            eq(scheduleDate.date, body.date)
+          )
         )
-      ))[0];
+        .orderBy(asc(scheduleDate.startTimeUtc)))[0];
+    }
 
     if (!sd) {
       return NextResponse.json(
@@ -733,35 +763,57 @@ export async function PUT(
 
     if (Object.keys(updates).length > 0) {
       await db.update(scheduleDate).set(updates).where(eq(scheduleDate.id, sd.id));
-      await logScheduleAction(scheduleId, authResult.user.id, "date_updated", `Fecha actualizada: ${dateStr}`);
+      await logScheduleAction(scheduleId, authResult.user.id, "date_updated", `Fecha actualizada: ${sd.date}`);
     }
 
     return NextResponse.json({ success: true });
   }
 
-  // Remove a date (delete schedule_date row; entries cascade)
-  if (body.action === "remove_date" && body.date) {
-    const dateStr = body.date as string;
-
-    const deleted = await db
-      .delete(scheduleDate)
-      .where(
-        and(
-          eq(scheduleDate.scheduleId, scheduleId),
-          eq(scheduleDate.date, dateStr)
+  // Remove a date: by scheduleDateId (one event) or by date (all events on that day)
+  if (body.action === "remove_date") {
+    if (body.scheduleDateId != null) {
+      const deleted = await db
+        .delete(scheduleDate)
+        .where(
+          and(
+            eq(scheduleDate.scheduleId, scheduleId),
+            eq(scheduleDate.id, body.scheduleDateId)
+          )
         )
-      )
-      .returning({ id: scheduleDate.id });
+        .returning({ id: scheduleDate.id, date: scheduleDate.date });
 
-    if (deleted.length === 0) {
+      if (deleted.length === 0) {
+        return NextResponse.json(
+          { error: "Fecha no encontrada" },
+          { status: 404 }
+        );
+      }
+      await logScheduleAction(scheduleId, authResult.user.id, "remove_date", `Evento eliminado: ${deleted[0].date}`);
+    } else if (body.date) {
+      const dateStr = body.date as string;
+      const deleted = await db
+        .delete(scheduleDate)
+        .where(
+          and(
+            eq(scheduleDate.scheduleId, scheduleId),
+            eq(scheduleDate.date, dateStr)
+          )
+        )
+        .returning({ id: scheduleDate.id });
+
+      if (deleted.length === 0) {
+        return NextResponse.json(
+          { error: "Fecha no encontrada" },
+          { status: 404 }
+        );
+      }
+      await logScheduleAction(scheduleId, authResult.user.id, "remove_date", `Fecha eliminada: ${dateStr}`);
+    } else {
       return NextResponse.json(
-        { error: "Fecha no encontrada" },
-        { status: 404 }
+        { error: "Indica scheduleDateId o date" },
+        { status: 400 }
       );
     }
-
-    await logScheduleAction(scheduleId, authResult.user.id, "remove_date", `Fecha eliminada: ${dateStr}`);
-
     return NextResponse.json({ success: true });
   }
 

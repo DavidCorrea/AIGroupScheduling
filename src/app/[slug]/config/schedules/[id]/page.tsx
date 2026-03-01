@@ -154,9 +154,9 @@ function formatRelativeTime(isoStr: string): string {
   return new Date(isoStr).toLocaleDateString("es-ES", { day: "numeric", month: "short" });
 }
 
-// Key for the edit state map: "date|roleId|slotIndex"
-function slotKey(date: string, roleId: number, slotIndex: number): string {
-  return `${date}|${roleId}|${slotIndex}`;
+// Key for the edit state map: "scheduleDateId|roleId|slotIndex"
+function slotKey(scheduleDateId: number, roleId: number, slotIndex: number): string {
+  return `${scheduleDateId}|${roleId}|${slotIndex}`;
 }
 
 export default function SchedulePreviewPage() {
@@ -260,7 +260,7 @@ export default function SchedulePreviewPage() {
       new Set(
         (schedule?.scheduleDates ?? [])
           .filter((d) => String(d.type).toLowerCase() === "for_everyone")
-          .map((d) => d.date)
+          .map((d) => d.id)
       ),
     [schedule]
   );
@@ -276,20 +276,26 @@ export default function SchedulePreviewPage() {
       new Map(
         (schedule?.scheduleDates ?? [])
           .filter((sd) => sd.note != null && sd.note.trim() !== "")
-          .map((sd) => [sd.date, sd.note!])
+          .map((sd) => [sd.id, sd.note!])
       ),
     [schedule]
   );
   const scheduleDateMap = useMemo(
     () =>
       new Map(
-        (schedule?.scheduleDates ?? []).map((d) => [d.date, d])
+        (schedule?.scheduleDates ?? []).map((d) => [d.id, d])
       ),
     [schedule]
   );
-  const allDates = useMemo(() => {
+  const visibleScheduleDates = useMemo(() => {
     if (!schedule) return [];
-    return [...schedule.scheduleDates.map((d) => d.date)].sort();
+    const list = [...schedule.scheduleDates];
+    list.sort((a, b) => {
+      const d = a.date.localeCompare(b.date);
+      if (d !== 0) return d;
+      return (a.startTimeUtc ?? "00:00").localeCompare(b.startTimeUtc ?? "00:00");
+    });
+    return list;
   }, [schedule]);
 
   // Map dayOfWeek name -> weekdayId for availability lookups (member.availableDayIds are weekday ids)
@@ -301,23 +307,23 @@ export default function SchedulePreviewPage() {
     return map;
   }, [scheduleDays]);
 
-  // Build edit state from schedule whenever schedule changes
+  // Build edit state from schedule whenever schedule changes (keyed by scheduleDateId)
   useEffect(() => {
     if (!schedule || roleOrder.length === 0) return;
 
     const state = new Map<string, number | null>();
+    const assignableSds = schedule.scheduleDates.filter(
+      (sd) => String(sd.type).toLowerCase() !== "for_everyone"
+    );
 
-    for (const date of allDates) {
-      if (rehearsalSet.has(date)) continue;
-
+    for (const sd of assignableSds) {
       for (const role of roleOrder) {
         const roleEntries = schedule.entries
-          .filter((e) => e.date === date && e.roleId === role.id)
-          .sort((a, b) => a.id - b.id); // stable order by id
-
+          .filter((e) => e.scheduleDateId === sd.id && e.roleId === role.id)
+          .sort((a, b) => a.id - b.id);
         const slotCount = Math.max(role.requiredCount, roleEntries.length);
         for (let i = 0; i < slotCount; i++) {
-          const key = slotKey(date, role.id, i);
+          const key = slotKey(sd.id, role.id, i);
           state.set(key, roleEntries[i]?.memberId ?? null);
         }
       }
@@ -325,13 +331,11 @@ export default function SchedulePreviewPage() {
 
     setEditState(new Map(state));
     setInitialState(new Map(state));
-  }, [schedule, roleOrder, allDates, rehearsalSet]);
+  }, [schedule, roleOrder]);
 
-  // Helper: display label for a date (recurring event label when linked, else stored label, else default)
-  const getDateDisplayLabel = (date: string): string => {
-    const d = scheduleDateMap.get(date);
-    if (!d) return "";
-    return d.recurringEventLabel ?? d.label ?? (d.type === "for_everyone" ? "Ensayo" : "Evento");
+  // Helper: display label for a schedule date (recurring event label when linked, else stored label, else default)
+  const getDateDisplayLabel = (sd: ScheduleDateInfo): string => {
+    return sd.recurringEventLabel ?? sd.label ?? (sd.type === "for_everyone" ? "Ensayo" : "Evento");
   };
 
   // Check if there are unsaved changes
@@ -343,10 +347,10 @@ export default function SchedulePreviewPage() {
     return false;
   }, [editState, initialState]);
 
-  const updateSlot = (date: string, roleId: number, slotIndex: number, memberId: number | null) => {
+  const updateSlot = (scheduleDateId: number, roleId: number, slotIndex: number, memberId: number | null) => {
     setEditState((prev) => {
       const next = new Map(prev);
-      next.set(slotKey(date, roleId, slotIndex), memberId);
+      next.set(slotKey(scheduleDateId, roleId, slotIndex), memberId);
       return next;
     });
   };
@@ -355,12 +359,11 @@ export default function SchedulePreviewPage() {
     if (!schedule) return;
     setSaving(true);
 
-    // Build entries array from editState
-    const entries: Array<{ date: string; roleId: number; memberId: number | null }> = [];
+    const entries: Array<{ scheduleDateId: number; roleId: number; memberId: number | null }> = [];
     for (const [key, memberId] of editState) {
-      const [date, roleIdStr] = key.split("|");
+      const [scheduleDateIdStr, roleIdStr] = key.split("|");
       entries.push({
-        date,
+        scheduleDateId: parseInt(scheduleDateIdStr, 10),
         roleId: parseInt(roleIdStr, 10),
         memberId,
       });
@@ -413,12 +416,12 @@ export default function SchedulePreviewPage() {
     }
   };
 
-  const handleRemoveDate = async (date: string) => {
-    if (!confirm("¿Eliminar esta fecha y todas sus asignaciones?")) return;
+  const handleRemoveDate = async (scheduleDateId: number) => {
+    if (!confirm("¿Eliminar este evento y todas sus asignaciones?")) return;
     const res = await fetch(`/api/schedules/${params.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "remove_date", date }),
+      body: JSON.stringify({ action: "remove_date", scheduleDateId }),
     });
     if (res.ok) fetchData();
   };
@@ -442,7 +445,7 @@ export default function SchedulePreviewPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "update_date",
-        date: editDateModal.date,
+        scheduleDateId: editDateModal.id,
         startTimeUtc: localTimeToUtc(editDateStartUtc),
         endTimeUtc: localTimeToUtc(editDateEndUtc),
         note: editDateNote.trim() || null,
@@ -459,11 +462,11 @@ export default function SchedulePreviewPage() {
   };
 
   const handleDeleteFromEditModal = async () => {
-    if (!editDateModal || !confirm("¿Eliminar esta fecha y todas sus asignaciones?")) return;
+    if (!editDateModal || !confirm("¿Eliminar este evento y todas sus asignaciones?")) return;
     const res = await fetch(`/api/schedules/${params.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "remove_date", date: editDateModal.date }),
+      body: JSON.stringify({ action: "remove_date", scheduleDateId: editDateModal.id }),
     });
     if (res.ok) {
       closeEditDateModal();
@@ -516,39 +519,41 @@ export default function SchedulePreviewPage() {
 
   // Check if there are future dates for the rebuild button
   const todayISO = useMemo(() => new Date().toISOString().split("T")[0], []);
-  const hasFutureDates = allDates.some((d) => d >= todayISO);
-  const hasPastDates = allDates.some((d) => d < todayISO);
-  const visibleDates = useMemo(() => {
-    if (showPastDates) return allDates;
-    return allDates.filter((d) => d >= todayISO);
-  }, [allDates, showPastDates, todayISO]);
+  const hasFutureDates = visibleScheduleDates.some((sd) => sd.date >= todayISO);
+  const hasPastDates = visibleScheduleDates.some((sd) => sd.date < todayISO);
+  const visibleScheduleDatesFiltered = useMemo(() => {
+    if (showPastDates) return visibleScheduleDates;
+    return visibleScheduleDates.filter((sd) => sd.date >= todayISO);
+  }, [visibleScheduleDates, showPastDates, todayISO]);
 
-  // Group visible dates by week of month (Semana 1 = days 1-7, Semana 2 = 8-14, etc.)
-  const visibleDatesByWeek = useMemo(() => {
-    const weekMap = new Map<number, string[]>();
-    for (const date of visibleDates) {
-      const dayOfMonth = parseInt(date.slice(8, 10), 10);
+  // Group visible schedule dates by week of month (Semana 1 = days 1-7, etc.)
+  const visibleScheduleDatesByWeek = useMemo(() => {
+    const weekMap = new Map<number, ScheduleDateInfo[]>();
+    for (const sd of visibleScheduleDatesFiltered) {
+      const dayOfMonth = parseInt(sd.date.slice(8, 10), 10);
       const weekNum = Math.ceil(dayOfMonth / 7);
       if (!weekMap.has(weekNum)) weekMap.set(weekNum, []);
-      weekMap.get(weekNum)!.push(date);
+      weekMap.get(weekNum)!.push(sd);
     }
     return [...weekMap.entries()]
       .sort((a, b) => a[0] - b[0])
-      .map(([weekNumber, dates]) => ({ weekNumber, dates }));
-  }, [visibleDates]);
+      .map(([weekNumber, scheduleDates]) => ({ weekNumber, scheduleDates }));
+  }, [visibleScheduleDatesFiltered]);
 
   // Default: all weeks collapsed except the one containing today (once per schedule load)
   useEffect(() => {
-    if (!schedule?.id || visibleDatesByWeek.length === 0) return;
+    if (!schedule?.id || visibleScheduleDatesByWeek.length === 0) return;
     if (initialCollapseAppliedForRef.current === schedule.id) return;
     initialCollapseAppliedForRef.current = schedule.id;
-    const weekWithToday = visibleDatesByWeek.find((w) => w.dates.includes(todayISO))?.weekNumber;
-    const allWeekNumbers = visibleDatesByWeek.map((w) => w.weekNumber);
+    const weekWithToday = visibleScheduleDatesByWeek.find((w) =>
+      w.scheduleDates.some((sd) => sd.date === todayISO)
+    )?.weekNumber;
+    const allWeekNumbers = visibleScheduleDatesByWeek.map((w) => w.weekNumber);
     const toCollapse = weekWithToday != null
       ? allWeekNumbers.filter((n) => n !== weekWithToday)
       : allWeekNumbers;
     setCollapsedWeeks(new Set(toCollapse));
-  }, [schedule?.id, visibleDatesByWeek, todayISO]);
+  }, [schedule?.id, visibleScheduleDatesByWeek, todayISO]);
 
   if (groupLoading || loading || !schedule) {
     return <p className="text-sm text-muted-foreground">Cargando...</p>;
@@ -563,22 +568,20 @@ export default function SchedulePreviewPage() {
     return member.availableDayIds.includes(weekdayId);
   };
 
-  // Helper: get eligible members for a role slot
-  const getEligibleMembers = (date: string, role: RoleInfo): Member[] => {
+  // Helper: get eligible members for a role slot (for a specific schedule date / event)
+  const getEligibleMembers = (scheduleDateId: number, date: string, role: RoleInfo): Member[] => {
     if (role.dependsOnRoleId != null) {
-      // Dependent role: only members assigned to the source role on this date
-      // who also have this dependent role in their roleIds
       const sourceEntryMemberIds: number[] = [];
       for (const sourceRole of roleOrder) {
         if (sourceRole.id === role.dependsOnRoleId) {
           const slotCount = Math.max(
             sourceRole.requiredCount,
             schedule.entries.filter(
-              (e) => e.date === date && e.roleId === sourceRole.id
+              (e) => e.scheduleDateId === scheduleDateId && e.roleId === sourceRole.id
             ).length
           );
           for (let i = 0; i < slotCount; i++) {
-            const mid = editState.get(slotKey(date, sourceRole.id, i));
+            const mid = editState.get(slotKey(scheduleDateId, sourceRole.id, i));
             if (mid != null) sourceEntryMemberIds.push(mid);
           }
         }
@@ -589,29 +592,28 @@ export default function SchedulePreviewPage() {
           m.roleIds.includes(role.id)
       );
     }
-    // For dates in the schedule, skip availability check when explicitly added (all dates are in schedule_date)
     return members.filter(
       (m) => m.roleIds.includes(role.id) && isMemberAvailable(m, date)
     );
   };
 
-  // Render a single select for a slot
+  // Render a single select for a slot (for a specific schedule date / event)
   const renderSlotSelect = (
+    scheduleDateId: number,
     date: string,
     role: RoleInfo,
     slotIndex: number,
     totalSlots?: number
   ) => {
-    const key = slotKey(date, role.id, slotIndex);
+    const key = slotKey(scheduleDateId, role.id, slotIndex);
     const currentMemberId = editState.get(key) ?? null;
-    const eligible = getEligibleMembers(date, role);
+    const eligible = getEligibleMembers(scheduleDateId, date, role);
 
-    // Collect member IDs already selected in OTHER slots of the same role on the same date
     const takenByOtherSlots = new Set<number>();
     const slots = totalSlots ?? role.requiredCount;
     for (let i = 0; i < slots; i++) {
       if (i === slotIndex) continue;
-      const otherId = editState.get(slotKey(date, role.id, i));
+      const otherId = editState.get(slotKey(scheduleDateId, role.id, i));
       if (otherId != null) takenByOtherSlots.add(otherId);
     }
 
@@ -633,7 +635,7 @@ export default function SchedulePreviewPage() {
           value={currentMemberId ?? ""}
           onChange={(e) => {
             const val = e.target.value;
-            updateSlot(date, role.id, slotIndex, val ? parseInt(val, 10) : null);
+            updateSlot(scheduleDateId, role.id, slotIndex, val ? parseInt(val, 10) : null);
           }}
         >
           <option value="">— Vacío —</option>
@@ -814,7 +816,7 @@ export default function SchedulePreviewPage() {
 
       {/* Mobile card view */}
       <div className="md:hidden space-y-8">
-        {visibleDatesByWeek.map(({ weekNumber, dates }) => {
+        {visibleScheduleDatesByWeek.map(({ weekNumber, scheduleDates }) => {
           const isCollapsed = collapsedWeeks.has(weekNumber);
           return (
           <section
@@ -843,23 +845,28 @@ export default function SchedulePreviewPage() {
             </button>
             {!isCollapsed && (
             <div className="p-4 space-y-4">
-        {dates.map((date) => {
-          const isRehearsal = rehearsalSet.has(date);
-          const note = noteMap.get(date);
+        {scheduleDates.map((sd) => {
+          const isRehearsal = rehearsalSet.has(sd.id);
+          const note = noteMap.get(sd.id);
+          const timeRange = sd.startTimeUtc && sd.endTimeUtc && (sd.startTimeUtc !== "00:00" || sd.endTimeUtc !== "23:59")
+            ? `${utcTimeToLocalDisplay(sd.startTimeUtc)} – ${utcTimeToLocalDisplay(sd.endTimeUtc)}`
+            : null;
 
           return (
             <div
-              key={date}
+              key={sd.id}
               className={`border border-border rounded-md overflow-hidden ${isRehearsal ? "bg-muted/30" : "bg-background"}`}
             >
-              {/* Date header */}
               <div className="px-4 py-3 border-b border-border">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex flex-col gap-0.5">
-                    <span className="font-medium text-sm">{formatDateWeekdayDay(date)}</span>
-                    {!isRehearsal && getDateDisplayLabel(date) && (
+                    <span className="font-medium text-sm">{formatDateWeekdayDay(sd.date)}</span>
+                    {timeRange && (
+                      <span className="text-xs text-muted-foreground">{timeRange}</span>
+                    )}
+                    {!isRehearsal && getDateDisplayLabel(sd) && (
                       <span className="text-xs text-muted-foreground italic">
-                        {getDateDisplayLabel(date)}
+                        {getDateDisplayLabel(sd)}
                       </span>
                     )}
                   </div>
@@ -868,9 +875,9 @@ export default function SchedulePreviewPage() {
                       <span className="text-xs text-muted-foreground">{note}</span>
                     ) : null}
                     <button
-                      onClick={() => scheduleDateMap.get(date) && openEditDateModal(scheduleDateMap.get(date)!)}
+                      onClick={() => openEditDateModal(sd)}
                       className="text-xs text-accent hover:opacity-80"
-                      title="Editar fecha"
+                      title="Editar evento"
                     >
                       Editar
                     </button>
@@ -878,19 +885,17 @@ export default function SchedulePreviewPage() {
                 </div>
               </div>
 
-              {/* For-everyone event: label centered across the card */}
               {isRehearsal && (
                 <div className="px-4 py-3 text-sm text-muted-foreground italic text-center border-b border-border">
-                  {getDateDisplayLabel(date) || "Ensayo"}
+                  {getDateDisplayLabel(sd) || "Ensayo"}
                 </div>
               )}
 
-              {/* Role entries (assignable dates only) */}
               {!isRehearsal && (
                 <div className="divide-y divide-border/50">
                   {roleOrder.map((role) => {
                     const existingEntries = schedule.entries.filter(
-                      (e) => e.date === date && e.roleId === role.id
+                      (e) => e.scheduleDateId === sd.id && e.roleId === role.id
                     );
                     const slotCount = Math.max(role.requiredCount, existingEntries.length);
 
@@ -901,7 +906,7 @@ export default function SchedulePreviewPage() {
                         </div>
                         <div className={slotCount > 1 ? "grid grid-cols-2 gap-2" : ""}>
                           {Array.from({ length: slotCount }).map((_, i) =>
-                            renderSlotSelect(date, role, i, slotCount)
+                            renderSlotSelect(sd.id, sd.date, role, i, slotCount)
                           )}
                         </div>
                       </div>
@@ -921,7 +926,7 @@ export default function SchedulePreviewPage() {
 
       {/* Desktop table view: one table per week */}
       <div className="hidden md:block space-y-8">
-        {visibleDatesByWeek.map(({ weekNumber, dates }) => {
+        {visibleScheduleDatesByWeek.map(({ weekNumber, scheduleDates }) => {
           const isCollapsed = collapsedWeeks.has(weekNumber);
           return (
           <section key={weekNumber} className="border border-border rounded-lg overflow-hidden bg-muted/5">
@@ -967,21 +972,27 @@ export default function SchedulePreviewPage() {
             </tr>
           </thead>
           <tbody>
-            {dates.map((date) => {
-              const isRehearsal = rehearsalSet.has(date);
-              const note = noteMap.get(date);
+            {scheduleDates.map((sd) => {
+              const isRehearsal = rehearsalSet.has(sd.id);
+              const note = noteMap.get(sd.id);
+              const timeRange = sd.startTimeUtc && sd.endTimeUtc && (sd.startTimeUtc !== "00:00" || sd.endTimeUtc !== "23:59")
+                ? `${utcTimeToLocalDisplay(sd.startTimeUtc)} – ${utcTimeToLocalDisplay(sd.endTimeUtc)}`
+                : null;
 
               return (
                 <tr
-                  key={date}
+                  key={sd.id}
                   className={`border-b border-border ${isRehearsal ? "bg-muted/20" : "hover:bg-muted/30"} transition-colors`}
                 >
                   <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">
                     <div>
-                      <div>{formatDateWeekdayDay(date)}</div>
-                      {!isRehearsal && getDateDisplayLabel(date) && (
+                      <div>{formatDateWeekdayDay(sd.date)}</div>
+                      {timeRange && (
+                        <div className="text-xs text-muted-foreground mt-0.5">{timeRange}</div>
+                      )}
+                      {!isRehearsal && getDateDisplayLabel(sd) && (
                         <div className="text-xs text-muted-foreground italic mt-0.5">
-                          {getDateDisplayLabel(date)}
+                          {getDateDisplayLabel(sd)}
                         </div>
                       )}
                     </div>
@@ -994,12 +1005,12 @@ export default function SchedulePreviewPage() {
                       colSpan={roleOrder.length}
                       className="px-4 py-3 text-sm text-muted-foreground italic text-center"
                     >
-                      {getDateDisplayLabel(date) || "Ensayo"}
+                      {getDateDisplayLabel(sd) || "Ensayo"}
                     </td>
                   ) : (
                     roleOrder.map((role) => {
                       const existingEntries = schedule.entries.filter(
-                        (e) => e.date === date && e.roleId === role.id
+                        (e) => e.scheduleDateId === sd.id && e.roleId === role.id
                       );
                       const slotCount = Math.max(role.requiredCount, existingEntries.length);
 
@@ -1007,7 +1018,7 @@ export default function SchedulePreviewPage() {
                         <td key={role.id} className="px-4 py-3 text-sm">
                           <div className={slotCount > 1 ? "grid grid-cols-2 gap-1.5" : ""}>
                             {Array.from({ length: slotCount }).map((_, i) =>
-                              renderSlotSelect(date, role, i, slotCount)
+                              renderSlotSelect(sd.id, sd.date, role, i, slotCount)
                             )}
                           </div>
                         </td>
@@ -1016,9 +1027,9 @@ export default function SchedulePreviewPage() {
                   )}
                   <td className="px-4 py-3 text-sm">
                     <button
-                      onClick={() => scheduleDateMap.get(date) && openEditDateModal(scheduleDateMap.get(date)!)}
+                      onClick={() => openEditDateModal(sd)}
                       className="text-xs text-accent hover:opacity-80"
-                      title="Editar fecha"
+                      title="Editar evento"
                     >
                       Editar
                     </button>

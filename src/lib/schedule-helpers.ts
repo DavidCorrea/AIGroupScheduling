@@ -276,11 +276,15 @@ export async function rebuildScheduleFutureAssignments(
         eq(scheduleDate.type, "assignable")
       )
     );
-  const futureDates = assignableDatesRows
-    .map((r) => r.date)
+  const futureDates = [...new Set(assignableDatesRows.map((r) => r.date))]
     .filter((d) => d >= today)
     .sort();
-  const dateToSdId = new Map(assignableDatesRows.map((r) => [r.date, r.id]));
+  const dateToSdIds = new Map<string, number[]>();
+  for (const r of assignableDatesRows) {
+    const list = dateToSdIds.get(r.date) ?? [];
+    list.push(r.id);
+    dateToSdIds.set(r.date, list);
+  }
 
   if (futureDates.length === 0) {
     return { applied: 0 };
@@ -322,17 +326,17 @@ export async function rebuildScheduleFutureAssignments(
   }
 
   if (result.assignments.length > 0) {
-    const toInsert = result.assignments
-      .map((a) => {
-        const scheduleDateId = dateToSdId.get(a.date);
-        if (!scheduleDateId) return null;
-        return {
+    const toInsert: { scheduleDateId: number; roleId: number; memberId: number }[] = [];
+    for (const a of result.assignments) {
+      const sdIds = dateToSdIds.get(a.date) ?? [];
+      for (const scheduleDateId of sdIds) {
+        toInsert.push({
           scheduleDateId,
           roleId: a.roleId,
           memberId: a.memberId,
-        };
-      })
-      .filter(Boolean) as { scheduleDateId: number; roleId: number; memberId: number }[];
+        });
+      }
+    }
     if (toInsert.length > 0) {
       await db.insert(scheduleDateAssignments).values(toInsert);
     }

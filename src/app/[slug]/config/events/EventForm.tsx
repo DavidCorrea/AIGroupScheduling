@@ -26,6 +26,7 @@ interface EventData {
   startTimeUtc?: string;
   endTimeUtc?: string;
   groupId: number;
+  notes?: string | null;
 }
 
 interface PriorityItem {
@@ -131,6 +132,7 @@ export default function EventForm({
   const [active, setActive] = useState(initialEvent?.active ?? true);
   const [type, setType] = useState<string>(initialEvent?.type ?? "assignable");
   const [label, setLabel] = useState(initialEvent?.label ?? "Evento");
+  const [notes, setNotes] = useState(initialEvent?.notes ?? "");
   const [startTimeUtc, setStartTimeUtc] = useState(
     initialEvent ? utcTimeToLocalDisplay(initialEvent.startTimeUtc ?? "00:00") : "00:00"
   );
@@ -159,6 +161,7 @@ export default function EventForm({
         active !== true ||
         type !== "assignable" ||
         label.trim() !== "Evento" ||
+        (notes ?? "").trim() !== "" ||
         startTimeUtc !== "00:00" ||
         endTimeUtc !== "23:59" ||
         JSON.stringify(priorityOrder) !== JSON.stringify(appliedPriorityOrder)
@@ -170,6 +173,7 @@ export default function EventForm({
       active !== initialEvent.active ||
       type !== initialEvent.type ||
       (label ?? "Evento").trim() !== (initialEvent.label ?? "Evento").trim() ||
+      (notes ?? "").trim() !== (initialEvent.notes ?? "").trim() ||
       startTimeUtc !== initialStartLocal ||
       endTimeUtc !== initialEndLocal ||
       JSON.stringify(priorityOrder) !== JSON.stringify(appliedPriorityOrder)
@@ -185,6 +189,7 @@ export default function EventForm({
     endTimeUtc,
     priorityOrder,
     appliedPriorityOrder,
+    notes,
   ]);
 
   useEffect(() => {
@@ -346,6 +351,7 @@ export default function EventForm({
             active,
             type: type === "for_everyone" ? "for_everyone" : "assignable",
             label: label.trim() || "Evento",
+            notes: (notes ?? "").trim() || null,
             startTimeUtc: localTimeToUtc(startTimeUtc || "00:00"),
             endTimeUtc: localTimeToUtc(endTimeUtc || "23:59"),
           }),
@@ -385,6 +391,7 @@ export default function EventForm({
             active,
             type: type === "for_everyone" ? "for_everyone" : "assignable",
             label: label.trim() || "Evento",
+            notes: (notes ?? "").trim() || null,
             startTimeUtc: localTimeToUtc(startTimeUtc || "00:00"),
             endTimeUtc: localTimeToUtc(endTimeUtc || "23:59"),
           }),
@@ -483,6 +490,19 @@ export default function EventForm({
             <p className="text-xs text-muted-foreground mt-1">
               Obligatorio. Se muestra en el cronograma para identificar el evento.
             </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">
+              Notas
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Opcional. Notas internas sobre este evento."
+              rows={3}
+              className="w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground resize-y min-h-[80px]"
+            />
           </div>
 
           {isNew ? (

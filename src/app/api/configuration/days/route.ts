@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
       startTimeUtc: recurringEvents.startTimeUtc,
       endTimeUtc: recurringEvents.endTimeUtc,
       groupId: recurringEvents.groupId,
+      notes: recurringEvents.notes,
     })
     .from(recurringEvents)
     .innerJoin(weekdays, eq(recurringEvents.weekdayId, weekdays.id))
@@ -34,7 +35,7 @@ export async function PUT(request: NextRequest) {
   const { groupId } = accessResult;
 
   const body = await request.json();
-  const { id, active, type, label, startTimeUtc, endTimeUtc, dayOfWeek: bodyDayOfWeek } = body;
+  const { id, active, type, label, startTimeUtc, endTimeUtc, notes, dayOfWeek: bodyDayOfWeek } = body;
 
   if (!id) {
     return NextResponse.json(
@@ -59,6 +60,7 @@ export async function PUT(request: NextRequest) {
     label: string;
     startTimeUtc: string;
     endTimeUtc: string;
+    notes: string | null;
   }> = {};
   if (typeof active === "boolean") updates.active = active;
   if (typeof bodyDayOfWeek === "string" && bodyDayOfWeek.trim() !== "") {
@@ -90,10 +92,13 @@ export async function PUT(request: NextRequest) {
   if (typeof endTimeUtc === "string" && /^\d{1,2}:\d{2}$/.test(endTimeUtc)) {
     updates.endTimeUtc = endTimeUtc;
   }
+  if (notes !== undefined) {
+    updates.notes = typeof notes === "string" ? notes.trim() || null : null;
+  }
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json(
-      { error: "At least one of active, dayOfWeek, type, label, startTimeUtc, or endTimeUtc must be provided" },
+      { error: "At least one of active, dayOfWeek, type, label, startTimeUtc, endTimeUtc, or notes must be provided" },
       { status: 400 }
     );
   }
@@ -118,6 +123,7 @@ export async function PUT(request: NextRequest) {
       startTimeUtc: recurringEvents.startTimeUtc,
       endTimeUtc: recurringEvents.endTimeUtc,
       groupId: recurringEvents.groupId,
+      notes: recurringEvents.notes,
     })
     .from(recurringEvents)
     .innerJoin(weekdays, eq(recurringEvents.weekdayId, weekdays.id))
@@ -144,6 +150,8 @@ export async function POST(request: NextRequest) {
     typeof body.label === "string" && body.label.trim() !== ""
       ? body.label.trim()
       : "Evento";
+  const notes =
+    typeof body.notes === "string" ? (body.notes.trim() || null) : null;
   const startTimeUtc = typeof body.startTimeUtc === "string" && /^\d{1,2}:\d{2}$/.test(body.startTimeUtc)
     ? body.startTimeUtc
     : "00:00";
@@ -174,6 +182,7 @@ export async function POST(request: NextRequest) {
       active: type === "for_everyone" ? true : active,
       type,
       label,
+      notes,
       startTimeUtc,
       endTimeUtc,
     })
@@ -190,6 +199,7 @@ export async function POST(request: NextRequest) {
       startTimeUtc: recurringEvents.startTimeUtc,
       endTimeUtc: recurringEvents.endTimeUtc,
       groupId: recurringEvents.groupId,
+      notes: recurringEvents.notes,
     })
     .from(recurringEvents)
     .innerJoin(weekdays, eq(recurringEvents.weekdayId, weekdays.id))
