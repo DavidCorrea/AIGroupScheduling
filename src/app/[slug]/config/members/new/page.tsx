@@ -150,14 +150,14 @@ export default function NewMemberPage() {
           </div>
 
           <div>
-            <h3 className="text-sm font-medium text-foreground mb-2">
+            <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">
               Días y horarios disponibles
-            </h3>
+            </h2>
             <AvailabilityWeekGrid
               days={days}
               availability={availabilityLocal}
               onChange={setAvailabilityLocal}
-              gridHeight={220}
+              gridHeight={330}
             />
           </div>
 
