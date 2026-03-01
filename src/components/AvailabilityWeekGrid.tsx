@@ -2,14 +2,69 @@
 
 import { useCallback, useRef, useState } from "react";
 
-const MIN_BLOCK_MINUTES = 15;
-const SNAP_MINUTES = 15; // soft-lock: snap to 15-min like calendar apps
+const MIN_BLOCK_MINUTES = 30;
+const SNAP_MINUTES = 30; // snap to 30-min boundaries
 const TOTAL_MINUTES = 24 * 60; // 1440
+const STEPS_PER_HOUR = TOTAL_MINUTES / 24 / SNAP_MINUTES; // 2 for 30-min
+const STEPS_PER_DAY = 24 * STEPS_PER_HOUR; // 48
 const HEADER_HEIGHT = 40;
+/** Padding above 00 and below 24; blocks cannot extend into these areas */
+const BODY_PADDING_TOP = 12;
+const BODY_PADDING_BOTTOM = 12;
+
+/** Body height in px (used for layout and block positioning so they match). */
+function getBodyHeightPx(gridHeight: number): number {
+  return gridHeight - BODY_PADDING_TOP - BODY_PADDING_BOTTOM;
+}
 
 function parseHHMM(s: string): number {
   const [h, m] = (s ?? "00:00").trim().split(":").map((x) => parseInt(x, 10) || 0);
-  return Math.min(TOTAL_MINUTES - 1, Math.max(0, h * 60 + m));
+  return Math.min(TOTAL_MINUTES, Math.max(0, h * 60 + m));
+}
+
+/** Normalize blocks for one day: clamp to [0,24h], merge overlaps, trim total to ≤24h. */
+function normalizeDayBlocks(blocks: AvailabilityBlock[]): AvailabilityBlock[] {
+  if (blocks.length === 0) return [];
+  const parsed = blocks
+    .map((b) => {
+      const start = Math.max(0, Math.min(TOTAL_MINUTES, parseHHMM(b.startLocal)));
+      const end = Math.max(0, Math.min(TOTAL_MINUTES, parseHHMM(b.endLocal)));
+      return { start, end };
+    })
+    .filter((b) => b.end > b.start)
+    .sort((a, b) => a.start - b.start);
+  if (parsed.length === 0) return [];
+  const merged: { start: number; end: number }[] = [];
+  for (const b of parsed) {
+    const last = merged[merged.length - 1];
+    if (last && b.start <= last.end) {
+      last.end = Math.max(last.end, b.end);
+    } else {
+      merged.push({ start: b.start, end: b.end });
+    }
+  }
+  let total = merged.reduce((s, b) => s + (b.end - b.start), 0);
+  if (total <= TOTAL_MINUTES) {
+    return merged.map((b) => ({
+      startLocal: minutesToHHMM(b.start),
+      endLocal: minutesToHHMM(b.end),
+    }));
+  }
+  let toTrim = total - TOTAL_MINUTES;
+  for (let i = merged.length - 1; i >= 0 && toTrim > 0; i--) {
+    const len = merged[i].end - merged[i].start;
+    if (toTrim >= len) {
+      toTrim -= len;
+      merged.splice(i, 1);
+    } else {
+      merged[i].end -= toTrim;
+      toTrim = 0;
+    }
+  }
+  return merged.map((b) => ({
+    startLocal: minutesToHHMM(b.start),
+    endLocal: minutesToHHMM(b.end),
+  }));
 }
 
 function minutesToHHMM(min: number): string {
@@ -45,7 +100,7 @@ export default function AvailabilityWeekGrid({
   days,
   availability,
   onChange,
-  gridHeight = 360,
+  gridHeight = 540,
 }: AvailabilityWeekGridProps) {
   const gridRef = useRef<HTMLDivElement>(null);
   const mobileStripRefs = useRef<Record<number, HTMLDivElement | null>>({});
@@ -60,37 +115,37 @@ export default function AvailabilityWeekGrid({
     layout: "desktop" | "mobile";
   } | null>(null);
 
-  const handleColumnClick = useCallback(
-    (e: React.MouseEvent, weekdayId: number) => {
-      const rect = gridRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const bodyTop = rect.top + HEADER_HEIGHT;
-      const bodyHeight = rect.height - HEADER_HEIGHT;
-      const bodyY = e.clientY - bodyTop;
-      const pointerMinutes = snapToStep(
-        Math.max(0, Math.min(TOTAL_MINUTES, (bodyY / bodyHeight) * TOTAL_MINUTES))
-      );
-
-      const blocks = availability[weekdayId] ?? [];
-      if (blocks.length === 0) {
-        onChange({ ...availability, [weekdayId]: [{ startLocal: "00:00", endLocal: "23:59" }] });
-        return;
-      }
-      const startMinutes = pointerMinutes;
-      const endMinutes = Math.min(TOTAL_MINUTES, snapToStep(pointerMinutes + 60));
-      const actualEnd = Math.max(endMinutes, startMinutes + MIN_BLOCK_MINUTES);
+  const handleHourClick = useCallback(
+    (weekdayId: number, hourIndex: number) => {
+      const hour = Math.max(0, Math.min(23, hourIndex));
+      const startMinutes = hour * 60;
+      const endMinutes = Math.min(TOTAL_MINUTES, (hour + 1) * 60);
       const newBlock: AvailabilityBlock = {
         startLocal: minutesToHHMM(startMinutes),
-        endLocal: minutesToHHMM(actualEnd),
+        endLocal: minutesToHHMM(endMinutes),
       };
-      onChange({
-        ...availability,
-        [weekdayId]: [...blocks, newBlock].sort(
-          (a, b) => parseHHMM(a.startLocal) - parseHHMM(b.startLocal)
-        ),
-      });
+      const blocks = availability[weekdayId] ?? [];
+      const next = [...blocks, newBlock].sort(
+        (a, b) => parseHHMM(a.startLocal) - parseHHMM(b.startLocal)
+      );
+      onChange({ ...availability, [weekdayId]: next });
     },
     [availability, onChange]
+  );
+
+  const handleColumnBodyClick = useCallback(
+    (e: React.MouseEvent, weekdayId: number) => {
+      if ((e.target as HTMLElement).closest("[data-availability-block]")) return;
+      const cell = (e.target as HTMLElement).closest("[data-step]");
+      if (!cell) return;
+      const stepAttr = cell.getAttribute("data-step");
+      if (stepAttr == null) return;
+      const stepIndex = parseInt(stepAttr, 10);
+      if (!Number.isFinite(stepIndex) || stepIndex < 0 || stepIndex >= STEPS_PER_DAY) return;
+      const hourIndex = Math.floor(stepIndex / STEPS_PER_HOUR);
+      handleHourClick(weekdayId, hourIndex);
+    },
+    [handleHourClick]
   );
 
   const handleRemoveBlock = useCallback(
@@ -103,7 +158,7 @@ export default function AvailabilityWeekGrid({
         delete nextAvail[weekdayId];
         onChange(nextAvail);
       } else {
-        onChange({ ...availability, [weekdayId]: next });
+        onChange({ ...availability, [weekdayId]: normalizeDayBlocks(next) });
       }
     },
     [availability, onChange]
@@ -121,31 +176,17 @@ export default function AvailabilityWeekGrid({
 
   const handleMobileStripClick = useCallback(
     (e: React.MouseEvent, weekdayId: number) => {
-      const strip = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-      const x = e.clientX - strip.left;
-      const pointerMinutes = snapToStep(
-        Math.max(0, Math.min(TOTAL_MINUTES, (x / strip.width) * TOTAL_MINUTES))
-      );
-      const blocks = availability[weekdayId] ?? [];
-      if (blocks.length === 0) {
-        onChange({ ...availability, [weekdayId]: [{ startLocal: "00:00", endLocal: "23:59" }] });
-        return;
-      }
-      const startMinutes = pointerMinutes;
-      const endMinutes = Math.min(TOTAL_MINUTES, snapToStep(pointerMinutes + 60));
-      const actualEnd = Math.max(endMinutes, startMinutes + MIN_BLOCK_MINUTES);
-      const newBlock: AvailabilityBlock = {
-        startLocal: minutesToHHMM(startMinutes),
-        endLocal: minutesToHHMM(actualEnd),
-      };
-      onChange({
-        ...availability,
-        [weekdayId]: [...blocks, newBlock].sort(
-          (a, b) => parseHHMM(a.startLocal) - parseHHMM(b.startLocal)
-        ),
-      });
+      if ((e.target as HTMLElement).closest("[data-availability-block]")) return;
+      const cell = (e.target as HTMLElement).closest("[data-step]");
+      if (!cell) return;
+      const stepAttr = cell.getAttribute("data-step");
+      if (stepAttr == null) return;
+      const stepIndex = parseInt(stepAttr, 10);
+      if (!Number.isFinite(stepIndex) || stepIndex < 0 || stepIndex >= STEPS_PER_DAY) return;
+      const hourIndex = Math.floor(stepIndex / STEPS_PER_HOUR);
+      handleHourClick(weekdayId, hourIndex);
     },
-    [availability, onChange]
+    [handleHourClick]
   );
 
   const handlePointerDownBlockMobile = useCallback(
@@ -223,15 +264,30 @@ export default function AvailabilityWeekGrid({
           Math.min(TOTAL_MINUTES, (x / rect.width) * TOTAL_MINUTES)
         );
       } else {
-        const rect = gridRef.current?.getBoundingClientRect();
-        if (!rect) return;
-        const bodyTop = rect.top + HEADER_HEIGHT;
-        const bodyHeight = rect.height - HEADER_HEIGHT;
-        const bodyY = e.clientY - bodyTop;
-        pointerMinutes = Math.max(
-          0,
-          Math.min(TOTAL_MINUTES, (bodyY / bodyHeight) * TOTAL_MINUTES)
-        );
+        const bodyEl = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest?.("[data-column-body]") as HTMLDivElement | null;
+        if (bodyEl) {
+          const bodyRect = bodyEl.getBoundingClientRect();
+          const bodyY = e.clientY - bodyRect.top;
+          const bodyHeight = bodyRect.height;
+          if (bodyHeight > 0) {
+            pointerMinutes = Math.max(
+              0,
+              Math.min(TOTAL_MINUTES, (bodyY / bodyHeight) * TOTAL_MINUTES)
+            );
+          }
+        } else {
+          const gridEl = gridRef.current;
+          if (!gridEl) return;
+          const rect = gridEl.getBoundingClientRect();
+          const gridContentTop = rect.top + gridEl.clientTop;
+          const bodyTop = gridContentTop + HEADER_HEIGHT + BODY_PADDING_TOP;
+          const bodyHeight = getBodyHeightPx(gridHeight);
+          const bodyY = e.clientY - bodyTop;
+          pointerMinutes = Math.max(
+            0,
+            Math.min(TOTAL_MINUTES, (bodyY / bodyHeight) * TOTAL_MINUTES)
+          );
+        }
       }
 
       let newStart = startMinutes;
@@ -287,18 +343,22 @@ export default function AvailabilityWeekGrid({
       );
       onChange({ ...availability, [weekdayId]: blocks });
     },
-    [dragState, availability, onChange]
+    [dragState, availability, onChange, gridHeight]
   );
 
   const handlePointerUp = useCallback(() => {
+    if (dragState) {
+      const { weekdayId } = dragState;
+      const blocks = availability[weekdayId] ?? [];
+      if (blocks.length > 0) {
+        onChange({ ...availability, [weekdayId]: normalizeDayBlocks(blocks) });
+      }
+    }
     setDragState(null);
-  }, []);
+  }, [dragState, availability, onChange]);
 
   return (
     <div className="overflow-x-auto">
-      <p className="text-xs text-muted-foreground mb-2">
-        Haz clic en un día para agregar un bloque. Clic en espacio vacío del día agrega otro bloque. Arrastra para ajustar. Horarios en tu zona horaria local.
-      </p>
       {/* Desktop: days as columns, time vertical */}
       <div
         ref={gridRef}
@@ -312,7 +372,15 @@ export default function AvailabilityWeekGrid({
           <div className="h-10 shrink-0 border-b border-border flex items-center justify-center text-xs text-muted-foreground font-medium">
             Hora
           </div>
-          <div className="flex-1 relative py-0">
+          <div
+            className="shrink-0"
+            style={{ height: BODY_PADDING_TOP }}
+            aria-hidden
+          />
+          <div
+            className="shrink-0 relative py-0 min-h-0"
+            style={{ height: getBodyHeightPx(gridHeight) }}
+          >
             {[0, 6, 12, 18, 24].map((hour) => (
               <div
                 key={hour}
@@ -336,6 +404,11 @@ export default function AvailabilityWeekGrid({
               ))}
             </div>
           </div>
+          <div
+            className="shrink-0"
+            style={{ height: BODY_PADDING_BOTTOM }}
+            aria-hidden
+          />
         </div>
 
         {days.map((d) => {
@@ -349,42 +422,46 @@ export default function AvailabilityWeekGrid({
             >
               <div className="h-10 shrink-0 border-b border-border flex items-center justify-center gap-1 bg-background">
                 <span className="text-xs font-medium truncate max-w-full px-0.5" title={d.dayOfWeek}>
-                  {d.dayOfWeek.slice(0, 2)}
+                  {d.dayOfWeek}
                 </span>
                 {hasBlocks && (
                   <button
                     type="button"
                     onClick={(e) => handleRemoveAllDay(e, d.weekdayId)}
-                    className="rounded p-0.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    className="rounded p-1.5 min-w-[28px] min-h-[28px] flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                     aria-label={`Quitar todo ${d.dayOfWeek}`}
                     title={`Quitar todo ${d.dayOfWeek}`}
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
                 )}
               </div>
               <div
-                className="flex-1 relative cursor-pointer group"
-                style={{ minHeight: gridHeight }}
-                onClick={(e) => handleColumnClick(e, d.weekdayId)}
+                className="shrink-0"
+                style={{ height: BODY_PADDING_TOP }}
+                aria-hidden
+              />
+              <div
+                className="shrink-0 relative cursor-pointer group"
+                style={{ height: getBodyHeightPx(gridHeight) }}
+                onClick={(e) => handleColumnBodyClick(e, d.weekdayId)}
+                data-column-body
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleColumnClick(e as unknown as React.MouseEvent, d.weekdayId);
-                  }
-                }}
                 aria-label={
                   hasBlocks
                     ? `${d.dayOfWeek} ${blocks.length} bloque(s)`
                     : `Agregar disponibilidad ${d.dayOfWeek}`
                 }
               >
-                {/* Hour guides: subtle horizontal lines every hour */}
-                <div className="absolute inset-0 pointer-events-none z-0" aria-hidden>
+                {/* Hour borders: only at full hours, behind grid so they don't show inside blocks */}
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{ zIndex: 0 }}
+                  aria-hidden
+                >
                   {Array.from({ length: 25 }, (_, i) => (
                     <div
                       key={i}
@@ -393,69 +470,90 @@ export default function AvailabilityWeekGrid({
                     />
                   ))}
                 </div>
+                {/* Grid: one cell per step (e.g. 48 for 30-min), no cell borders; blocks sit in same grid */}
+                <div
+                  className="grid grid-cols-1 gap-0 absolute inset-0"
+                  style={{ gridTemplateRows: `repeat(${STEPS_PER_DAY}, 1fr)`, zIndex: 10 }}
+                  aria-hidden
+                >
+                  {Array.from({ length: STEPS_PER_DAY }, (_, step) => (
+                    <div
+                      key={`cell-${step}`}
+                      data-step={step}
+                      data-weekday-id={d.weekdayId}
+                      className="min-h-0 w-full col-start-1"
+                      style={{ gridRow: `${step + 1} / ${step + 2}` }}
+                    />
+                  ))}
+                  {blocks.map((range, blockIndex) => {
+                    const startMinutes = parseHHMM(range.startLocal);
+                    const endMinutes = parseHHMM(range.endLocal);
+                    const startRow = Math.floor(startMinutes / SNAP_MINUTES) + 1;
+                    const endRow = Math.min(STEPS_PER_DAY, Math.ceil(endMinutes / SNAP_MINUTES)) + 1;
+                    const timeLabel = `${range.startLocal}–${range.endLocal}`;
+                    if (startRow >= endRow) return null;
+                    return (
+                      <div
+                        key={`${blockIndex}-${range.startLocal}-${range.endLocal}`}
+                        data-availability-block
+                        className="group/block col-start-1 mx-0.5 rounded bg-primary/80 transition-colors flex flex-col cursor-grab active:cursor-grabbing z-10 relative min-h-0"
+                        style={{ gridRow: `${startRow} / ${endRow}` }}
+                        onClick={(e) => e.stopPropagation()}
+                        onPointerDown={(ev) => handlePointerDownBlock(ev, d.weekdayId, blockIndex, "center")}
+                        title={timeLabel}
+                      >
+                        <span
+                          className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-primary-foreground truncate px-0.5 pointer-events-none z-20"
+                          title={timeLabel}
+                        >
+                          {timeLabel}
+                        </span>
+                        <div
+                          className="h-3 shrink-0 cursor-n-resize flex-shrink-0 flex items-center justify-end pr-0.5 gap-0.5 z-30 relative"
+                          aria-hidden
+                          onPointerDown={(ev) => {
+                            ev.stopPropagation();
+                            handlePointerDownBlock(ev, d.weekdayId, blockIndex, "top");
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={(ev) => handleRemoveBlock(ev, d.weekdayId, blockIndex)}
+                            className="rounded p-1 min-w-[28px] min-h-[28px] flex items-center justify-center text-primary-foreground/90 touch-manipulation"
+                            aria-label={`Quitar bloque ${timeLabel}`}
+                            title={`Quitar bloque ${timeLabel}`}
+                          >
+                            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                        <div className="flex-1 min-h-0" aria-hidden />
+                        <div
+                          className="h-3 shrink-0 cursor-s-resize flex-shrink-0 z-30 relative"
+                          aria-hidden
+                          onPointerDown={(ev) => {
+                            ev.stopPropagation();
+                            handlePointerDownBlock(ev, d.weekdayId, blockIndex, "bottom");
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
                 {!hasBlocks && (
-                  <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <span className="text-xs text-muted-foreground/60 group-hover:text-muted-foreground">
                       +
                     </span>
                   </div>
                 )}
-                {blocks.map((range, blockIndex) => {
-                  const startMinutes = parseHHMM(range.startLocal);
-                  const endMinutes = parseHHMM(range.endLocal);
-                  const topPct = (startMinutes / TOTAL_MINUTES) * 100;
-                  const heightPct = ((endMinutes - startMinutes) / TOTAL_MINUTES) * 100;
-                  const canShowTime = heightPct > 8; // only show time if block is tall enough
-
-                  return (
-                    <div
-                      key={`${blockIndex}-${range.startLocal}-${range.endLocal}`}
-                      className="group/block absolute left-0.5 right-0.5 rounded bg-primary/80 hover:bg-primary transition-colors flex flex-col cursor-grab active:cursor-grabbing z-10"
-                      style={{
-                        top: `${topPct}%`,
-                        height: `${heightPct}%`,
-                        minHeight: 4,
-                      }}
-                      onPointerDown={(ev) => handlePointerDownBlock(ev, d.weekdayId, blockIndex, "center")}
-                    >
-                      <div
-                        className="h-2 shrink-0 cursor-n-resize border-b border-primary flex-shrink-0 flex items-center justify-end pr-0.5"
-                        aria-hidden
-                        onPointerDown={(ev) => {
-                          ev.stopPropagation();
-                          handlePointerDownBlock(ev, d.weekdayId, blockIndex, "top");
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={(ev) => handleRemoveBlock(ev, d.weekdayId, blockIndex)}
-                          className="rounded p-0.5 text-primary-foreground/80 hover:bg-primary-foreground/20 opacity-0 group-hover/block:opacity-100 focus:opacity-100 transition-opacity"
-                          aria-label={`Quitar bloque ${range.startLocal}–${range.endLocal}`}
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                      <div className="flex-1 min-h-0 flex items-center justify-center px-0.5 overflow-hidden">
-                        {canShowTime && (
-                          <span className="text-[10px] font-medium text-primary-foreground truncate text-center">
-                            {range.startLocal}–{range.endLocal}
-                          </span>
-                        )}
-                      </div>
-                      <div
-                        className="h-2 shrink-0 cursor-s-resize border-t border-primary flex-shrink-0"
-                        aria-hidden
-                        onPointerDown={(ev) => {
-                          ev.stopPropagation();
-                          handlePointerDownBlock(ev, d.weekdayId, blockIndex, "bottom");
-                        }}
-                      />
-                    </div>
-                  );
-                })}
               </div>
+              <div
+                className="shrink-0"
+                style={{ height: BODY_PADDING_BOTTOM }}
+                aria-hidden
+              />
             </div>
           );
         })}
@@ -463,7 +561,7 @@ export default function AvailabilityWeekGrid({
 
       {/* Mobile: days as rows, time horizontal */}
       <div
-        className="md:hidden border border-border rounded-lg overflow-hidden bg-muted/20 space-y-2 p-2"
+        className="md:hidden space-y-2"
         onPointerMove={dragState?.layout === "mobile" ? handlePointerMove : undefined}
         onPointerUp={dragState ? handlePointerUp : undefined}
         onPointerLeave={dragState ? handlePointerUp : undefined}
@@ -477,42 +575,50 @@ export default function AvailabilityWeekGrid({
               className="flex flex-col gap-1 rounded-md bg-background border border-border overflow-hidden"
             >
               <div className="flex items-center justify-between px-2 py-1.5 shrink-0">
-                <span className="text-sm font-medium">{d.dayOfWeek}</span>
-                {hasBlocks && (
-                  <button
-                    type="button"
-                    onClick={(e) => handleRemoveAllDay(e, d.weekdayId)}
-                    className="rounded p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                    aria-label={`Quitar todo ${d.dayOfWeek}`}
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                )}
+                <span className="text-sm font-medium" title={d.dayOfWeek}>{d.dayOfWeek}</span>
+                <span className="w-7 h-7 flex shrink-0 items-center justify-center" aria-hidden>
+                  {hasBlocks ? (
+                    <button
+                      type="button"
+                      onClick={(e) => handleRemoveAllDay(e, d.weekdayId)}
+                      className="rounded p-1.5 flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 touch-manipulation -m-1.5"
+                      aria-label={`Quitar todo ${d.dayOfWeek}`}
+                      title={`Quitar todo ${d.dayOfWeek}`}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  ) : null}
+                </span>
               </div>
               <div
                 ref={(el) => {
                   mobileStripRefs.current[d.weekdayId] = el;
                 }}
                 data-weekday-id={d.weekdayId}
-                className="relative cursor-pointer group h-12 mx-2 mb-2 rounded border border-border bg-muted/30"
+                className="relative cursor-pointer group w-full h-24 rounded border border-border bg-muted/30 overflow-hidden"
                 onClick={(e) => handleMobileStripClick(e, d.weekdayId)}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleMobileStripClick(e as unknown as React.MouseEvent, d.weekdayId);
-                  }
-                }}
                 aria-label={
                   hasBlocks
                     ? `${d.dayOfWeek} ${blocks.length} bloque(s)`
                     : `Agregar disponibilidad ${d.dayOfWeek}`
                 }
               >
-                {/* Hour guides: vertical lines every 2 hours */}
+                {/* 48 step cells: click target; no borders */}
+                <div className="absolute inset-0 flex z-0" aria-hidden>
+                  {Array.from({ length: STEPS_PER_DAY }, (_, step) => (
+                    <div
+                      key={step}
+                      data-step={step}
+                      data-weekday-id={d.weekdayId}
+                      className="flex-1 min-w-0 h-full"
+                    />
+                  ))}
+                </div>
+                {/* Hour guides: vertical lines every 2 hours (full hours only) */}
                 <div className="absolute inset-0 pointer-events-none flex" aria-hidden>
                   {[0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24].map((hour) => (
                     <div
@@ -523,8 +629,8 @@ export default function AvailabilityWeekGrid({
                   ))}
                 </div>
                 {!hasBlocks && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-xs text-muted-foreground/60 group-hover:text-muted-foreground">+</span>
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <span className="text-xs text-muted-foreground/60 group-hover:text-muted-foreground">+ Toca para agregar</span>
                   </div>
                 )}
                 {blocks.map((range, blockIndex) => {
@@ -532,52 +638,64 @@ export default function AvailabilityWeekGrid({
                   const endMinutes = parseHHMM(range.endLocal);
                   const leftPct = (startMinutes / TOTAL_MINUTES) * 100;
                   const widthPct = ((endMinutes - startMinutes) / TOTAL_MINUTES) * 100;
-                  const canShowTime = widthPct > 12;
+                  const timeLabel = `${range.startLocal}–${range.endLocal}`;
                   return (
                     <div
                       key={`${blockIndex}-${range.startLocal}-${range.endLocal}`}
-                      className="group/block absolute top-0.5 bottom-0.5 rounded bg-primary/80 hover:bg-primary flex items-center cursor-grab active:cursor-grabbing z-10 min-w-[4px]"
+                      data-availability-block
+                      className="group/block rounded bg-primary/80 flex items-stretch cursor-grab active:cursor-grabbing z-10 min-w-[4px] relative"
                       style={{
+                        position: "absolute",
+                        top: 2,
+                        bottom: 2,
                         left: `${leftPct}%`,
                         width: `${widthPct}%`,
                       }}
+                      title={timeLabel}
+                      onClick={(e) => e.stopPropagation()}
                       onPointerDown={(ev) =>
                         handlePointerDownBlockMobile(ev, d.weekdayId, blockIndex, "center")
                       }
                     >
                       <div
-                        className="w-2 shrink-0 cursor-w-resize border-r border-primary self-stretch"
+                        className="w-4 shrink-0 cursor-w-resize self-stretch touch-manipulation min-w-[20px] relative"
                         aria-hidden
                         onPointerDown={(ev) => {
                           ev.stopPropagation();
                           handlePointerDownBlockMobile(ev, d.weekdayId, blockIndex, "left");
                         }}
                       />
-                      <div className="flex-1 min-w-0 flex items-center justify-center px-0.5 overflow-hidden">
-                        {canShowTime && (
-                          <span className="text-[10px] font-medium text-primary-foreground truncate">
-                            {range.startLocal}–{range.endLocal}
-                          </span>
-                        )}
-                      </div>
+                      <div className="flex-1 min-w-0" aria-hidden />
                       <div
-                        className="w-2 shrink-0 cursor-e-resize border-l border-primary self-stretch"
+                        className="w-4 shrink-0 cursor-e-resize self-stretch touch-manipulation min-w-[20px] relative"
                         aria-hidden
                         onPointerDown={(ev) => {
                           ev.stopPropagation();
                           handlePointerDownBlockMobile(ev, d.weekdayId, blockIndex, "right");
                         }}
                       />
-                      <button
-                        type="button"
-                        onClick={(ev) => handleRemoveBlock(ev, d.weekdayId, blockIndex)}
-                        className="absolute top-0 right-0 rounded p-0.5 text-primary-foreground/80 hover:bg-primary-foreground/20 opacity-0 group-hover/block:opacity-100 focus:opacity-100 transition-opacity"
-                        aria-label={`Quitar bloque ${range.startLocal}–${range.endLocal}`}
+                      {/* Time + remove on top of handles so time is always visible */}
+                      <div
+                        className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 py-1 px-0.5 overflow-hidden pointer-events-none z-50"
                       >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                        <span className="text-[10px] font-medium text-primary-foreground tabular-nums leading-tight truncate w-full text-center">
+                          {range.startLocal}
+                        </span>
+                        <span className="text-[10px] font-medium text-primary-foreground tabular-nums leading-tight truncate w-full text-center">
+                          {range.endLocal}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(ev) => handleRemoveBlock(ev, d.weekdayId, blockIndex)}
+                          className="shrink-0 rounded p-1 min-w-[28px] min-h-[28px] flex items-center justify-center text-primary-foreground/90 touch-manipulation pointer-events-auto"
+                          aria-label={`Quitar ${timeLabel}`}
+                          title={`Quitar ${timeLabel}`}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
