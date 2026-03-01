@@ -274,6 +274,18 @@ export default function AvailabilityWeekGrid({
               0,
               Math.min(TOTAL_MINUTES, (bodyY / bodyHeight) * TOTAL_MINUTES)
             );
+          } else {
+            const gridEl = gridRef.current;
+            if (!gridEl) return;
+            const rect = gridEl.getBoundingClientRect();
+            const gridContentTop = rect.top + gridEl.clientTop;
+            const bodyTop = gridContentTop + HEADER_HEIGHT + BODY_PADDING_TOP;
+            const bodyH = getBodyHeightPx(gridHeight);
+            const bodyYFallback = e.clientY - bodyTop;
+            pointerMinutes = Math.max(
+              0,
+              Math.min(TOTAL_MINUTES, (bodyYFallback / bodyH) * TOTAL_MINUTES)
+            );
           }
         } else {
           const gridEl = gridRef.current;
@@ -597,7 +609,7 @@ export default function AvailabilityWeekGrid({
                   mobileStripRefs.current[d.weekdayId] = el;
                 }}
                 data-weekday-id={d.weekdayId}
-                className="relative cursor-pointer group w-full h-24 rounded border border-border bg-muted/30 overflow-hidden"
+                className="relative cursor-pointer group w-full h-24 rounded border border-border bg-muted/30 overflow-hidden touch-none"
                 onClick={(e) => handleMobileStripClick(e, d.weekdayId)}
                 role="button"
                 tabIndex={0}

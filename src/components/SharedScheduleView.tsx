@@ -1026,7 +1026,8 @@ export default function SharedScheduleView({
                 )}
               </section>
             );
-          }); }
+          })
+        }
         </div>
 
         {/* Calendar grid view */}
