@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import LoadingScreen from "@/components/LoadingScreen";
+import { debugLoadingDelay } from "@/lib/debug-loading-delay";
 
 interface UserRow {
   id: string;
@@ -33,6 +35,7 @@ export default function AdminPage() {
       return;
     }
     setUsers(await res.json());
+    await debugLoadingDelay();
     setLoading(false);
   }, [router]);
 
@@ -61,11 +64,7 @@ export default function AdminPage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
-        <p className="text-sm text-muted-foreground">Cargando...</p>
-      </div>
-    );
+    return <LoadingScreen message="Cargando..." fullPage />;
   }
 
   if (error) {

@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { formatDateLong, formatDateShort } from "@/lib/timezone-utils";
+import LoadingScreen from "@/components/LoadingScreen";
+import { debugLoadingDelay } from "@/lib/debug-loading-delay";
 
 interface Group {
   id: number;
@@ -70,6 +72,7 @@ export default function HomePage() {
     ]);
     setGroups(await groupsRes.json());
     setDashboard(await dashboardRes.json());
+    await debugLoadingDelay();
     setLoading(false);
   }, []);
 
@@ -121,11 +124,7 @@ export default function HomePage() {
   }, [dashboard, todayISO]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
-        <p className="text-sm text-muted-foreground">Cargando...</p>
-      </div>
-    );
+    return <LoadingScreen message="Cargando..." fullPage />;
   }
 
   const daysInMonth = new Date(Date.UTC(currentYear, currentMonth, 0)).getUTCDate();

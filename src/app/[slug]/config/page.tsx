@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useGroup } from "@/lib/group-context";
+import LoadingScreen from "@/components/LoadingScreen";
 
 export default function AdminHome() {
   const { slug, groupName, loading, error } = useGroup();
 
-  if (loading) return <p className="text-sm text-muted-foreground">Cargando...</p>;
+  if (loading) return <LoadingScreen message="Cargando..." fullPage={false} />;
   if (error) return <p className="text-sm text-destructive">Grupo no encontrado</p>;
 
   const cards = [

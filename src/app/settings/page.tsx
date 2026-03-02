@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { formatDateRangeWithYear } from "@/lib/timezone-utils";
+import LoadingScreen from "@/components/LoadingScreen";
 
 interface Holiday {
   id: number;
@@ -179,7 +180,7 @@ export default function SettingsPage() {
           </form>
 
           {loading ? (
-            <p className="text-sm text-muted-foreground">Cargando...</p>
+            <LoadingScreen message="Cargando..." fullPage={false} />
           ) : holidays.length === 0 ? null : (
             <div className="divide-y divide-border">
               {holidays.map((h) => (

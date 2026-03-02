@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useGroup } from "@/lib/group-context";
+import LoadingScreen from "@/components/LoadingScreen";
 
 interface Member {
   id: number;
@@ -36,7 +37,7 @@ export default function MembersPage() {
   }, [groupId, fetchData]);
 
   if (groupLoading || loading) {
-    return <p className="text-sm text-muted-foreground">Cargando...</p>;
+    return <LoadingScreen message="Cargando..." fullPage={false} />;
   }
 
   return (

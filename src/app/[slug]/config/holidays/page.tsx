@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useGroup } from "@/lib/group-context";
 import { formatDateRangeWithYear } from "@/lib/timezone-utils";
+import LoadingScreen from "@/components/LoadingScreen";
 
 interface MemberOption {
   id: number;
@@ -106,7 +107,7 @@ export default function HolidaysPage() {
   const memberHolidays = holidays.filter((h) => h.source === "member");
 
   if (groupLoading || loading) {
-    return <p className="text-sm text-muted-foreground">Cargando...</p>;
+    return <LoadingScreen message="Cargando..." fullPage={false} />;
   }
 
   return (

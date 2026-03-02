@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useGroup } from "@/lib/group-context";
 import { useUnsavedConfig } from "@/lib/unsaved-config-context";
+import LoadingScreen from "@/components/LoadingScreen";
 
 interface Member {
   id: number;
@@ -126,7 +127,7 @@ export default function NewRolePage() {
   };
 
   if (groupLoading || loading) {
-    return <p className="text-sm text-muted-foreground">Cargando...</p>;
+    return <LoadingScreen message="Cargando..." fullPage={false} />;
   }
 
   return (

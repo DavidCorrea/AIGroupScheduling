@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useGroup } from "@/lib/group-context";
 import { buildColumnOrderPayload } from "@/lib/column-order";
 import { useUnsavedConfig } from "@/lib/unsaved-config-context";
+import LoadingScreen from "@/components/LoadingScreen";
 
 interface Role {
   id: number;
@@ -332,7 +333,7 @@ export default function SchedulesPage() {
   };
 
   if (groupLoading || loading) {
-    return <p className="text-sm text-muted-foreground">Cargando...</p>;
+    return <LoadingScreen message="Cargando..." fullPage={false} />;
   }
 
   return (

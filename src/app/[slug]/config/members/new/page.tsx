@@ -8,6 +8,7 @@ import { OptionToggleGroup } from "@/components/OptionToggleGroup";
 import AvailabilityWeekGrid from "@/components/AvailabilityWeekGrid";
 import { localTimeToUtc } from "@/lib/timezone-utils";
 import { DAY_ORDER } from "@/lib/constants";
+import LoadingScreen from "@/components/LoadingScreen";
 
 /** Canonical 7 weekdays for availability grid (weekdayId 1–7 match DB weekdays table). */
 const AVAILABILITY_WEEKDAYS: { id: number; weekdayId: number; dayOfWeek: string }[] = DAY_ORDER.map(
@@ -95,7 +96,7 @@ export default function NewMemberPage() {
   };
 
   if (groupLoading || loading) {
-    return <p className="text-sm text-muted-foreground">Cargando...</p>;
+    return <LoadingScreen message="Cargando..." fullPage={false} />;
   }
 
   return (

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useGroup } from "@/lib/group-context";
 import { utcTimeToLocalDisplay } from "@/lib/timezone-utils";
+import LoadingScreen from "@/components/LoadingScreen";
 
 interface ScheduleDay {
   id: number;
@@ -43,7 +44,7 @@ export default function EventsPage() {
   }, [groupId, fetchData]);
 
   if (groupLoading || loading) {
-    return <p className="text-sm text-muted-foreground">Cargando...</p>;
+    return <LoadingScreen message="Cargando..." fullPage={false} />;
   }
 
   return (

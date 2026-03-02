@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import SharedScheduleView, {
   SharedScheduleData,
 } from "@/components/SharedScheduleView";
+import LoadingScreen from "@/components/LoadingScreen";
+import { debugLoadingDelay } from "@/lib/debug-loading-delay";
 
 export default function CronogramaPage() {
   const params = useParams();
@@ -25,6 +27,7 @@ export default function CronogramaPage() {
     } catch {
       setError(true);
     }
+    await debugLoadingDelay();
     setLoading(false);
   }, [slug]);
 
@@ -33,11 +36,7 @@ export default function CronogramaPage() {
   }, [fetchSchedule]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
-        <p className="text-muted-foreground">Cargando agenda...</p>
-      </div>
-    );
+    return <LoadingScreen message="Cargando agenda..." fullPage />;
   }
 
   if (error || !schedule) {

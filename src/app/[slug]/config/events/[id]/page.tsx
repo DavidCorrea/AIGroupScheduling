@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useGroup } from "@/lib/group-context";
 import EventForm from "../EventForm";
+import LoadingScreen from "@/components/LoadingScreen";
 
 interface EventData {
   id: number;
@@ -76,7 +77,7 @@ export default function EditEventPage() {
   }, [groupId, eventId, fetchData]);
 
   if (groupLoading || loading) {
-    return <p className="text-sm text-muted-foreground">Cargando...</p>;
+    return <LoadingScreen message="Cargando..." fullPage={false} />;
   }
 
   if (notFound || !event) {

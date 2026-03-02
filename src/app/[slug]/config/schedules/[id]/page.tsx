@@ -12,6 +12,7 @@ import {
   utcTimeToLocalDisplay,
   localTimeToUtc,
 } from "@/lib/timezone-utils";
+import LoadingScreen from "@/components/LoadingScreen";
 
 interface ScheduleEntry {
   id: number;
@@ -556,7 +557,7 @@ export default function SchedulePreviewPage() {
   }, [schedule?.id, visibleScheduleDatesByWeek, todayISO]);
 
   if (groupLoading || loading || !schedule) {
-    return <p className="text-sm text-muted-foreground">Cargando...</p>;
+    return <LoadingScreen message="Cargando..." fullPage={false} />;
   }
 
   // Helper: check if a member is available on a given date

@@ -45,11 +45,7 @@ function GroupSubNav() {
   if (loading) {
     return (
       <nav className="border-b border-border">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-12 items-center">
-            <span className="text-muted-foreground text-sm">Cargando...</span>
-          </div>
-        </div>
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-12" />
       </nav>
     );
   }
