@@ -276,11 +276,37 @@ export default function SharedScheduleView({
     return date < today;
   };
 
-  // Use scheduleDates as source of truth when present so we show every date (assignable and for_everyone),
-  // including dates with no assignments. Otherwise fall back to dates that have entries (legacy).
+  /** True if the event's end (date + endTimeUtc in UTC) is before the user's current time. */
+  const hasScheduleDatePassed = (sd: ScheduleDateInfo): boolean => {
+    const endUtc = sd.endTimeUtc ?? sd.recurringEventEndTimeUtc ?? "23:59";
+    const [h, m] = endUtc.split(":").map(Number);
+    const endMs = new Date(`${sd.date}T${String(h).padStart(2, "0")}:${String(m ?? 0).padStart(2, "0")}:00.000Z`).getTime();
+    return endMs < Date.now();
+  };
+
+  // Schedule dates that are visible (respecting day filter and hiding events that have already ended).
+  const visibleScheduleDates = useMemo(() => {
+    if (scheduleDateList.length === 0 || scheduleDateList.every((d) => d.id == null)) return [];
+    const now = Date.now();
+    const list = scheduleDateList.filter((sd) => {
+      if (!isDateVisible(sd.date)) return false;
+      if (showPastDates) return true;
+      const endUtc = sd.endTimeUtc ?? sd.recurringEventEndTimeUtc ?? "23:59";
+      const [h, m] = endUtc.split(":").map(Number);
+      const endMs = new Date(`${sd.date}T${String(h).padStart(2, "0")}:${String(m ?? 0).padStart(2, "0")}:00.000Z`).getTime();
+      return endMs >= now;
+    });
+    return [...list].sort((a, b) => {
+      const d = a.date.localeCompare(b.date);
+      if (d !== 0) return d;
+      return (a.startTimeUtc ?? "00:00").localeCompare(b.startTimeUtc ?? "00:00");
+    });
+  }, [scheduleDateList, showPastDates, dayFilter, today]);
+
+  // Use scheduleDates as source of truth when present; only show dates that have at least one non-passed event.
   const allDates = (
     scheduleDateList.length > 0
-      ? scheduleDateList.map((d) => d.date)
+      ? [...new Set(visibleScheduleDates.map((d) => d.date))].sort()
       : [
           ...new Set([
             ...entryDates,
@@ -288,9 +314,9 @@ export default function SharedScheduleView({
             ...((schedule.extraDates ?? []).map((d) => d.date)),
           ]),
         ]
-  )
-    .sort()
-    .filter(isDateVisible);
+          .sort()
+          .filter(isDateVisible)
+  );
 
   // Filter entries by member and/or role
   const filteredEntries = schedule.entries.filter((e) => {
@@ -347,16 +373,6 @@ export default function SharedScheduleView({
   );
   const getNoteForScheduleDate = (sd: ScheduleDateInfo): string | undefined =>
     (sd.id != null ? noteMapByScheduleDateId.get(sd.id) : undefined) ?? noteMap.get(sd.date);
-
-  const visibleScheduleDates = useMemo(() => {
-    if (scheduleDateList.length === 0 || scheduleDateList.every((d) => d.id == null)) return [];
-    const list = scheduleDateList.filter((sd) => isDateVisible(sd.date));
-    return [...list].sort((a, b) => {
-      const d = a.date.localeCompare(b.date);
-      if (d !== 0) return d;
-      return (a.startTimeUtc ?? "00:00").localeCompare(b.startTimeUtc ?? "00:00");
-    });
-  }, [scheduleDateList, showPastDates, dayFilter, today]);
 
   const filteredScheduleDates = useMemo(() => {
     if (visibleScheduleDates.length === 0) return [];
