@@ -42,7 +42,7 @@ All tables are defined there. Exported table names and purpose:
 - **Folder:** `src/db/migrations`. Journal and snapshots: `meta/_journal.json` and `meta/*.json` snapshots.
 - **Workflow:** Edit `src/db/schema.ts` → run `npm run db:generate` (use a descriptive name when prompted) → run `npm run db:migrate`.
 - **Applied migrations:** Stored in **`drizzle.__drizzle_migrations`** (schema `drizzle`). Query with schema: `SELECT * FROM drizzle.__drizzle_migrations ORDER BY created_at;` — do not query `__drizzle_migrations` without the schema.
-- Full migration rules (reset, amend, etc.) are in **`PROJECT.md`**.
+- Full migration rules (reset, amend, etc.) are in **AGENTS.md** (Database and migrations section).
 
 ## 4. Where to look
 
