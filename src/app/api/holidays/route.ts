@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { holidays } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAuth, apiError } from "@/lib/api-helpers";
 
 export async function GET() {
   const authResult = await requireAuth();
@@ -79,7 +79,7 @@ export async function DELETE(request: NextRequest) {
 
   // Verify the holiday belongs to the current user
   if (existing.userId !== authResult.user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return apiError("Forbidden", 403, "FORBIDDEN");
   }
 
   await db.delete(holidays).where(eq(holidays.id, holidayId));

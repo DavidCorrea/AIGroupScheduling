@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { groups, groupCollaborators, members, users, recurringEvents, weekdays, roles } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAuth, apiError } from "@/lib/api-helpers";
 
 export async function GET(request: NextRequest) {
   const authResult = await requireAuth();
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
       .where(eq(groups.slug, slug)))[0];
 
     if (!group) {
-      return NextResponse.json({ error: "Grupo no encontrado" }, { status: 404 });
+      return apiError("Grupo no encontrado", 404, "GROUP_NOT_FOUND");
     }
 
     return NextResponse.json(group);

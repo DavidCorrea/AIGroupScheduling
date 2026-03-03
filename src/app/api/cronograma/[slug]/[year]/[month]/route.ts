@@ -2,28 +2,30 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { schedules } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { apiError } from "@/lib/api-helpers";
+import { checkCronogramaRateLimit } from "@/lib/rate-limit";
 import { resolveGroupBySlug } from "@/lib/group";
 import { buildPublicScheduleResponse } from "@/lib/public-schedule";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ slug: string; year: string; month: string }> }
 ) {
+  if (!checkCronogramaRateLimit(request)) {
+    return apiError("Demasiadas solicitudes. Intenta de nuevo en un minuto.", 429, "RATE_LIMITED");
+  }
   const { slug, year: yearStr, month: monthStr } = await params;
 
   const group = await resolveGroupBySlug(slug);
   if (!group) {
-    return NextResponse.json({ error: "Grupo no encontrado" }, { status: 404 });
+    return apiError("Grupo no encontrado", 404, "GROUP_NOT_FOUND");
   }
 
   const year = parseInt(yearStr, 10);
   const month = parseInt(monthStr, 10);
 
   if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
-    return NextResponse.json(
-      { error: "Parámetros inválidos" },
-      { status: 400 }
-    );
+    return apiError("Parámetros inválidos", 400, "VALIDATION");
   }
 
   const schedule = (await db

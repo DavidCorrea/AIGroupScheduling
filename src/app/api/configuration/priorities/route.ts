@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { eventRolePriorities, recurringEvents, weekdays, roles } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { extractGroupId } from "@/lib/api-helpers";
+import { requireGroupAccess, apiError } from "@/lib/api-helpers";
 
 export async function GET(request: NextRequest) {
-  const groupId = extractGroupId(request);
-  if (groupId instanceof NextResponse) return groupId;
+  const accessResult = await requireGroupAccess(request);
+  if (accessResult.error) return accessResult.error;
+  const { groupId } = accessResult;
 
   const allRecurring = await db
     .select({
@@ -46,6 +47,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const accessResult = await requireGroupAccess(request);
+  if (accessResult.error) return accessResult.error;
+  const { groupId } = accessResult;
+
   const body = await request.json();
   const { recurringEventId, roleId, priority } = body;
 
@@ -54,6 +59,12 @@ export async function POST(request: NextRequest) {
       { error: "recurringEventId, roleId, and priority are required" },
       { status: 400 }
     );
+  }
+
+  const event = (await db.select({ groupId: recurringEvents.groupId }).from(recurringEvents).where(eq(recurringEvents.id, recurringEventId)))[0];
+  const role = (await db.select({ groupId: roles.groupId }).from(roles).where(eq(roles.id, roleId)))[0];
+  if (!event || event.groupId !== groupId || !role || role.groupId !== groupId) {
+    return apiError("Forbidden", 403, "FORBIDDEN");
   }
 
   const existing = (await db
@@ -87,6 +98,10 @@ export async function POST(request: NextRequest) {
  * Body: { recurringEventId, priorities: [{ roleId, priority }] }
  */
 export async function PUT(request: NextRequest) {
+  const accessResult = await requireGroupAccess(request);
+  if (accessResult.error) return accessResult.error;
+  const { groupId } = accessResult;
+
   const body = await request.json();
   const { recurringEventId, priorities } = body;
 
@@ -95,6 +110,11 @@ export async function PUT(request: NextRequest) {
       { error: "recurringEventId and priorities array are required" },
       { status: 400 }
     );
+  }
+
+  const event = (await db.select({ groupId: recurringEvents.groupId }).from(recurringEvents).where(eq(recurringEvents.id, recurringEventId)))[0];
+  if (!event || event.groupId !== groupId) {
+    return apiError("Forbidden", 403, "FORBIDDEN");
   }
 
   await db.delete(eventRolePriorities)
@@ -114,6 +134,10 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const accessResult = await requireGroupAccess(request);
+  if (accessResult.error) return accessResult.error;
+  const { groupId } = accessResult;
+
   const { searchParams } = new URL(request.url);
   const recurringEventId = searchParams.get("recurringEventId");
 
@@ -124,8 +148,14 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
+  const eventId = parseInt(recurringEventId, 10);
+  const event = (await db.select({ groupId: recurringEvents.groupId }).from(recurringEvents).where(eq(recurringEvents.id, eventId)))[0];
+  if (!event || event.groupId !== groupId) {
+    return apiError("Forbidden", 403, "FORBIDDEN");
+  }
+
   await db.delete(eventRolePriorities)
-    .where(eq(eventRolePriorities.recurringEventId, parseInt(recurringEventId, 10)));
+    .where(eq(eventRolePriorities.recurringEventId, eventId));
 
   return NextResponse.json({ success: true });
 }

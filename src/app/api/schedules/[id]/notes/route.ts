@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { scheduleDate } from "@/db/schema";
+import { scheduleDate, schedules } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAuth, hasGroupAccess, apiError, parseBody } from "@/lib/api-helpers";
 import { logScheduleAction } from "@/lib/audit-log";
+import { scheduleNoteSchema } from "@/lib/schemas";
 
 export async function GET(
   _request: NextRequest,
@@ -33,15 +34,18 @@ export async function POST(
 
   const { id } = await params;
   const scheduleId = parseInt(id, 10);
-  const body = await request.json();
-  const { date, description } = body;
-
-  if (!date || !description || typeof description !== "string" || !description.trim()) {
-    return NextResponse.json(
-      { error: "date and description are required" },
-      { status: 400 }
-    );
+  const schedule = (await db.select({ groupId: schedules.groupId }).from(schedules).where(eq(schedules.id, scheduleId)))[0];
+  if (!schedule) {
+    return apiError("Cronograma no encontrado", 404, "NOT_FOUND");
   }
+  const access = await hasGroupAccess(authResult.user.id, schedule.groupId);
+  if (!access) {
+    return apiError("Forbidden", 403, "FORBIDDEN");
+  }
+  const raw = await request.json();
+  const parsed = parseBody(scheduleNoteSchema, raw);
+  if (parsed.error) return parsed.error;
+  const { date, description } = parsed.data;
 
   const existing = (await db
     .select()
@@ -54,19 +58,16 @@ export async function POST(
     ))[0];
 
   if (!existing) {
-    return NextResponse.json(
-      { error: "La fecha no existe en el cronograma" },
-      { status: 404 }
-    );
+    return apiError("La fecha no existe en el cronograma", 404, "NOT_FOUND");
   }
 
   await db
     .update(scheduleDate)
-    .set({ note: description.trim() })
+    .set({ note: description })
     .where(eq(scheduleDate.id, existing.id));
 
   await logScheduleAction(scheduleId, authResult.user.id, "note_saved", `Nota guardada para ${date}`);
-  return NextResponse.json({ date: existing.date, description: description.trim() });
+  return NextResponse.json({ date: existing.date, description });
 }
 
 export async function DELETE(
@@ -78,6 +79,14 @@ export async function DELETE(
 
   const { id } = await params;
   const scheduleId = parseInt(id, 10);
+  const schedule = (await db.select({ groupId: schedules.groupId }).from(schedules).where(eq(schedules.id, scheduleId)))[0];
+  if (!schedule) {
+    return apiError("Cronograma no encontrado", 404, "NOT_FOUND");
+  }
+  const access = await hasGroupAccess(authResult.user.id, schedule.groupId);
+  if (!access) {
+    return apiError("Forbidden", 403, "FORBIDDEN");
+  }
   const { searchParams } = new URL(request.url);
   const date = searchParams.get("date");
 

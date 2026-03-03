@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { recurringEvents, scheduleDate } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { requireGroupAccess } from "@/lib/api-helpers";
+import { requireGroupAccess, apiError } from "@/lib/api-helpers";
 import { rebuildScheduleFutureAssignments } from "@/lib/schedule-helpers";
 
 /**
@@ -21,7 +21,7 @@ export async function POST(
   const { id } = await params;
   const recurringEventId = parseInt(id, 10);
   if (isNaN(recurringEventId)) {
-    return NextResponse.json({ error: "Invalid event id" }, { status: 400 });
+    return apiError("Invalid event id", 400, "VALIDATION");
   }
 
   const event = (await db
@@ -30,7 +30,7 @@ export async function POST(
     .where(eq(recurringEvents.id, recurringEventId)))[0];
 
   if (!event || event.groupId !== groupId) {
-    return NextResponse.json({ error: "Evento no encontrado" }, { status: 404 });
+    return apiError("Evento no encontrado", 404, "NOT_FOUND");
   }
 
   const assignableDatesWithSchedule = await db

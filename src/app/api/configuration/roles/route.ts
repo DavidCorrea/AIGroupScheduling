@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { roles, scheduleDateAssignments, eventRolePriorities } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
-import { extractGroupId } from "@/lib/api-helpers";
+import { requireGroupAccess, apiError, parseBody } from "@/lib/api-helpers";
+import { roleCreateSchema } from "@/lib/schemas";
 
 export async function GET(request: NextRequest) {
-  const groupId = extractGroupId(request);
-  if (groupId instanceof NextResponse) return groupId;
+  const accessResult = await requireGroupAccess(request);
+  if (accessResult.error) return accessResult.error;
+  const { groupId } = accessResult;
 
   const allRoles = await db
     .select()
@@ -17,24 +19,14 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const groupId = extractGroupId(request);
-  if (groupId instanceof NextResponse) return groupId;
+  const accessResult = await requireGroupAccess(request);
+  if (accessResult.error) return accessResult.error;
+  const { groupId } = accessResult;
 
-  const body = await request.json();
-  const {
-    name,
-    requiredCount = 1,
-    dependsOnRoleId,
-    exclusiveGroupId,
-    isRelevant = false,
-  } = body;
-
-  if (!name || typeof name !== "string" || name.trim().length === 0) {
-    return NextResponse.json(
-      { error: "Role name is required" },
-      { status: 400 }
-    );
-  }
+  const raw = await request.json();
+  const parsed = parseBody(roleCreateSchema, raw);
+  if (parsed.error) return parsed.error;
+  const { name, requiredCount = 1, dependsOnRoleId, exclusiveGroupId, isRelevant = false } = parsed.data;
 
   // Assign displayOrder = max(existing) + 1 so new roles appear at the end
   const maxResult = (await db
@@ -44,11 +36,11 @@ export async function POST(request: NextRequest) {
   const nextOrder = (maxResult?.maxOrder ?? -1) + 1;
 
   const insertValues: Record<string, unknown> = {
-    name: name.trim(),
+    name,
     requiredCount,
     displayOrder: nextOrder,
     groupId,
-    isRelevant: typeof isRelevant === "boolean" ? isRelevant : false,
+    isRelevant,
   };
   if (dependsOnRoleId !== undefined) insertValues.dependsOnRoleId = dependsOnRoleId;
   if (exclusiveGroupId !== undefined) insertValues.exclusiveGroupId = exclusiveGroupId;
@@ -62,6 +54,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const accessResult = await requireGroupAccess(request);
+  if (accessResult.error) return accessResult.error;
+  const { groupId } = accessResult;
+
   const body = await request.json();
   const { id, name, requiredCount, dependsOnRoleId, exclusiveGroupId, isRelevant } = body;
 
@@ -74,7 +70,10 @@ export async function PUT(request: NextRequest) {
 
   const existing = (await db.select().from(roles).where(eq(roles.id, id)))[0];
   if (!existing) {
-    return NextResponse.json({ error: "Role not found" }, { status: 404 });
+    return apiError("Role not found", 404, "NOT_FOUND");
+  }
+  if (existing.groupId !== groupId) {
+    return apiError("Forbidden", 403, "FORBIDDEN");
   }
 
   const updates: Partial<{ name: string; requiredCount: number; dependsOnRoleId: number | null; exclusiveGroupId: number | null; isRelevant: boolean }> = {};
@@ -94,6 +93,10 @@ export async function PUT(request: NextRequest) {
  * PATCH: Batch reorder roles. Accepts an array of { id, displayOrder } pairs.
  */
 export async function PATCH(request: NextRequest) {
+  const accessResult = await requireGroupAccess(request);
+  if (accessResult.error) return accessResult.error;
+  const { groupId } = accessResult;
+
   const body = await request.json();
   const { order } = body;
 
@@ -119,11 +122,16 @@ export async function PATCH(request: NextRequest) {
   const allRoles = await db
     .select()
     .from(roles)
+    .where(eq(roles.groupId, groupId))
     .orderBy(roles.displayOrder);
   return NextResponse.json(allRoles);
 }
 
 export async function DELETE(request: NextRequest) {
+  const accessResult = await requireGroupAccess(request);
+  if (accessResult.error) return accessResult.error;
+  const { groupId } = accessResult;
+
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
 
@@ -138,7 +146,10 @@ export async function DELETE(request: NextRequest) {
 
   const existing = (await db.select().from(roles).where(eq(roles.id, roleId)))[0];
   if (!existing) {
-    return NextResponse.json({ error: "Role not found" }, { status: 404 });
+    return apiError("Role not found", 404, "NOT_FOUND");
+  }
+  if (existing.groupId !== groupId) {
+    return apiError("Forbidden", 403, "FORBIDDEN");
   }
 
   // Cascade: delete schedule entries referencing this role

@@ -11,7 +11,7 @@ import {
   recurringEvents,
 } from "@/db/schema";
 import { eq, and, or, lt, gt, asc, desc, inArray } from "drizzle-orm";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAuth, hasGroupAccess, apiError } from "@/lib/api-helpers";
 import { getHolidayConflicts } from "@/lib/holiday-conflicts";
 import { loadScheduleConfig, getPreviousAssignments } from "@/lib/schedule-helpers";
 import { generateSchedule } from "@/lib/scheduler";
@@ -33,10 +33,12 @@ export async function GET(
     .where(eq(schedules.id, scheduleId)))[0];
 
   if (!schedule) {
-    return NextResponse.json(
-      { error: "Cronograma no encontrado" },
-      { status: 404 }
-    );
+    return apiError("Cronograma no encontrado", 404, "NOT_FOUND");
+  }
+
+  const access = await hasGroupAccess(authResult.user.id, schedule.groupId);
+  if (!access) {
+    return apiError("Forbidden", 403, "FORBIDDEN");
   }
 
   const allMembers = await db
@@ -187,10 +189,12 @@ export async function PUT(
     .where(eq(schedules.id, scheduleId)))[0];
 
   if (!schedule) {
-    return NextResponse.json(
-      { error: "Cronograma no encontrado" },
-      { status: 404 }
-    );
+    return apiError("Cronograma no encontrado", 404, "NOT_FOUND");
+  }
+
+  const putAccess = await hasGroupAccess(authResult.user.id, schedule.groupId);
+  if (!putAccess) {
+    return apiError("Forbidden", 403, "FORBIDDEN");
   }
 
   // Commit action
@@ -679,7 +683,7 @@ export async function PUT(
     const label = type === "for_everyone" ? ((body.label as string) ?? "Ensayo") : null;
 
     if (type !== "assignable" && type !== "for_everyone") {
-      return NextResponse.json({ error: "Tipo inválido" }, { status: 400 });
+      return apiError("Tipo inválido", 400, "VALIDATION");
     }
 
     const [dy, dm] = dateStr.split("-").map(Number);
@@ -747,13 +751,13 @@ export async function PUT(
     const updates: Partial<{ startTimeUtc: string; endTimeUtc: string; note: string | null }> = {};
     if (startTimeUtc !== undefined) {
       if (!/^\d{2}:\d{2}$/.test(startTimeUtc)) {
-        return NextResponse.json({ error: "startTimeUtc debe ser HH:MM" }, { status: 400 });
+        return apiError("startTimeUtc debe ser HH:MM", 400, "VALIDATION");
       }
       updates.startTimeUtc = startTimeUtc;
     }
     if (endTimeUtc !== undefined) {
       if (!/^\d{2}:\d{2}$/.test(endTimeUtc)) {
-        return NextResponse.json({ error: "endTimeUtc debe ser HH:MM" }, { status: 400 });
+        return apiError("endTimeUtc debe ser HH:MM", 400, "VALIDATION");
       }
       updates.endTimeUtc = endTimeUtc;
     }
@@ -809,15 +813,12 @@ export async function PUT(
       }
       await logScheduleAction(scheduleId, authResult.user.id, "remove_date", `Fecha eliminada: ${dateStr}`);
     } else {
-      return NextResponse.json(
-        { error: "Indica scheduleDateId o date" },
-        { status: 400 }
-      );
+      return apiError("Indica scheduleDateId o date", 400, "VALIDATION");
     }
     return NextResponse.json({ success: true });
   }
 
-  return NextResponse.json({ error: "Acción inválida" }, { status: 400 });
+  return apiError("Acción inválida", 400, "VALIDATION");
 }
 
 export async function DELETE(
@@ -836,10 +837,12 @@ export async function DELETE(
     .where(eq(schedules.id, scheduleId)))[0];
 
   if (!existing) {
-    return NextResponse.json(
-      { error: "Cronograma no encontrado" },
-      { status: 404 }
-    );
+    return apiError("Cronograma no encontrado", 404, "NOT_FOUND");
+  }
+
+  const delAccess = await hasGroupAccess(authResult.user.id, existing.groupId);
+  if (!delAccess) {
+    return apiError("Forbidden", 403, "FORBIDDEN");
   }
 
   await db.delete(schedules).where(eq(schedules.id, scheduleId));

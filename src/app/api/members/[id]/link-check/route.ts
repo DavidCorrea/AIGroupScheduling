@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { members, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAuth, hasGroupAccess, apiError } from "@/lib/api-helpers";
 
 /**
  * GET /api/members/[id]/link-check
@@ -20,12 +20,17 @@ export async function GET(
   const memberId = parseInt(id, 10);
 
   const member = (await db
-    .select({ id: members.id, email: members.email, userId: members.userId })
+    .select({ id: members.id, groupId: members.groupId, email: members.email, userId: members.userId })
     .from(members)
     .where(eq(members.id, memberId)))[0];
 
   if (!member) {
-    return NextResponse.json({ error: "Miembro no encontrado" }, { status: 404 });
+    return apiError("Miembro no encontrado", 404, "NOT_FOUND");
+  }
+
+  const access = await hasGroupAccess(authResult.user.id, member.groupId);
+  if (!access) {
+    return apiError("Forbidden", 403, "FORBIDDEN");
   }
 
   const hasEmail = member.email && member.email.trim().length > 0;

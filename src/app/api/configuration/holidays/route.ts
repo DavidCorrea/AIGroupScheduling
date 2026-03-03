@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { holidays, members } from "@/db/schema";
 import { eq, and, inArray, isNotNull, gte } from "drizzle-orm";
-import { requireGroupAccess } from "@/lib/api-helpers";
+import { requireGroupAccess, apiError, parseBody } from "@/lib/api-helpers";
+import { configHolidayCreateSchema } from "@/lib/schemas";
 
 /**
  * Admin-managed member-level holidays for a group.
@@ -101,29 +102,10 @@ export async function POST(request: NextRequest) {
   if (accessResult.error) return accessResult.error;
   const { groupId } = accessResult;
 
-  const body = await request.json();
-  const { memberId, startDate, endDate, description } = body;
-
-  if (!memberId || typeof memberId !== "number") {
-    return NextResponse.json(
-      { error: "memberId es obligatorio" },
-      { status: 400 }
-    );
-  }
-
-  if (!startDate || !endDate) {
-    return NextResponse.json(
-      { error: "startDate y endDate son obligatorios" },
-      { status: 400 }
-    );
-  }
-
-  if (startDate > endDate) {
-    return NextResponse.json(
-      { error: "La fecha de inicio debe ser anterior o igual a la fecha de fin" },
-      { status: 400 }
-    );
-  }
+  const raw = await request.json();
+  const parsed = parseBody(configHolidayCreateSchema, raw);
+  if (parsed.error) return parsed.error;
+  const { memberId, startDate, endDate, description } = parsed.data;
 
   // Verify member belongs to this group
   const member = (await db
@@ -132,10 +114,7 @@ export async function POST(request: NextRequest) {
     .where(and(eq(members.id, memberId), eq(members.groupId, groupId))))[0];
 
   if (!member) {
-    return NextResponse.json(
-      { error: "Miembro no encontrado en este grupo" },
-      { status: 404 }
-    );
+    return apiError("Miembro no encontrado en este grupo", 404, "NOT_FOUND");
   }
 
   const holiday = (await db
@@ -154,49 +133,4 @@ export async function POST(request: NextRequest) {
   );
 }
 
-export async function DELETE(request: NextRequest) {
-  const accessResult = await requireGroupAccess(request);
-  if (accessResult.error) return accessResult.error;
-  const { groupId } = accessResult;
-
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get("id");
-
-  if (!id) {
-    return NextResponse.json(
-      { error: "id es obligatorio" },
-      { status: 400 }
-    );
-  }
-
-  const holidayId = parseInt(id, 10);
-  const existing = (await db
-    .select()
-    .from(holidays)
-    .where(eq(holidays.id, holidayId)))[0];
-
-  if (!existing) {
-    return NextResponse.json(
-      { error: "Fecha no encontrada" },
-      { status: 404 }
-    );
-  }
-
-  // Verify the holiday belongs to a member in this group
-  if (existing.memberId) {
-    const member = (await db
-      .select()
-      .from(members)
-      .where(and(eq(members.id, existing.memberId), eq(members.groupId, groupId))))[0];
-
-    if (!member) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-  } else {
-    return NextResponse.json({ error: "Esta fecha no es de un miembro" }, { status: 400 });
-  }
-
-  await db.delete(holidays).where(eq(holidays.id, holidayId));
-
-  return NextResponse.json({ success: true });
-}
+// DELETE by id: use DELETE /api/configuration/holidays/[id]?groupId= or ?slug=

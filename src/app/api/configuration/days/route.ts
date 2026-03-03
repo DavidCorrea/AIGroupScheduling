@@ -3,11 +3,12 @@ import { db } from "@/lib/db";
 import { recurringEvents, weekdays, scheduleDate } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { dayIndex } from "@/lib/constants";
-import { extractGroupId, requireGroupAccess } from "@/lib/api-helpers";
+import { requireGroupAccess, apiError } from "@/lib/api-helpers";
 
 export async function GET(request: NextRequest) {
-  const groupId = extractGroupId(request);
-  if (groupId instanceof NextResponse) return groupId;
+  const accessResult = await requireGroupAccess(request);
+  if (accessResult.error) return accessResult.error;
+  const { groupId } = accessResult;
 
   const allDays = await db
     .select({
@@ -50,7 +51,7 @@ export async function PUT(request: NextRequest) {
     .where(eq(recurringEvents.id, id)))[0];
 
   if (!existing || existing.groupId !== groupId) {
-    return NextResponse.json({ error: "Day not found" }, { status: 404 });
+    return apiError("Day not found", 404, "NOT_FOUND");
   }
 
   const updates: Partial<{

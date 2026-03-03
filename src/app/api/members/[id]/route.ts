@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { members, memberRoles, memberAvailability, users, scheduleDateAssignments } from "@/db/schema";
 import { eq, and, ne } from "drizzle-orm";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAuth, hasGroupAccess, apiError } from "@/lib/api-helpers";
 
 function normalizeHHMM(v: unknown): string | null {
   if (v == null) return null;
@@ -40,7 +40,12 @@ export async function GET(
     .where(eq(members.id, memberId)))[0];
 
   if (!member) {
-    return NextResponse.json({ error: "Miembro no encontrado" }, { status: 404 });
+    return apiError("Miembro no encontrado", 404, "NOT_FOUND");
+  }
+
+  const access = await hasGroupAccess(authResult.user.id, member.groupId);
+  if (!access) {
+    return apiError("Forbidden", 403, "FORBIDDEN");
   }
 
   const roles = await db
@@ -94,7 +99,12 @@ export async function PUT(
     .where(eq(members.id, memberId)))[0];
 
   if (!existing) {
-    return NextResponse.json({ error: "Miembro no encontrado" }, { status: 404 });
+    return apiError("Miembro no encontrado", 404, "NOT_FOUND");
+  }
+
+  const access = await hasGroupAccess(authResult.user.id, existing.groupId);
+  if (!access) {
+    return apiError("Forbidden", 403, "FORBIDDEN");
   }
 
   // Build update fields
@@ -286,7 +296,12 @@ export async function DELETE(
     .where(eq(members.id, memberId)))[0];
 
   if (!existing) {
-    return NextResponse.json({ error: "Miembro no encontrado" }, { status: 404 });
+    return apiError("Miembro no encontrado", 404, "NOT_FOUND");
+  }
+
+  const access = await hasGroupAccess(authResult.user.id, existing.groupId);
+  if (!access) {
+    return apiError("Forbidden", 403, "FORBIDDEN");
   }
 
   // Check if member has schedule assignments
@@ -297,9 +312,10 @@ export async function DELETE(
     .limit(1);
 
   if (assignments.length > 0) {
-    return NextResponse.json(
-      { error: "No se puede eliminar este miembro porque tiene asignaciones en cronogramas existentes. Edita los cronogramas primero." },
-      { status: 409 }
+    return apiError(
+      "No se puede eliminar este miembro porque tiene asignaciones en cronogramas existentes. Edita los cronogramas primero.",
+      409,
+      "CONFLICT"
     );
   }
 

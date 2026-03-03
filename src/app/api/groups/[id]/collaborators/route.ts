@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { groupCollaborators, groups, users, members } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { requireAuth, hasGroupAccess } from "@/lib/api-helpers";
+import { requireAuth, hasGroupAccess, apiError } from "@/lib/api-helpers";
 
 export async function GET(
   _request: NextRequest,
@@ -16,7 +16,7 @@ export async function GET(
 
   const access = await hasGroupAccess(authResult.user.id, groupId);
   if (!access) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return apiError("Forbidden", 403, "FORBIDDEN");
   }
 
   const collabs = await db
@@ -59,7 +59,7 @@ export async function POST(
 
   const access = await hasGroupAccess(authResult.user.id, groupId);
   if (!access) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return apiError("Forbidden", 403, "FORBIDDEN");
   }
 
   const body = await request.json();
@@ -152,7 +152,7 @@ export async function DELETE(
 
   const access = await hasGroupAccess(authResult.user.id, groupId);
   if (!access) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return apiError("Forbidden", 403, "FORBIDDEN");
   }
 
   const { searchParams } = new URL(request.url);

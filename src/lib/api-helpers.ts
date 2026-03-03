@@ -1,11 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { z } from "zod";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { groups, groupCollaborators, users } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { resolveGroupBySlug } from "@/lib/group";
+
+/** Standard API error shape: { error: string, code?: string } */
+export function apiError(
+  message: string,
+  status: number,
+  code?: string
+): NextResponse {
+  const body: { error: string; code?: string } = { error: message };
+  if (code) body.code = code;
+  return NextResponse.json(body, { status });
+}
 
 /**
- * Extract groupId from a request's query string.
+ * Parse request body with a Zod schema. Returns parsed data or a 400 NextResponse.
+ * Uses first issue message for the error body.
+ */
+export function parseBody<T extends z.ZodType>(
+  schema: T,
+  body: unknown
+): { data: z.infer<T>; error?: never } | { data?: never; error: NextResponse } {
+  const result = schema.safeParse(body);
+  if (result.success) {
+    return { data: result.data as z.infer<T> };
+  }
+  const first = result.error.issues[0];
+  const message = first?.message ?? "Invalid request body";
+  return { error: apiError(message, 400, "VALIDATION") };
+}
+
+/**
+ * Extract groupId from a request's query string (?groupId=N).
  * Returns the parsed groupId or a NextResponse error.
  */
 export function extractGroupId(request: NextRequest): number | NextResponse {
@@ -13,21 +43,44 @@ export function extractGroupId(request: NextRequest): number | NextResponse {
   const groupIdStr = searchParams.get("groupId");
 
   if (!groupIdStr) {
-    return NextResponse.json(
-      { error: "groupId query parameter is required" },
-      { status: 400 }
-    );
+    return apiError("groupId query parameter is required", 400, "MISSING_GROUP_ID");
   }
 
   const groupId = parseInt(groupIdStr, 10);
   if (isNaN(groupId)) {
-    return NextResponse.json(
-      { error: "groupId must be a number" },
-      { status: 400 }
-    );
+    return apiError("groupId must be a number", 400, "INVALID_GROUP_ID");
   }
 
   return groupId;
+}
+
+/**
+ * Extract groupId from query: accepts either ?groupId=N or ?slug=xxx.
+ * When slug is present, resolves it to groupId via resolveGroupBySlug.
+ * Returns groupId or a NextResponse (400 missing/invalid, 404 group not found).
+ */
+export async function extractGroupIdOrSlug(request: NextRequest): Promise<number | NextResponse> {
+  const { searchParams } = new URL(request.url);
+  const groupIdStr = searchParams.get("groupId");
+  const slug = searchParams.get("slug");
+
+  if (groupIdStr) {
+    const groupId = parseInt(groupIdStr, 10);
+    if (isNaN(groupId)) {
+      return apiError("groupId must be a number", 400, "INVALID_GROUP_ID");
+    }
+    return groupId;
+  }
+
+  if (slug && slug.trim()) {
+    const group = await resolveGroupBySlug(slug.trim());
+    if (!group) {
+      return apiError("Grupo no encontrado", 404, "GROUP_NOT_FOUND");
+    }
+    return group.id;
+  }
+
+  return apiError("groupId or slug query parameter is required", 400, "MISSING_GROUP_ID");
 }
 
 /**
@@ -49,7 +102,7 @@ export async function requireAuth(): Promise<
 > {
   const user = await getAuthUser();
   if (!user) {
-    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+    return { error: apiError("Unauthorized", 401, "UNAUTHORIZED") };
   }
   return { user };
 }
@@ -79,6 +132,7 @@ export async function hasGroupAccess(userId: string, groupId: number): Promise<b
 
 /**
  * Require auth + group access. Returns user or error response.
+ * Accepts either ?groupId=N or ?slug=xxx in the query.
  */
 export async function requireGroupAccess(request: NextRequest): Promise<
   { user: { id: string; name?: string | null; email?: string | null; image?: string | null }; groupId: number; error?: never } |
@@ -87,12 +141,12 @@ export async function requireGroupAccess(request: NextRequest): Promise<
   const authResult = await requireAuth();
   if (authResult.error) return { error: authResult.error };
 
-  const groupId = extractGroupId(request);
+  const groupId = await extractGroupIdOrSlug(request);
   if (groupId instanceof NextResponse) return { error: groupId };
 
   const access = await hasGroupAccess(authResult.user.id, groupId);
   if (!access) {
-    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+    return { error: apiError("Forbidden", 403, "FORBIDDEN") };
   }
 
   return { user: authResult.user, groupId };
@@ -156,5 +210,5 @@ export async function requireAdmin(request: NextRequest): Promise<
     }
   }
 
-  return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  return { error: apiError("Forbidden", 403, "FORBIDDEN") };
 }

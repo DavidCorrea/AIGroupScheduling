@@ -2,18 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { schedules, scheduleDate } from "@/db/schema";
 import { eq, and, desc, asc, or, gt, gte } from "drizzle-orm";
+import { apiError } from "@/lib/api-helpers";
+import { checkCronogramaRateLimit } from "@/lib/rate-limit";
 import { resolveGroupBySlug } from "@/lib/group";
 import { buildPublicScheduleResponse } from "@/lib/public-schedule";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
+  if (!checkCronogramaRateLimit(request)) {
+    return apiError("Demasiadas solicitudes. Intenta de nuevo en un minuto.", 429, "RATE_LIMITED");
+  }
   const { slug } = await params;
 
   const group = await resolveGroupBySlug(slug);
   if (!group) {
-    return NextResponse.json({ error: "Grupo no encontrado" }, { status: 404 });
+    return apiError("Grupo no encontrado", 404, "GROUP_NOT_FOUND");
   }
 
   const now = new Date();
