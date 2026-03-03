@@ -1,56 +1,17 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
-import { useTranslations } from "next-intl";
-import SharedScheduleView, {
-  SharedScheduleData,
-} from "@/components/SharedScheduleView";
-import LoadingScreen from "@/components/LoadingScreen";
-
-export default function CronogramaPage() {
-  const params = useParams();
-  const slug = params.slug as string;
-  const t = useTranslations("cronograma");
-  const [schedule, setSchedule] = useState<SharedScheduleData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-
-  const fetchSchedule = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/cronograma/${slug}`);
-      if (!res.ok) {
-        setError(true);
-        setLoading(false);
-        return;
-      }
-      setSchedule(await res.json());
-    } catch {
-      setError(true);
-    }
-    setLoading(false);
-  }, [slug]);
-
-  useEffect(() => {
-    queueMicrotask(() => fetchSchedule());
-  }, [fetchSchedule]);
-
-  if (loading) {
-    return <LoadingScreen fullPage />;
-  }
-
-  if (error || !schedule) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">{t("agendaNotFound")}</h1>
-          <p className="mt-2 text-muted-foreground">
-            {t("noAgendaThisMonth")}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return <SharedScheduleView schedule={schedule} basePath={`/${slug}/cronograma`} />;
+/**
+ * Redirect to current month so there is a single URL shape for "view this month".
+ * Bookmarks and links stay consistent at /[slug]/cronograma/[year]/[month].
+ */
+export default async function CronogramaPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  redirect(`/${slug}/cronograma/${year}/${month}`);
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useParams } from "next/navigation";
 import { useGroup } from "@/lib/group-context";
 import { useTranslations } from "next-intl";
 import { formatDateRangeWithYear } from "@/lib/timezone-utils";
@@ -27,6 +28,8 @@ function formatDateRange(start: string, end: string): string {
 }
 
 export default function HolidaysPage() {
+  const params = useParams();
+  const slug = params.slug as string;
   const t = useTranslations("holidays");
   const tCommon = useTranslations("common");
   const { groupId, loading: groupLoading } = useGroup();
@@ -100,7 +103,8 @@ export default function HolidaysPage() {
   };
 
   const handleDelete = async (id: number) => {
-    await fetch(`/api/configuration/holidays?id=${id}&groupId=${groupId}`, {
+    const q = groupId != null ? `?groupId=${groupId}` : `?slug=${encodeURIComponent(slug)}`;
+    await fetch(`/api/configuration/holidays/${id}${q}`, {
       method: "DELETE",
     });
     fetchData();

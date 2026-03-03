@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { useGroup } from "@/lib/group-context";
 import { useUnsavedConfig } from "@/lib/unsaved-config-context";
 import { DAY_ORDER } from "@/lib/constants";
 import { utcTimeToLocalDisplay, localTimeToUtc } from "@/lib/timezone-utils";
@@ -132,6 +133,7 @@ export default function EventForm({
 }: EventFormProps) {
   const router = useRouter();
   const { setDirty } = useUnsavedConfig();
+  const { refetchContext } = useGroup();
   const t = useTranslations("events");
   const tCommon = useTranslations("common");
   const tConfigNav = useTranslations("configNav");
@@ -253,6 +255,7 @@ export default function EventForm({
         return;
       }
       setDirty(false);
+      await refetchContext();
       router.push(`/${slug}/config/events`);
     } finally {
       setDeleteInProgress(false);
@@ -293,6 +296,7 @@ export default function EventForm({
   const handleRecalcConfirm = async (doRecalc: boolean) => {
     setShowRecalcDialog(false);
     if (!doRecalc || !groupId || !initialEvent) {
+      await refetchContext();
       router.push(`/${slug}/config/events`);
       return;
     }
@@ -307,6 +311,7 @@ export default function EventForm({
         setFormError(data.error || t("errorRecalc"));
         return;
       }
+      await refetchContext();
       router.push(`/${slug}/config/events`);
     } finally {
       setRecalcInProgress(false);
@@ -387,6 +392,7 @@ export default function EventForm({
           }
         }
         setDirty(false);
+        await refetchContext();
         router.push(`/${slug}/config/events/${created.id}`);
       } else if (initialEvent) {
         const putRes = await fetch(`/api/configuration/days?groupId=${groupId}`, {
@@ -447,6 +453,7 @@ export default function EventForm({
             // ignore; redirect anyway
           }
         }
+        await refetchContext();
         router.push(`/${slug}/config/events`);
       }
     } finally {

@@ -9,6 +9,8 @@ import { aggregateAffectedScheduleDates } from "@/lib/affected-schedule-dates";
 const mockRequireGroupAccess = jest.fn();
 jest.mock("@/lib/api-helpers", () => ({
   requireGroupAccess: (...args: unknown[]) => mockRequireGroupAccess(...args),
+  apiError: (message: string, status: number, _code?: string) =>
+    NextResponse.json({ error: message }, { status }),
 }));
 
 const mockSelect = jest.fn();

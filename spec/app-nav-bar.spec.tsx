@@ -38,6 +38,10 @@ jest.mock("next/link", () => {
   };
 });
 
+jest.mock("next-intl", () => ({
+  useTranslations: () => (key: string) => key,
+}));
+
 import AppNavBar from "@/components/AppNavBar";
 
 beforeAll(() => {
@@ -73,7 +77,7 @@ describe("Global navigation bar", () => {
 
     render(<AppNavBar />);
 
-    expect(screen.getAllByText("Iniciar sesión").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("signIn").length).toBeGreaterThan(0);
   });
 
   it("does not render on the login page", () => {
@@ -98,7 +102,7 @@ describe("Global navigation bar", () => {
 
     render(<AppNavBar />);
 
-    const titleLink = screen.getAllByText("Cronogramas")[0].closest("a");
+    const titleLink = screen.getAllByText("appName")[0].closest("a");
     expect(titleLink).toHaveAttribute("href", "/");
   });
 });

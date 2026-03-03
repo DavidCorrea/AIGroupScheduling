@@ -1,26 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useGroup } from "@/lib/group-context";
 import LoadingScreen from "@/components/LoadingScreen";
-
-interface Role {
-  id: number;
-  name: string;
-  requiredCount: number;
-  displayOrder: number;
-  dependsOnRoleId: number | null;
-  exclusiveGroupId: number | null;
-  isRelevant: boolean;
-}
-
-interface Member {
-  id: number;
-  roleIds: number[];
-}
 
 interface ExclusiveGroup {
   id: number;
@@ -32,45 +17,19 @@ export default function RolesPage() {
   const slug = params.slug as string;
   const t = useTranslations("roles");
   const tCommon = useTranslations("common");
-  const { groupId, loading: groupLoading } = useGroup();
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [groups, setGroups] = useState<ExclusiveGroup[]>([]);
-  const [memberCountByRole, setMemberCountByRole] = useState<Record<number, number>>({});
-  const [loading, setLoading] = useState(true);
-
+  const { groupId, loading: groupLoading, configContext, refetchContext } = useGroup();
   const [newGroupName, setNewGroupName] = useState("");
 
-  const fetchData = useCallback(async () => {
-    if (!groupId) return;
-    const [rolesRes, groupsRes, membersRes] = await Promise.all([
-      fetch(`/api/configuration/roles?groupId=${groupId}`),
-      fetch(`/api/configuration/exclusive-groups?groupId=${groupId}`),
-      fetch(`/api/members?groupId=${groupId}`),
-    ]);
-    const rolesData = await rolesRes.json();
-    const membersData = await membersRes.json();
-    setRoles(rolesData);
-    setGroups(await groupsRes.json());
+  const roles = useMemo(() => configContext?.roles ?? [], [configContext?.roles]);
+  const groups = (configContext?.exclusiveGroups ?? []) as ExclusiveGroup[];
+  const memberCountByRole = useMemo(() => {
+    const members = configContext?.members ?? [];
     const counts: Record<number, number> = {};
-    for (const role of rolesData) {
-      counts[role.id] = (membersData as Member[]).filter((m) =>
-        m.roleIds.includes(role.id)
-      ).length;
+    for (const r of roles) {
+      counts[r.id] = members.filter((m) => m.roleIds.includes(r.id)).length;
     }
-    setMemberCountByRole(counts);
-    setLoading(false);
-  }, [groupId]);
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      if (!groupId) {
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      fetchData();
-    });
-  }, [groupId, fetchData]);
+    return counts;
+  }, [configContext?.members, roles]);
 
   const addGroup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,25 +40,19 @@ export default function RolesPage() {
       body: JSON.stringify({ name: newGroupName.trim() }),
     });
     setNewGroupName("");
-    fetchData();
+    await refetchContext();
   };
 
   const deleteGroup = async (group: ExclusiveGroup) => {
-    if (
-      !confirm(t("confirmDeleteExclusive"))
-    )
-      return;
-    if (!groupId) return;
-    await fetch(
-      `/api/configuration/exclusive-groups?id=${group.id}&groupId=${groupId}`,
-      {
-        method: "DELETE",
-      }
-    );
-    fetchData();
+    if (!confirm(t("confirmDeleteExclusive"))) return;
+    const q = groupId != null ? `?groupId=${groupId}` : `?slug=${encodeURIComponent(slug)}`;
+    await fetch(`/api/configuration/exclusive-groups/${group.id}${q}`, {
+      method: "DELETE",
+    });
+    await refetchContext();
   };
 
-  if (groupLoading || loading) {
+  if (groupLoading) {
     return <LoadingScreen fullPage={false} />;
   }
 

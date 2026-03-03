@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -8,46 +7,14 @@ import { useGroup } from "@/lib/group-context";
 import { utcTimeToLocalDisplay } from "@/lib/timezone-utils";
 import LoadingScreen from "@/components/LoadingScreen";
 
-interface ScheduleDay {
-  id: number;
-  weekdayId: number;
-  dayOfWeek: string;
-  active: boolean;
-  type: string;
-  label: string | null;
-  startTimeUtc?: string;
-  endTimeUtc?: string;
-  groupId: number;
-}
-
 export default function EventsPage() {
   const params = useParams();
   const slug = params.slug as string;
   const t = useTranslations("events");
-  const { groupId, loading: groupLoading } = useGroup();
-  const [days, setDays] = useState<ScheduleDay[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { loading: groupLoading, configContext } = useGroup();
+  const days = configContext?.days ?? [];
 
-  const fetchData = useCallback(async () => {
-    if (!groupId) return;
-    const res = await fetch(`/api/configuration/days?groupId=${groupId}`);
-    const data = await res.json();
-    setDays(data);
-    setLoading(false);
-  }, [groupId]);
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      if (!groupId) {
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      fetchData();
-    });
-  }, [groupId, fetchData]);
-
-  if (groupLoading || loading) {
+  if (groupLoading) {
     return <LoadingScreen fullPage={false} />;
   }
 

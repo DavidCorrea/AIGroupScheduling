@@ -1,44 +1,19 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useGroup } from "@/lib/group-context";
 import LoadingScreen from "@/components/LoadingScreen";
 
-interface Member {
-  id: number;
-  name: string;
-  memberEmail: string | null;
-  userId: string | null;
-  email: string | null;
-  image: string | null;
-  userName: string | null;
-  roleIds: number[];
-  availableDayIds: number[];
-}
-
 export default function MembersPage() {
   const params = useParams();
   const slug = params.slug as string;
   const t = useTranslations("members");
-  const { groupId, loading: groupLoading } = useGroup();
-  const [members, setMembers] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { loading: groupLoading, configContext } = useGroup();
+  const members = configContext?.members ?? [];
 
-  const fetchData = useCallback(async () => {
-    if (!groupId) return;
-    const res = await fetch(`/api/members?groupId=${groupId}`);
-    setMembers(await res.json());
-    setLoading(false);
-  }, [groupId]);
-
-  useEffect(() => {
-    if (groupId) queueMicrotask(() => fetchData());
-  }, [groupId, fetchData]);
-
-  if (groupLoading || loading) {
+  if (groupLoading) {
     return <LoadingScreen fullPage={false} />;
   }
 
