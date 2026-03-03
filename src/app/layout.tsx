@@ -6,6 +6,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
 import SessionProvider from "@/components/SessionProvider";
 import AppNavBar from "@/components/AppNavBar";
+import KeyboardShortcuts from "@/components/KeyboardShortcuts";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -44,6 +45,7 @@ export default async function RootLayout({
         <NextIntlClientProvider messages={messages}>
           <SessionProvider>
             <AppNavBar />
+            <KeyboardShortcuts />
             {children}
             <Analytics />
             <SpeedInsights />

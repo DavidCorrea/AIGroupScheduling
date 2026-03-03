@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { GroupProvider, useGroup } from "@/lib/group-context";
 import { UnsavedConfigProvider, useUnsavedConfig } from "@/lib/unsaved-config-context";
 import { isConfigFormPageWithUnsavedGuard } from "@/lib/config-nav-guard";
+import ConfigGoTo from "@/components/ConfigGoTo";
 
 function GroupSubNav() {
   const { slug, groupName, loading, error } = useGroup();
@@ -81,6 +82,7 @@ function GroupSubNav() {
 
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-1">
+            <ConfigGoTo />
             {navLinks.map((link) => {
               const active = isActive(link.href, link.exact);
               return (
