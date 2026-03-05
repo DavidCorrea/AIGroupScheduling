@@ -9,3 +9,4 @@ export { exclusiveGroupCreateSchema } from "./exclusive-groups";
 export { configHolidayCreateSchema } from "./holidays";
 export { scheduleNoteSchema } from "./schedule-notes";
 export { groupCreateSchema } from "./groups";
+export { adminAuthSchema } from "./admin";

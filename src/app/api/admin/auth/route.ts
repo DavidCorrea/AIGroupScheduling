@@ -2,13 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { parseBody } from "@/lib/api-helpers";
+import { adminAuthSchema } from "@/lib/schemas";
+import { createBootstrapToken } from "@/lib/admin-bootstrap-token";
+import { checkAdminAuthRateLimit } from "@/lib/rate-limit";
 
 /**
  * Bootstrap admin authentication.
  * Only works when no admin users exist in the database.
- * Validates ADMIN_USERNAME/ADMIN_PASSWORD from env and sets a short-lived cookie.
+ * Validates ADMIN_USERNAME/ADMIN_PASSWORD from env and sets a short-lived random token in a cookie
+ * (never the raw password). Rate limited per IP.
  */
 export async function POST(request: NextRequest) {
+  if (!checkAdminAuthRateLimit(request)) {
+    return NextResponse.json(
+      { error: "Demasiados intentos. Intenta más tarde." },
+      { status: 429 }
+    );
+  }
+
   // Check if any admin users exist
   const admins = await db
     .select({ id: users.id })
@@ -23,8 +35,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const body = await request.json();
-  const { username, password } = body;
+  const raw = await request.json();
+  const parsed = parseBody(adminAuthSchema, raw);
+  if (parsed.error) return parsed.error;
+  const { username, password } = parsed.data;
 
   const envUser = process.env.ADMIN_USERNAME;
   const envPass = process.env.ADMIN_PASSWORD;
@@ -43,9 +57,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Set a bootstrap cookie (expires in 1 hour)
+  const token = createBootstrapToken();
   const response = NextResponse.json({ success: true });
-  response.cookies.set("admin-bootstrap-token", envPass, {
+  response.cookies.set("admin-bootstrap-token", token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

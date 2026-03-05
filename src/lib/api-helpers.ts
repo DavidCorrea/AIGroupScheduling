@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { groups, groupCollaborators, users } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { resolveGroupBySlug } from "@/lib/group";
+import { validateBootstrapToken } from "@/lib/admin-bootstrap-token";
 
 /** Standard API error shape: { error: string, code?: string } */
 export function apiError(
@@ -190,10 +191,9 @@ export async function requireAdmin(request: NextRequest): Promise<
   // 2. Check bootstrap mode (Basic Auth or cookie) — only when no admin users exist
   const adminExists = await hasAdminUsers();
   if (!adminExists) {
-    // Check bootstrap cookie
+    // Check bootstrap cookie (random token, never ADMIN_PASSWORD)
     const bootstrapToken = request.cookies.get("admin-bootstrap-token")?.value;
-    const expectedToken = process.env.ADMIN_PASSWORD;
-    if (bootstrapToken && expectedToken && bootstrapToken === expectedToken) {
+    if (bootstrapToken && validateBootstrapToken(bootstrapToken)) {
       return { isBootstrap: true };
     }
 
