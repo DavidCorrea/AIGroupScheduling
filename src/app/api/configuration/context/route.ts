@@ -10,7 +10,8 @@ const SLUG_SET = new Set<string>(CONFIG_CONTEXT_SLICES);
 
 function parseInclude(value: string | null): ConfigContextSlice[] | undefined {
   if (!value || typeof value !== "string") return undefined;
-  const parts = value.split(",").map((p) => p.trim().toLowerCase());
+  // Keep case: slice names are camelCase (e.g. exclusiveGroups); toLowerCase would drop them.
+  const parts = value.split(",").map((p) => p.trim());
   const included = parts.filter((p): p is ConfigContextSlice => SLUG_SET.has(p));
   return included.length > 0 ? [...new Set(included)] : undefined;
 }
