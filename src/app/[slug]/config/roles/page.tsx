@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { useGroup } from "@/lib/group-context";
 import { useConfigContext } from "@/lib/config-queries";
 import LoadingScreen from "@/components/LoadingScreen";
+import { EmptyState } from "@/components/EmptyState";
 import { DangerZone } from "@/components/DangerZone";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
@@ -91,6 +92,13 @@ export default function RolesPage() {
           <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground">
             {t("count", { n: roles.length })}
           </h2>
+          {roles.length === 0 ? (
+            <EmptyState
+              message={t("emptyMessage")}
+              ctaLabel={t("addRole")}
+              ctaHref={`/${slug}/config/roles/new`}
+            />
+          ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <Link
               href={`/${slug}/config/roles/new`}
@@ -112,6 +120,7 @@ export default function RolesPage() {
               </Link>
             ))}
           </div>
+          )}
         </section>
       </div>
 

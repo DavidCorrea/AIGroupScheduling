@@ -10,6 +10,7 @@ Reusable React components used across the app. All user-facing text should use *
 | **SharedScheduleView** | Public cronograma: month grid, entries, notes, nav. Used by cronograma pages. |
 | **AvailabilityWeekGrid** | Weekday grid for member availability (blocks per day). Used in member new/edit. |
 | **BackLink** | Top-of-page back link (to list). Uses `common.back`, `members.backToMembers`, etc. |
+| **EmptyState** | Empty-state block: short message + primary CTA. Used on config list pages (members, roles, events, schedules) when list is empty. |
 | **OptionToggleGroup** | Bordered multi-select toggle (e.g. active days, roles, available days). |
 | **KeyboardShortcuts** | Global shortcuts; `?` opens help overlay. Rendered in root layout. |
 | **LoadingScreen** | Loading state. |

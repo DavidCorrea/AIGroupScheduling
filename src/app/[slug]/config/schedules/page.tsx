@@ -9,6 +9,7 @@ import { useConfigContext } from "@/lib/config-queries";
 import { buildColumnOrderPayload } from "@/lib/column-order";
 import { useUnsavedConfig } from "@/lib/unsaved-config-context";
 import LoadingScreen from "@/components/LoadingScreen";
+import { EmptyState } from "@/components/EmptyState";
 import { DangerZone } from "@/components/DangerZone";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
@@ -384,7 +385,7 @@ export default function SchedulesPage() {
 
       <div className="border-t border-border pt-8">
         {/* Generate form */}
-        <div>
+        <div id="generate">
           <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-2">{t("generate")}</h2>
           <p className="text-sm text-muted-foreground mb-5">
             {t("generateHelp")}
@@ -445,11 +446,11 @@ export default function SchedulesPage() {
         <div className="border-t border-border pt-8 mt-8">
           <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground mb-6">{t("existing")}</h2>
           {schedulesList.length === 0 ? (
-            <div className="border border-dashed border-border rounded-lg py-10 text-center">
-              <p className="text-sm text-muted-foreground">
-                {t("noSchedulesYet")}
-              </p>
-            </div>
+            <EmptyState
+              message={t("noSchedulesYet")}
+              ctaLabel={t("generate")}
+              ctaHref="#generate"
+            />
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {[...schedulesList]

@@ -7,6 +7,7 @@ import { useGroup } from "@/lib/group-context";
 import { useConfigContext } from "@/lib/config-queries";
 import { utcTimeToLocalDisplay } from "@/lib/timezone-utils";
 import LoadingScreen from "@/components/LoadingScreen";
+import { EmptyState } from "@/components/EmptyState";
 
 export default function EventsPage() {
   const params = useParams();
@@ -35,6 +36,13 @@ export default function EventsPage() {
           <h2 className="uppercase tracking-widest text-xs font-medium text-muted-foreground">
             {t("recurringCount", { n: days.length })}
           </h2>
+          {days.length === 0 ? (
+            <EmptyState
+              message={t("emptyMessage")}
+              ctaLabel={t("addEvent")}
+              ctaHref={`/${slug}/config/events/new`}
+            />
+          ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <Link
               href={`/${slug}/config/events/new`}
@@ -72,6 +80,7 @@ export default function EventsPage() {
               );
             })}
           </div>
+          )}
         </section>
       </div>
     </div>
