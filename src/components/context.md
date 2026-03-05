@@ -13,7 +13,7 @@ Reusable React components used across the app. All user-facing text should use *
 | **EmptyState** | Empty-state block: short message + primary CTA. Used on config list pages (members, roles, events, schedules) when list is empty. |
 | **OptionToggleGroup** | Bordered multi-select toggle (e.g. active days, roles, available days). |
 | **KeyboardShortcuts** | Global shortcuts; `?` opens help overlay. Rendered in root layout. |
-| **LoadingScreen** | Loading state. |
+| **LoadingScreen** | Skeleton-only loading state (fullPage → RootLoadingSkeleton, else ConfigContentSkeleton). |
 | **Skeletons** | `src/components/Skeletons/` — SkeletonCard, SkeletonRow, SkeletonText, SkeletonGrid, SkeletonRegion for route and inline loading placeholders. |
 | **UnsavedBanner** | Shown when config is dirty: "Tienes cambios sin guardar"; sets beforeunload to warn on tab close. Used in config layout. |
 | **SessionProvider** | Auth session provider wrapper. |
