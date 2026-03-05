@@ -147,6 +147,7 @@ Skills: `next-auth`, `next-intl`, `react`, `tanstack-react-query`, `drizzle-orm`
 
 ## Schedule generation algorithm
 - `src/lib/scheduler.ts`, types in `src/lib/scheduler.types.ts`. Input: dates, roles (required counts), members (roles, availability, holidays).
+- **Full algorithm description:** **docs/SCHEDULE_ALGORITHM.md** (round-robin, eligibility, priorities, exclusive groups, time window, dependent roles).
 - Round-robin with per-day-of-week pointers; event time window filters eligible members; role dependencies = manual selection; exclusive role groups = same member can't get same-exclusive-group roles same date; day role priorities (event_role_priorities) order fill.
 
 ## Member management
