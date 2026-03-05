@@ -14,14 +14,8 @@ description: How this project uses Drizzle ORM with PostgreSQL. Use when working
 
 ## How it should be used
 
+- **New use cases:** Before using this library in a new way, check the official docs and document the approach and any gotchas in this skill.
 - **Single `db` instance:** Never create a second `postgres()` or `drizzle()` in app code; use the shared `db` from `@/lib/db`.
 - **Schema changes:** Edit only `src/db/schema.ts` → run `npm run db:generate` (descriptive name) → run `npm run db:migrate`. See **AGENTS.md** for migration reset, applied table, and backfill rules.
 - **Type safety:** Prefer schema-backed queries and Drizzle operators. Use `sql` only when an aggregate or expression isn’t available in Drizzle; prefer `max()`, `count()`, etc., when possible.
 - **Imports:** Tables from `@/db/schema`; `db` from `@/lib/db`; operators/aggregates from `drizzle-orm`.
-
-## Findings
-
-- **Connection handling:** One top-level `postgres()` client is correct. postgres-js manages connections internally; for serverless, use an external pooler (e.g. Neon/Supabase pooler) and keep a single client per instance.
-- **Raw SQL:** Only one use: roles POST used `sql\`COALESCE(MAX(displayOrder), -1)\``. Replaced with `max(roles.displayOrder)` and `(result?.maxOrder ?? -1) + 1` for consistency.
-- **No `.prepare()`:** Not used; postgres-js/Drizzle handle statements. In serverless (e.g. AWS), if prepared statements cause issues, configure postgres with `{ prepare: false }` where the client is created.
-- **Migrations:** Workflow and journal are in **AGENTS.md**. Snapshot files in `src/db/migrations/meta/` stay in sync via `db:generate`; do not hand-edit.

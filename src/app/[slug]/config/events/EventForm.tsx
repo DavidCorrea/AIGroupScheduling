@@ -726,8 +726,15 @@ export default function EventForm({
         loading={deleteInProgress}
       />
 
-      {showDeleteDialog && affectedInfo && (
-        <Dialog.Root open={showDeleteDialog} onOpenChange={(open) => { if (!open) { setShowDeleteDialog(false); setAffectedInfo(null); } }}>
+      <Dialog.Root
+        open={!!(showDeleteDialog && affectedInfo)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowDeleteDialog(false);
+            setAffectedInfo(null);
+          }
+        }}
+      >
           <Dialog.Portal>
             <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
             <Dialog.Content
@@ -740,10 +747,10 @@ export default function EventForm({
                 {t("deleteDialogTitle")}
               </Dialog.Title>
               <Dialog.Description id="delete-dialog-description" className="mt-2 text-sm text-muted-foreground">
-                {t("deleteDialogMessage", {
+                {affectedInfo ? t("deleteDialogMessage", {
                   count: affectedInfo.count,
                   schedules: affectedInfo.schedules.length,
-                })}
+                }) : ""}
               </Dialog.Description>
               <div className="flex flex-col gap-2 pt-4">
                 <button
@@ -776,10 +783,13 @@ export default function EventForm({
             </Dialog.Content>
           </Dialog.Portal>
         </Dialog.Root>
-      )}
 
-      {showRecalcDialog && affectedInfo && (
-        <Dialog.Root open={showRecalcDialog} onOpenChange={(open) => { if (!open) setShowRecalcDialog(false); }}>
+      <Dialog.Root
+        open={!!(showRecalcDialog && affectedInfo)}
+        onOpenChange={(open) => {
+          if (!open) setShowRecalcDialog(false);
+        }}
+      >
           <Dialog.Portal>
             <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
             <Dialog.Content
@@ -792,10 +802,10 @@ export default function EventForm({
                 {t("recalcDialogTitle")}
               </Dialog.Title>
               <Dialog.Description id="recalc-dialog-description" className="mt-2 text-sm text-muted-foreground">
-                {t("recalcDialogMessage", {
+                {affectedInfo ? t("recalcDialogMessage", {
                   count: affectedInfo.count,
                   schedules: affectedInfo.schedules.length,
-                })}
+                }) : ""}
               </Dialog.Description>
               <div className="flex flex-col gap-2 pt-4">
                 <button
@@ -818,7 +828,6 @@ export default function EventForm({
             </Dialog.Content>
           </Dialog.Portal>
         </Dialog.Root>
-      )}
     </div>
   );
 }

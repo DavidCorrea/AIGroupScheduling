@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
+import { getRawArray } from "@/lib/intl-utils";
 import { formatDateLong } from "@/lib/timezone-utils";
 import LoadingScreen from "@/components/LoadingScreen";
 
@@ -132,8 +133,8 @@ export default function HomePage() {
   const daysInMonth = new Date(Date.UTC(currentYear, currentMonth, 0)).getUTCDate();
   const firstDayDow = new Date(Date.UTC(currentYear, currentMonth - 1, 1)).getUTCDay();
   const leadingBlanks = firstDayDow === 0 ? 6 : firstDayDow - 1;
-  const MONTH_NAMES = (t as unknown as { raw: (k: string) => string[] }).raw("monthsLowercase") ?? [];
-  const dayHeaders = (t as unknown as { raw: (k: string) => string[] }).raw("dayHeaders") ?? [];
+  const MONTH_NAMES = getRawArray(t, "monthsLowercase");
+  const dayHeaders = getRawArray(t, "dayHeaders");
   const hasAssignments = dashboard && dashboard.assignments.length > 0;
 
   return (

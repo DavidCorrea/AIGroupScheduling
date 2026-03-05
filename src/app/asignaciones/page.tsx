@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { getRawArray } from "@/lib/intl-utils";
 import { formatDateLong } from "@/lib/timezone-utils";
 import LoadingScreen from "@/components/LoadingScreen";
 
@@ -205,7 +206,7 @@ export default function MyAssignmentsPage() {
               className="w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm"
             >
               <option value="">—</option>
-              {(tHome as unknown as { raw: (k: string) => string[] }).raw("monthsLowercase").map((name, i) => (
+              {getRawArray(tHome, "monthsLowercase").map((name, i) => (
                 <option key={i} value={String(i + 1)}>
                   {name}
                 </option>

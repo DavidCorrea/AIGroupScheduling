@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { groups, groupCollaborators, members, users, recurringEvents, weekdays, roles } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
-import { requireAuth, apiError } from "@/lib/api-helpers";
+import { requireAuth, apiError, parseBody } from "@/lib/api-helpers";
+import { groupCreateSchema } from "@/lib/schemas";
 
 export async function GET(request: NextRequest) {
   const authResult = await requireAuth();
@@ -86,58 +87,33 @@ export async function POST(request: NextRequest) {
     .where(eq(users.id, userId)))[0];
 
   if (!dbUser || (!dbUser.isAdmin && !dbUser.canCreateGroups)) {
-    return NextResponse.json(
-      { error: "No tienes permisos para crear grupos" },
-      { status: 403 }
-    );
+    return apiError("No tienes permisos para crear grupos", 403, "FORBIDDEN");
   }
 
   const body = await request.json();
-  const { name, slug, days, roles: rolesList, collaboratorUserIds } = body;
-
-  if (!name || typeof name !== "string" || name.trim().length === 0) {
-    return NextResponse.json(
-      { error: "El nombre es obligatorio" },
-      { status: 400 }
-    );
-  }
-
-  if (!slug || typeof slug !== "string" || slug.trim().length === 0) {
-    return NextResponse.json(
-      { error: "El slug es obligatorio" },
-      { status: 400 }
-    );
-  }
-
-  if (!/^[a-z0-9-]+$/.test(slug.trim())) {
-    return NextResponse.json(
-      { error: "El slug solo puede contener letras minúsculas, números y guiones" },
-      { status: 400 }
-    );
-  }
+  const parsed = parseBody(groupCreateSchema, body);
+  if (parsed.error) return parsed.error;
+  const { name, slug, days, roles: rolesList, collaboratorUserIds } = parsed.data;
 
   const existing = (await db
     .select()
     .from(groups)
-    .where(eq(groups.slug, slug.trim())))[0];
+    .where(eq(groups.slug, slug)))[0];
 
   if (existing) {
-    return NextResponse.json(
-      { error: "Ya existe un grupo con ese slug" },
-      { status: 409 }
-    );
+    return apiError("Ya existe un grupo con ese slug", 409, "CONFLICT");
   }
 
   const group = (await db
     .insert(groups)
-    .values({ name: name.trim(), slug: slug.trim(), ownerId: userId })
+    .values({ name, slug, ownerId: userId })
     .returning())[0];
 
   if (Array.isArray(days) && days.length > 0) {
     const weekdayRows = await db.select().from(weekdays).orderBy(weekdays.displayOrder);
     const nameToId = new Map(weekdayRows.map((w) => [w.name, w.id]));
     for (const d of days) {
-      const weekdayId = typeof d.weekdayId === "number" ? d.weekdayId : nameToId.get(d.dayOfWeek);
+      const weekdayId = typeof d.weekdayId === "number" ? d.weekdayId : (d.dayOfWeek ? nameToId.get(d.dayOfWeek) : undefined);
       if (weekdayId != null) {
         await db.insert(recurringEvents).values({
           weekdayId,
@@ -158,7 +134,7 @@ export async function POST(request: NextRequest) {
       if (r.name && typeof r.name === "string" && r.name.trim()) {
         await db.insert(roles).values({
           name: r.name.trim(),
-          requiredCount: r.requiredCount ?? 1,
+          requiredCount: 1,
           displayOrder: i,
           groupId: group.id,
         });

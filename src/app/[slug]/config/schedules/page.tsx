@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { getRawArray } from "@/lib/intl-utils";
 import { useGroup } from "@/lib/group-context";
 import { useConfigContext } from "@/lib/config-queries";
 import { buildColumnOrderPayload } from "@/lib/column-order";
@@ -257,7 +258,7 @@ export default function SchedulesPage() {
     slug ?? groupSlug ?? "",
     ["schedules", "roles"]
   );
-  const monthNames = (t as unknown as { raw: (k: string) => string[] }).raw("months") ?? MONTH_NAMES;
+  const monthNames = getRawArray(t, "months").length > 0 ? getRawArray(t, "months") : MONTH_NAMES;
   const { setDirty } = useUnsavedConfig();
 
   const schedulesList = useMemo<Schedule[]>(

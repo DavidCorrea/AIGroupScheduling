@@ -29,16 +29,9 @@ description: Use when working with Google Calendar API, OAuth for calendar expor
 
 ## How it should be used
 
+- **New use cases:** Before changing OAuth scope or adding Calendar API usage, check Google Calendar API docs and document the approach in this skill.
 - **New calendar features**: Keep using Calendar API v3 and the same OAuth client/callback if you add more event types or update existing events. Use `calendar.events.insert` / `update` / `delete` as needed; stay with scope `calendar.events` unless you need broader access.
 - **Env**: Always check `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` before redirecting to OAuth or in the callback; return a clear error (e.g. 500 CONFIG) or redirect with `?calendar=error` when missing.
 - **Nonce**: Cookie `google_calendar_nonce` is set when starting OAuth (httpOnly, secure in prod, sameSite: lax, 10 min). Callback compares state.nonce to cookie and deletes the cookie on success or error. Do not skip nonce validation.
 - **Permissions**: User assignments path checks `users.canExportCalendars` and filters assignments by `groupCalendarExportEnabled`. Cronograma path checks `group.calendarExportEnabled` and member belongs to group. Keep these checks in place.
 - **Errors**: On insert failure (e.g. quota, invalid token), redirect to the same destination with `?calendar=error` and clear the nonce cookie. No need to expose Google error details to the user.
-
-## Findings
-
-1. **Single callback, two state shapes**: Callback discriminates with `isUserAssignmentsState(decoded)` and `isCronogramaState(decoded)`. State is base64url-encoded JSON; decoding failure or unknown shape leads to `/?calendar=error`.
-2. **No refresh token handling**: We use `prompt: "consent"` so the user gets a refresh token each time. We don’t store or use refresh tokens; each "Guardar en calendario" is a full OAuth round-trip. For fewer prompts, you could store refresh tokens (encrypted) and reuse them; current design favors simplicity.
-3. **Insert loop**: Events are inserted sequentially in a loop. For large sets, consider batching (Calendar API supports batch) or at least handling partial failure (e.g. continue and report "some events could not be added") if product requirements allow.
-4. **All-day events**: Using `start.date` / `end.date` (no `dateTime`) is correct for all-day events; `end.date` is exclusive (next day) per API spec.
-5. **Scope**: `calendar.events` is sufficient for insert; we don’t use `calendar.readonly` or `calendar` full scope.

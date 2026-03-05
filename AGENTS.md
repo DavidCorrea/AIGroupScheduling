@@ -7,7 +7,7 @@ This file is the single source for product behaviour, scripts, migrations, and a
 # When you begin
 
 - **In a specific folder?** Read its `context.md` first (what lives there, where to look next). Prefer that over broad searches.
-- **Touching a library we use?** Read the matching skill in **`.cursor/skills/`** before changing or adding usage: `next-auth`, `next-intl`, `tanstack-react-query`, `drizzle-orm`, `zod`, `radix-ui-dialog`, `dnd-kit`, `react-hotkeys-hook`, `googleapis`.
+- **Touching a library we use?** Read the matching skill in **`.cursor/skills/`** before changing or adding usage: `next-auth`, `next-intl`, `tanstack-react-query`, `drizzle-orm`, `zod`, `radix-ui-dialog`, `react-hotkeys-hook`, `googleapis`.
 - **Adding or changing API routes?** See **docs/API.md** (route index, auth, which file to edit).
 - **Adding or changing pages or nav?** See **docs/CLIENT.md** (route map, layouts, components).
 - **Changing schema or migrations?** See **docs/DATABASE.md** and the "Database and migrations" section below.
@@ -55,7 +55,9 @@ This file is the single source for product behaviour, scripts, migrations, and a
 
 Project skills in **`.cursor/skills/`** document how each major library is used and how it should be used. **Read the relevant skill before changing or adding usage** of that library so you follow existing patterns and best practices.
 
-Skills: `next-auth`, `next-intl`, `tanstack-react-query`, `drizzle-orm`, `zod`, `radix-ui-dialog`, `dnd-kit`, `react-hotkeys-hook`, `googleapis`.
+**Before using any library in a new use case:** Investigate the proper way to do it (official docs, best practices) and document the approach in that library’s skill file. Update the skill with patterns, gotchas, and “how it should be used” so future work stays consistent.
+
+Skills: `next-auth`, `next-intl`, `tanstack-react-query`, `drizzle-orm`, `zod`, `radix-ui-dialog`, `react-hotkeys-hook`, `googleapis`.
 
 ---
 
@@ -73,7 +75,7 @@ Skills: `next-auth`, `next-intl`, `tanstack-react-query`, `drizzle-orm`, `zod`, 
 *Feature index (where to look):* API consistency & validation → "API consistency, security, and validation". Config & BFF → "Config BFF", "View-scoped config", "Server-side group resolution", "Configuration". Schedule model → "Schedule / recurring events", "Schedule generation algorithm", "Schedule generation & preview". Auth & admin → "User authentication", "Admin panel". Calendar export → "Save in Calendar", "Library skills". UX → "Product and UX clarity", "Dashboard, navigation, public view". Data → "Member management", "Role management", "Holidays", "Multi-group architecture".
 
 ## Library skills
-- **Project skills** in `.cursor/skills/` document how each major library is used and how it should be used: next-auth, next-intl, tanstack-react-query, drizzle-orm, zod, radix-ui-dialog, dnd-kit, react-hotkeys-hook, googleapis. Read the relevant skill before changing or adding usage of that library. See "Library skills" above.
+- **Project skills** in `.cursor/skills/` document how each major library is used and how it should be used: next-auth, next-intl, tanstack-react-query, drizzle-orm, zod, radix-ui-dialog, react-hotkeys-hook, googleapis. Read the relevant skill before changing or adding usage of that library. See "Library skills" above.
 
 ## Context files for navigation
 - **context.md** in key folders (`src/`, `src/app/`, `src/app/api/`, `src/app/api/configuration/`, `src/app/[slug]/config/`, `src/components/`, `src/db/`, `src/lib/`, `spec/`, `docs/`) describe what belongs there and point to docs. Read these before broad searches. New domain or top-level folders get a `context.md`. See "Codebase context" above.

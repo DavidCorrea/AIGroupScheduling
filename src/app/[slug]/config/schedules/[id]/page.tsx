@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { getRawArray } from "@/lib/intl-utils";
 import { useGroup } from "@/lib/group-context";
 import {
   formatDateShort as formatDate,
@@ -151,7 +152,7 @@ export default function SchedulePreviewPage() {
   const t = useTranslations("scheduleDetail");
   const tCommon = useTranslations("common");
   const tSchedules = useTranslations("schedules");
-  const monthNames = (tSchedules as unknown as { raw: (k: string) => string[] }).raw("months");
+  const monthNames = getRawArray(tSchedules, "months");
   const { groupId, slug, loading: groupLoading } = useGroup();
   const [schedule, setSchedule] = useState<ScheduleDetail | null>(null);
   const [members, setMembers] = useState<Member[]>([]);

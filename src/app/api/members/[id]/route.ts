@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { members, memberRoles, memberAvailability, users, scheduleDateAssignments } from "@/db/schema";
 import { eq, and, ne } from "drizzle-orm";
-import { requireAuth, hasGroupAccess, apiError } from "@/lib/api-helpers";
+import { requireAuth, hasGroupAccess, apiError, parseBody } from "@/lib/api-helpers";
+import { memberUpdateSchema } from "@/lib/schemas";
 
 function normalizeHHMM(v: unknown): string | null {
   if (v == null) return null;
@@ -91,7 +92,9 @@ export async function PUT(
   const { id } = await params;
   const memberId = parseInt(id, 10);
   const body = await request.json();
-  const { name, email, userId, roleIds, availableDayIds, availability: availabilityBody } = body;
+  const parsed = parseBody(memberUpdateSchema, body);
+  if (parsed.error) return parsed.error;
+  const { name, email, userId, roleIds, availableDayIds, availability: availabilityBody } = parsed.data;
 
   const existing = (await db
     .select()
@@ -111,13 +114,7 @@ export async function PUT(
   const updateFields: Record<string, unknown> = {};
 
   if (name !== undefined) {
-    if (typeof name !== "string" || name.trim().length === 0) {
-      return NextResponse.json(
-        { error: "El nombre no puede estar vacío" },
-        { status: 400 }
-      );
-    }
-    updateFields.name = name.trim();
+    updateFields.name = name;
   }
 
   // email can be set or cleared
@@ -144,23 +141,17 @@ export async function PUT(
   // userId can be set (link), or null (unlink)
   if (userId !== undefined) {
     if (userId === null) {
-      // Unlink user
       updateFields.userId = null;
-    } else if (typeof userId === "string") {
-      // Link user — verify user exists
+    } else {
       const user = (await db
         .select()
         .from(users)
         .where(eq(users.id, userId)))[0];
 
       if (!user) {
-        return NextResponse.json(
-          { error: "Usuario no encontrado" },
-          { status: 404 }
-        );
+        return apiError("Usuario no encontrado", 404, "NOT_FOUND");
       }
       updateFields.userId = userId;
-      // Auto-populate email from linked user
       if (user.email) {
         updateFields.email = user.email.toLowerCase().trim();
       }
@@ -181,10 +172,7 @@ export async function PUT(
         )
       ))[0];
     if (duplicate) {
-      return NextResponse.json(
-        { error: "Ya existe un miembro con ese email en este grupo" },
-        { status: 409 }
-      );
+      return apiError("Ya existe un miembro con ese email en este grupo", 409, "CONFLICT");
     }
   }
 

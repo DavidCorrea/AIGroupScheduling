@@ -9,6 +9,7 @@ const availabilitySlotSchema = z.object({
 export const memberCreateSchema = z.object({
   name: z.string().min(1, "El nombre es obligatorio").transform((s) => s.trim()),
   email: z.string().optional(),
+  userId: z.string().uuid().optional(),
   roleIds: z.array(z.number()).optional().default([]),
   availableDayIds: z.array(z.number()).optional().default([]),
   availability: z.array(availabilitySlotSchema).optional().default([]),

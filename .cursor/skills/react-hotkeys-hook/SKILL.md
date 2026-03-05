@@ -27,15 +27,9 @@ description: Use when adding or changing keyboard shortcuts, global shortcuts (?
 
 ## How it should be used
 
+- **New use cases:** Before adding a new shortcut or scope, check react-hotkeys-hook options and document the pattern here.
 - **New global shortcuts**: Add to `KeyboardShortcuts.tsx`. Use `enableOnFormTags: false` for keys that would conflict with typing (letters, numbers, ?). Use `enableOnFormTags: true` only when the shortcut should also run when focus is in form fields (e.g. Escape to close).
 - **New config-only shortcuts**: Add in a component that is only mounted in config layout (e.g. ConfigGoTo or a dedicated shortcuts hook in config layout). Prefer one place per "scope" to avoid duplicate handlers.
 - **preventDefault**: Set `preventDefault: true` when the shortcut should override browser/default behavior (e.g. `mod+k` to avoid opening browser search). We use it for `mod+k` in ConfigGoTo.
 - **Sequences**: For "g then h/a" we use local state (`pendingG`) and a timeout (1200ms). Keep the timeout ref cleanup in useEffect and in the clearSequence callback to avoid leaks and stale state.
 - **Copy**: Shortcut labels and help text live in `messages/es.json` under the `shortcuts` namespace; use `useTranslations('shortcuts')` in KeyboardShortcuts.
-
-## Findings
-
-1. **No ref-based scoping**: We don’t use the hook’s ref parameter to limit shortcuts to a DOM node. Global shortcuts are "scoped" by which component is mounted (root vs config). If you need "only when this modal is open," either mount a component that registers the key only when open, or use a ref and pass it as the third argument to `useHotkeys`.
-2. **preventDefault for mod+k**: ConfigGoTo sets `preventDefault: true` for `mod+k` so the browser’s search/command palette doesn’t open. Other shortcuts don’t set it; add it if a browser default conflicts.
-3. **Help overlay a11y**: The help overlay is a custom div with `role="dialog"` and `aria-modal="true"`. docs/IMPROVEMENT_ROADMAP.md suggests optionally using Radix Dialog for focus trap and Escape handling; current Escape handling is via useHotkeys and works.
-4. **Dependencies**: The `h` and `a` hooks correctly list `[pendingG, router]` so they see current state; the `g` hook clears any existing timeout and sets state without needing router.

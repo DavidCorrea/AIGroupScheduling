@@ -14,14 +14,9 @@ description: How this project uses TanStack React Query for data fetching, cache
 
 ## How it should be used
 
+- **New use cases:** Before adding a new query or mutation pattern, check TanStack Query docs and document the key shape and invalidation here.
 - **Query keys**: Use the factory in `config-queries`: `configContextQueryKey(slug, include)` for queries, `configContextQueryKeyPrefix(slug)` for invalidation. Do not hardcode `["config", slug]` elsewhere.
 - **New queries**: Prefer view-scoped `useConfigContext(slug, include)` with the smallest `include` the view needs. Add a new slice in `load-config-context.ts` and API if required.
 - **After mutations**: Always `await refetchContext()` (or invalidate the same key prefix) before navigating away so the next view sees fresh data.
 - **Provider**: Keep a single `QueryClientProvider` at the root; do not nest another provider for React Query.
 - **v5**: We use v5; options are `staleTime` and `gcTime` (not `cacheTime`). Partial query keys in `invalidateQueries` match by prefix.
-
-## Findings
-
-- Provider placement and single client per tree are correct.
-- Query key structure is hierarchical and centralized; invalidation by prefix is correct for “all config for this slug.”
-- Optional improvements: use `useMutation` with `onSuccess: () => refetchContext()` for config mutations (consistency, loading/error on mutation); prefetch config in layout or on nav hover to reduce list-page loading (see IMPROVEMENT_ROADMAP.md). Not required for current behavior.

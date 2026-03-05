@@ -14,6 +14,7 @@ description: How this project uses Zod for validation, request body parsing, and
 
 ## How it should be used
 
+- **New use cases:** Before validating a new API body, define the Zod schema and document the shape and messages in this skill.
 1. **New or updated request bodies**: Add or edit a schema in `src/lib/schemas/<domain>.ts`, export from `index.ts`, and use `parseBody(schema, await request.json())` in the route. If validation fails, return `parsed.error` (already a NextResponse).
 2. **Error shape**: All API errors use `{ error: string, code?: string }`. Validation errors from `parseBody` use `apiError(message, 400, "VALIDATION")`. Use **`apiError`** for other 4xx/5xx in the same routes so the shape is consistent.
 3. **safeParse vs parse**: Use **safeParse** (via `parseBody`) in API routes. Use `.parse()` only in non-request code where throwing is acceptable (e.g. tests or internal transforms).
@@ -26,12 +27,6 @@ description: How this project uses Zod for validation, request body parsing, and
 - `src/app/api/configuration/exclusive-groups/route.ts` — POST: `exclusiveGroupCreateSchema`
 - `src/app/api/configuration/holidays/route.ts` — POST: `configHolidayCreateSchema`
 - `src/app/api/schedules/[id]/notes/route.ts` — POST: `scheduleNoteSchema`
-
-Other routes (e.g. members POST/PUT, groups POST) still use manual checks; when touching those, prefer migrating to the corresponding schema and `parseBody` for consistency.
-
-## Findings (audit)
-
-- **parseBody** correctly uses safeParse and returns the first issue message; error responses include `code: "VALIDATION"`.
-- **Roles PUT/PATCH** were updated to use `parseBody` with `roleUpdateSchema` and `roleReorderSchema`, and to use `apiError` for all 400/404 responses so error shape matches the rest of the API.
-- **Members and groups** have schemas (`memberCreateSchema`, `memberUpdateSchema`, `groupCreateSchema`) but their routes do not use them yet; refactor to `parseBody` when changing those handlers.
-- **Exported inferred types**: Only holidays exports `ConfigHolidayCreate`; other schemas can export `z.infer<typeof schema>` when a type is needed elsewhere.
+- `src/app/api/members/route.ts` — POST: `memberCreateSchema`
+- `src/app/api/members/[id]/route.ts` — PUT: `memberUpdateSchema`
+- `src/app/api/groups/route.ts` — POST: `groupCreateSchema`

@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { getRawArray } from "@/lib/intl-utils";
 import { useHotkeys } from "react-hotkeys-hook";
 import { useGroup } from "@/lib/group-context";
 import { useConfigContext } from "@/lib/config-queries";
@@ -29,7 +30,8 @@ export default function ConfigGoTo() {
   ]);
   const router = useRouter();
   const tNav = useTranslations("configNav");
-  const monthNames = (useTranslations("schedules") as unknown as { raw: (k: string) => string[] }).raw("months") ?? MONTH_NAMES;
+  const tSchedules = useTranslations("schedules");
+  const monthNames = getRawArray(tSchedules, "months").length > 0 ? getRawArray(tSchedules, "months") : MONTH_NAMES;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);

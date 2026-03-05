@@ -21,22 +21,13 @@ description: Use when working on auth, session, login, Auth.js v5, or @auth/driz
 
 ## How it should be used (best practices)
 
+- **New use cases:** Before adding a new auth flow or session usage, check Auth.js docs and document the approach in this skill.
 - **Session strategy**: JWT is appropriate when you don’t need instant server-side revocation; adapter is still used for user/account persistence (OAuth). Use database sessions only if you need “sign out everywhere” or strict revocation.
 - **Secret**: Set `AUTH_SECRET` (or `NEXTAUTH_SECRET`) with high entropy (e.g. `npm exec auth secret`). Required in production.
 - **Route protection**: Prefer server-side checks: `requireAuth()` / `requireGroupAccess(request)` in API handlers and `auth()` + redirect in server components. Middleware is a fast gate; always enforce in the handler/layout.
 - **Session data**: Keep JWT payload small; extend via `jwt`/`session` callbacks. For fresh server-only data (e.g. admin flags), fetch in callbacks or in the route (we fetch isAdmin/canCreateGroups in jwt callback and in requireAdmin from DB).
 - **Type augmentation**: Custom `User` and `Session` are declared in `src/lib/auth.ts`; use these types across the app.
 - **Secure cookies**: In production (HTTPS), Auth.js uses `__Secure-`-prefixed cookies; middleware already checks both names for dev/prod.
-
-## Findings
-
-| Area | Status | Note |
-|------|--------|------|
-| `auth()` vs `getServerSession` | Correct | We use `auth()` everywhere; v5 pattern. |
-| JWT + adapter (users/accounts only) | Correct | No sessions table; adapter for OAuth persistence only. |
-| Middleware cookie names | Correct | `authjs.session-token` and `__Secure-authjs.session-token` cover dev and prod. |
-| Env var name | Prefer update | Docs recommend `AUTH_SECRET`; we document `NEXTAUTH_SECRET` in AGENTS.md — both work; consider documenting `AUTH_SECRET` as primary. |
-| requireAdmin DB re-check | Good | We re-verify `isAdmin` from DB in `requireAdmin`, not only from session. |
 
 ## Reference
 

@@ -122,11 +122,6 @@ Config flows use `useConfigContext` (useQuery) and `refetchContext` (invalidatio
 
 - **Where to look:** `src/app/page.tsx`, `src/app/admin/page.tsx`; `src/lib/config-queries.ts` and `src/components/QueryProvider.tsx` for pattern. **Done when:** Home and admin use useQuery/useMutation; no manual fetch+useState+useEffect for server data; loading/error handled.
 
-**Unused dependency: @dnd-kit**  
-`@dnd-kit/core`, `@dnd-kit/sortable`, and `@dnd-kit/utilities` are in `package.json` but not imported anywhere in `src`. Either **remove** them to reduce bundle size and simplify dependencies, or **use** them for the planned schedule drag-and-drop / "Intercambiar" UX (see §7 Schedule editing UX).
-
-- **Where to look:** `package.json`; `src/` (grep for dnd-kit). **Done when:** Either removed from package.json and deps, or used in schedule detail (e.g. drag-drop reassign). Update AGENTS.md if removed.
-
 **react-hotkeys-hook**  
 Usage is appropriate: `enableOnFormTags: false` where shortcuts should not fire in inputs, and `mod+k` for config "Ir a…". Optional: set `preventDefault: true` for `mod+k` if browser default ever conflicts. The shortcuts help overlay (`?`) is a custom div with `role="dialog"`; for full a11y (focus trap, Escape) consider Radix Dialog (optional; §2 Modals already recommends Radix for new modals).
 
@@ -239,7 +234,7 @@ The create form only sends `name` and `slug` (`src/app/groups/new/page.tsx`); th
 Config detail pages (e.g. member edit, role edit) depend on `groupId` from GroupProvider. If the user opens a link in a new tab or refreshes, context may be missing. Ensure all config URLs include the slug (e.g. `/[slug]/config/members/[id]`) and that the page can resolve group from the URL (e.g. via server layout or the slug-accepting API above) so “open in new tab” and refresh work without in-memory context.
 
 **Schedule editing UX**  
-In the schedule detail view, allow inline edit of assignments where possible: e.g. click a cell → dropdown or modal to change the assigned member (same data as today, fewer clicks). Optional: “Intercambiar” to swap two assignments on the same date, or use **@dnd-kit** (already in the project for column order) for drag-and-drop reassignment. When adding a new month, offer “Usar asignaciones del mes anterior como base” (copy from previous month) so the user can tweak instead of starting from scratch—complements “Fill empty” and “Rebuild.”
+In the schedule detail view, allow inline edit of assignments where possible: e.g. click a cell → dropdown or modal to change the assigned member (same data as today, fewer clicks). Optional: “Intercambiar” to swap two assignments on the same date, or use a drag-and-drop library for reassignment. When adding a new month, offer “Usar asignaciones del mes anterior como base” (copy from previous month) so the user can tweak instead of starting from scratch—complements “Fill empty” and “Rebuild.”
 
 **Bulk actions**  
 Support bulk add members: e.g. paste a list of names (one per line or comma-separated) and create multiple members in one step; or “Duplicar evento” to copy an existing recurring event to another weekday with the same type/label/times. Bulk edit availability (e.g. “Marcar estos miembros como disponibles los miércoles”) can be a later enhancement. Keeps the same features; reduces repetitive form submissions.
@@ -401,7 +396,7 @@ Use consistent wording and icons for the three sources (cross-group, holiday, av
 
 ## Suggested order of implementation
 
-- **Library standards (§1):** Address next-intl message source and TanStack Query on home/admin when touching those pages; remove or use @dnd-kit when convenient.
+- **Library standards (§1):** Address next-intl message source and TanStack Query on home/admin when touching those pages.
 - **Phase 1 (Server and data):** Server group resolution.
 - **Phase 2 (A11y and perf):** Skip link + landmarks, cronograma grid semantics, move hardcoded strings, cache public API, split SharedScheduleView.
 - **Phase 3 (Product and ops):** Glossary + draft/published docs, guided setup + My assignments, shared forms, audit log + export, E2E + seed.

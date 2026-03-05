@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { members, memberRoles, memberAvailability, users } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { requireGroupAccess } from "@/lib/api-helpers";
+import { requireGroupAccess, parseBody, apiError } from "@/lib/api-helpers";
+import { memberCreateSchema } from "@/lib/schemas";
 
 export async function GET(request: NextRequest) {
   const accessResult = await requireGroupAccess(request);
@@ -68,39 +69,27 @@ export async function POST(request: NextRequest) {
   const { groupId } = accessResult;
 
   const body = await request.json();
-  const { name, email, userId, roleIds = [] } = body;
-
-  if (!name || typeof name !== "string" || name.trim().length === 0) {
-    return NextResponse.json(
-      { error: "El nombre es obligatorio" },
-      { status: 400 }
-    );
-  }
+  const parsed = parseBody(memberCreateSchema, body);
+  if (parsed.error) return parsed.error;
+  const { name, email, userId, roleIds = [], availability, availableDayIds } = parsed.data;
 
   let linkedUser = null;
-  // Determine the email to store: if linking a user, use their email; otherwise use the provided email
-  let memberEmail: string | null = email && typeof email === "string" ? email.trim().toLowerCase() : null;
+  let memberEmail: string | null = email ? email.trim().toLowerCase() : null;
 
-  if (userId && typeof userId === "string") {
-    // Verify user exists
+  if (userId) {
     linkedUser = (await db
       .select()
       .from(users)
       .where(eq(users.id, userId)))[0] ?? null;
 
     if (!linkedUser) {
-      return NextResponse.json(
-        { error: "Usuario no encontrado" },
-        { status: 404 }
-      );
+      return apiError("Usuario no encontrado", 404, "NOT_FOUND");
     }
-    // Auto-populate email from the linked user
     if (linkedUser.email) {
       memberEmail = linkedUser.email.toLowerCase().trim();
     }
   }
 
-  // Check for duplicate email within the group
   if (memberEmail) {
     const existing = (await db
       .select({ id: members.id })
@@ -116,19 +105,17 @@ export async function POST(request: NextRequest) {
 
   const member = (await db
     .insert(members)
-    .values({ name: name.trim(), email: memberEmail || null, userId: userId || null, groupId })
+    .values({ name, email: memberEmail || null, userId: userId || null, groupId })
     .returning())[0];
 
-  // Assign roles
   for (const roleId of roleIds) {
     await db.insert(memberRoles)
       .values({ memberId: member.id, roleId });
   }
 
-  // Assign availability (default all-day 00:00–23:59 UTC when using availableDayIds)
-  const availabilityList = Array.isArray(body.availability) && body.availability.length > 0
-    ? body.availability
-    : (body.availableDayIds ?? []).map((weekdayId: number) => ({
+  const availabilityList = availability && availability.length > 0
+    ? availability
+    : (availableDayIds ?? []).map((weekdayId) => ({
         weekdayId,
         startTimeUtc: "00:00",
         endTimeUtc: "23:59",
