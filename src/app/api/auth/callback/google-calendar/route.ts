@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
+import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { schedules, users } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -121,10 +122,19 @@ export async function GET(request: NextRequest) {
   // —— User assignments flow (Mis asignaciones) ——
   if (isUserAssignmentsState(decoded) && decoded.nonce === nonceCookie) {
     const state = decoded;
+    // Use session user only; ignore state.userId to prevent forged state exporting another user's assignments
+    const session = await auth();
+    const sessionUserId = session?.user?.id;
+    if (!sessionUserId) {
+      const res = redirectToAsignaciones("error");
+      res.cookies.delete(NONCE_COOKIE_NAME);
+      return res;
+    }
+
     const [userRow] = await db
       .select({ canExportCalendars: users.canExportCalendars })
       .from(users)
-      .where(eq(users.id, state.userId));
+      .where(eq(users.id, sessionUserId));
 
     if (!userRow?.canExportCalendars) {
       const res = redirectToAsignaciones("error");
@@ -132,7 +142,7 @@ export async function GET(request: NextRequest) {
       return res;
     }
 
-    let assignments = await getAssignments(state.userId);
+    let assignments = await getAssignments(sessionUserId);
     assignments = assignments.filter((a) => a.groupCalendarExportEnabled);
     if (state.groupId != null) {
       assignments = assignments.filter((a) => a.groupId === state.groupId);

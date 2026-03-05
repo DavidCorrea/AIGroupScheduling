@@ -10,8 +10,20 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   const { id } = await params;
   const scheduleId = parseInt(id, 10);
+
+  const schedule = (await db.select({ groupId: schedules.groupId }).from(schedules).where(eq(schedules.id, scheduleId)))[0];
+  if (!schedule) {
+    return apiError("Cronograma no encontrado", 404, "NOT_FOUND");
+  }
+  const access = await hasGroupAccess(authResult.user.id, schedule.groupId);
+  if (!access) {
+    return apiError("Forbidden", 403, "FORBIDDEN");
+  }
 
   const rows = await db
     .select({ date: scheduleDate.date, note: scheduleDate.note })
