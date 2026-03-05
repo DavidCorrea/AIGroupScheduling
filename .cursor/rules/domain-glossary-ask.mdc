@@ -1,0 +1,13 @@
+---
+description: Ask about unfamiliar domain terms and add them to AGENTS.md Domain glossary
+alwaysApply: true
+---
+
+# Domain terms — ask and document
+
+When something the user says might be a **domain term** you have not seen before (project- or domain-specific jargon, role names, process names, or concepts that are not clearly standard tech or common language):
+
+1. **Ask:** Briefly ask the user whether that term is domain-specific and, if so, request a short explanation (one or two sentences).
+2. **Document:** Once the user provides the explanation, add it to **AGENTS.md** under **# Domain glossary**: add a new row to the existing table with **Term** (bold) and **Meaning** (the explanation). Keep the same table format and style as the existing entries.
+
+Do not guess meanings. If you are unsure whether a term is domain-specific, prefer asking. Do not add terms to the glossary without the user's explanation.
