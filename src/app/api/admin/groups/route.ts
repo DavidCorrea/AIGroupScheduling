@@ -102,3 +102,34 @@ export async function PATCH(request: NextRequest) {
 
   return NextResponse.json(updated);
 }
+
+export async function DELETE(request: NextRequest) {
+  const adminResult = await requireAdmin(request);
+  if (adminResult.error) return adminResult.error;
+
+  const { searchParams } = new URL(request.url);
+  const groupIdParam = searchParams.get("groupId");
+  const groupId = groupIdParam != null ? parseInt(groupIdParam, 10) : NaN;
+
+  if (Number.isNaN(groupId) || groupId < 1) {
+    return NextResponse.json(
+      { error: "groupId es obligatorio y debe ser un número válido" },
+      { status: 400 }
+    );
+  }
+
+  const existing = (await db
+    .select()
+    .from(groups)
+    .where(eq(groups.id, groupId)))[0];
+
+  if (!existing) {
+    return NextResponse.json(
+      { error: "Grupo no encontrado" },
+      { status: 404 }
+    );
+  }
+
+  await db.delete(groups).where(eq(groups.id, groupId));
+  return new NextResponse(null, { status: 204 });
+}
