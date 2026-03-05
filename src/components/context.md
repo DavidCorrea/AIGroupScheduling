@@ -15,6 +15,7 @@ Reusable React components used across the app. All user-facing text should use *
 | **KeyboardShortcuts** | Global shortcuts; `?` opens help overlay. Rendered in root layout. |
 | **LoadingScreen** | Loading state. |
 | **Skeletons** | `src/components/Skeletons/` — SkeletonCard, SkeletonRow, SkeletonText, SkeletonGrid, SkeletonRegion for route and inline loading placeholders. |
+| **UnsavedBanner** | Shown when config is dirty: "Tienes cambios sin guardar"; sets beforeunload to warn on tab close. Used in config layout. |
 | **SessionProvider** | Auth session provider wrapper. |
 
 Route map and which pages use which components: **docs/CLIENT.md**.

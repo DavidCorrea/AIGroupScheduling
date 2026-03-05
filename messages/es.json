@@ -31,6 +31,7 @@
     "collaborators": "Colaboradores",
     "schedules": "Cronograma",
     "unsavedConfirm": "Hay cambios sin guardar. ¿Salir de todas formas?",
+    "unsavedBanner": "Tienes cambios sin guardar",
     "groupNotFound": "Grupo no encontrado",
     "goTo": "Ir a…",
     "goToPlaceholder": "Buscar miembro, rol, evento o mes…",
@@ -518,6 +519,7 @@
     "title": "Algo salió mal",
     "message": "Ha ocurrido un error inesperado. Puedes intentar de nuevo o volver."
   },
+  "weekdays": [
     "Lunes",
     "Martes",
     "Miércoles",
