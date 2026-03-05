@@ -36,6 +36,13 @@
       "when": 1772720300000,
       "tag": "0004_rename_users_calendar_export_to_can_export_calendars",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1772742827369,
+      "tag": "0005_add_cascade_schedule_date_assignments",
+      "breakpoints": true
     }
   ]
 }

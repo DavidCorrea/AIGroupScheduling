@@ -180,10 +180,10 @@ export const scheduleDateAssignments = pgTable("schedule_date_assignments", {
     .references(() => scheduleDate.id, { onDelete: "cascade" }),
   roleId: integer("role_id")
     .notNull()
-    .references(() => roles.id),
+    .references(() => roles.id, { onDelete: "cascade" }),
   memberId: integer("member_id")
     .notNull()
-    .references(() => members.id),
+    .references(() => members.id, { onDelete: "cascade" }),
 });
 
 export const scheduleAuditLog = pgTable("schedule_audit_log", {
