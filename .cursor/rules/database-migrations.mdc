@@ -1,0 +1,19 @@
+---
+description: Database and migrations — drizzle-kit only; schema → generate → migrate
+globs: src/db/**/*
+alwaysApply: false
+---
+
+# Database and migrations
+
+**drizzle-kit only.** Do not create or edit migration `.sql` or `src/db/migrations/meta/_journal.json` by hand (except documented one-off recovery).
+
+**Workflow:**
+1. Edit `src/db/schema.ts`
+2. `npm run db:generate` (use a descriptive name when prompted)
+3. `npm run db:migrate`
+
+- Applied migrations: `drizzle.__drizzle_migrations` (always use this schema name in queries).
+- After a migration reset (meta + migrations recreated, baseline no-op): in each env run `TRUNCATE drizzle.__drizzle_migrations;` then `npm run db:migrate`.
+- Deploy: `npm run build` runs migrate then next build; set DATABASE_URL in Vercel.
+- Non-schema changes (e.g. backfill): document in AGENTS.md or `scripts/`, then run `db:generate` after any schema change so snapshots stay in sync.

@@ -1,0 +1,12 @@
+---
+description: API error shape, group access, Zod validation, parseBody
+globs: src/app/api/**/*.ts
+alwaysApply: false
+---
+
+# API consistency and validation
+
+- **Error shape:** All API errors use `{ error: string, code?: string }` and consistent status codes (400 validation, 403 forbidden, 404 not found, 409 conflict, 429 rate limited). Helper: `apiError(message, status, code)` in `src/lib/api-helpers.ts`.
+- **Group access:** Resource-by-id routes load the resource's `groupId` and call `hasGroupAccess(userId, groupId)`; 403 if denied. Config routes use `requireGroupAccess(request)`; accept `?groupId=N` or `?slug=xxx` (slug resolved via `resolveGroupBySlug`).
+- **Request validation:** Zod schemas in `src/lib/schemas/`; use **`parseBody(schema, body)`** in handlers for POST/PUT; invalid payloads return 400 with first issue message.
+- **DELETE by path:** Prefer `DELETE /api/configuration/holidays/[id]` and `DELETE /api/configuration/exclusive-groups/[id]` with group in query (`?groupId=` or `?slug=`). Client uses these paths.

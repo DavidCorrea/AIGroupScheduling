@@ -1,0 +1,12 @@
+---
+description: Spanish UI, next-intl, messages/es.json; mobile-first
+globs: src/app/**/*.tsx, src/components/**/*.tsx, messages/**/*
+alwaysApply: false
+---
+
+# UI, copy, and i18n
+
+- **Locale:** UI in Spanish. App name **Cronogramas**. Mobile-first.
+- **Copy:** All user-facing text in **`messages/es.json`**. Use **next-intl**: client components use `useTranslations('namespace')` and `t('key')` (or `t('key', { n: value })` for placeholders). Do not hardcode Spanish strings in components.
+- **Back/cancel:** Use shared `BackLink` at top of form/detail pages; "Cancelar" / "Volver" at bottom returns to list. Keys: `common.back`, `members.backToMembers`, `roles.backToRoles`, `events.backToEvents`, `scheduleDetail.backToScheduleList`.
+- **Empty states:** Use **EmptyState** component on list pages when empty (message + primary CTA). **Loading:** Use Skeletons from `src/components/Skeletons/`; route-level `loading.tsx` for `/`, `[slug]/config`, `[slug]/cronograma/[year]/[month]`. **Errors:** `error.tsx` at root, config, and cronograma with "Reintentar" and "Volver".

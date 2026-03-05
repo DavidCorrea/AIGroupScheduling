@@ -1,0 +1,11 @@
+---
+description: Jest in spec/; TDD for new features; test descriptions = real scenarios
+globs: spec/**/*
+alwaysApply: false
+---
+
+# Testing
+
+- **Runner:** Jest in **`spec/`** (ts-jest). Use `npm test` / `npm run test:watch`. TDD for new features.
+- **Descriptions:** Test descriptions = real user/scenario language, no technical jargon (e.g. "when user has no assignments, shows empty message" not "returns empty array").
+- **Scope:** Describe real scenarios; avoid testing implementation details.

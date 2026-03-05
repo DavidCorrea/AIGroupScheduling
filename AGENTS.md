@@ -79,6 +79,8 @@ Skills: `next-auth`, `next-intl`, `tanstack-react-query`, `drizzle-orm`, `zod`, 
 
 ## Context files for navigation
 - **CONTEXT.md** in key folders (`src/`, `src/app/`, `src/app/api/`, `src/app/api/configuration/`, `src/app/[slug]/config/`, `src/components/`, `src/db/`, `src/lib/`, `spec/`, `docs/`) describe what belongs there and point to docs. Read these before broad searches. New domain or top-level folders get a `CONTEXT.md`. See "Codebase context" above.
+## Cursor rules (project conventions)
+- **`.cursor/rules/`** contains `.mdc` rules that encode project conventions for the AI: workflow and done criteria, when-you-begin/context, database and migrations, API conventions, UI/copy/i18n, destructive actions and ConfirmDialog, lint and Git, testing, security (passwords). Always-applied rules: workflow, when-you-begin, lint-and-git. File-scoped rules apply when matching files are open (see each rule's `globs`). See "Conventions" and "Workflow" in this file for the full text.
 
 ## Save in Calendar (Mis asignaciones)
 - **Guardar en calendario**: On **Mis asignaciones** (`/asignaciones`). Button shown only when (1) user has **canExportCalendars** (set by **admin** in Admin → Usuarios; user cannot change it) and (2) current filter includes at least one assignment from a group with **calendarExportEnabled** (Admin → Grupos). GET `/api/user/assignments/google-calendar` (optional `?groupId=&year=&month=`) → Google OAuth → callback inserts current user's assignment dates into primary Google Calendar (one all-day event per date, description = "Roles: Role1, Role2"). Only assignments from groups with calendarExportEnabled are included. Redirect to `/asignaciones?calendar=success|error`. Routes: `src/app/api/user/assignments/google-calendar/route.ts`, `src/app/api/auth/callback/google-calendar/route.ts`. Optional legacy flow: public cronograma `.../google-calendar?memberId=` still supported for one member's month (same callback, different state shape).
@@ -172,6 +174,8 @@ Skills: `next-auth`, `next-intl`, `tanstack-react-query`, `drizzle-orm`, `zod`, 
 ---
 
 # Conventions
+
+*(Canonical source for project conventions. The same conventions are reflected in `.cursor/rules/` so the AI applies them in Cursor; update both if you change something here.)*
 
 **UI** — Mobile-first. All user-facing text in **Spanish**. Copy lives in **`messages/es.json`**; use next-intl: `useTranslations('namespace')` and `t('key')` in components.
 

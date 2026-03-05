@@ -1,0 +1,11 @@
+---
+description: Mandatory workflow and done criteria; plan, implement, lint/build, commit
+alwaysApply: true
+---
+
+# Workflow (mandatory)
+
+1. **Plan:** Split work into units that can be done in parallel when possible; use subagents for parallel work. Get explicit confirmation before making changes; explain what you will do.
+2. **Implement:** After a feature, add a new list item under **Features** in **AGENTS.md**.
+3. **Done = green:** Work is complete only when **`npm run lint`** and **`npm run build`** pass. Fix any failures before finishing (including in files you did not change if they block the build).
+4. **Before committing:** Run `npm run lint` on changed files; update **docs/** (API.md, CLIENT.md, DATABASE.md) if you changed routes, pages, or schema; one logical change per commit (one commit per feature when multiple features are requested). Do not commit with `--no-verify`.
