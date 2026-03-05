@@ -18,8 +18,8 @@ This plan groups improvements into themes. Each theme can be implemented indepen
 |--------|----------------------|
 | Security | `src/app/api/schedules/[id]/notes/route.ts`, `src/app/api/groups/route.ts`, `src/app/api/auth/callback/google-calendar/route.ts`, `src/lib/api-helpers.ts`, `src/lib/rate-limit.ts`, `src/lib/schemas/` |
 | §1 Library usage | `src/app/layout.tsx`, `src/i18n/request.ts`, `src/app/page.tsx`, `src/app/admin/page.tsx`, `package.json` |
-| §2 Accessibility | `src/app/layout.tsx`, `src/components/AppNavBar.tsx`, `src/components/SharedScheduleView.tsx`, `messages/es.json` |
-| §3 Performance | `src/lib/public-schedule.ts`, `src/components/SharedScheduleView.tsx` |
+| §2 Accessibility | `src/app/layout.tsx`, `src/components/AppNavBar.tsx`, `src/components/SharedScheduleView/`, `messages/es.json` |
+| §3 Performance | `src/lib/public-schedule.ts`, `src/components/SharedScheduleView/` |
 | §4 Client data/forms | `src/lib/schemas/`, `src/lib/api-helpers.ts`, forms under `src/app/[slug]/config/` |
 | §5 Product/UX | Config landing `src/app/[slug]/config/page.tsx`, cronograma page, `messages/es.json` |
 | §6 Data/domain | `docs/DATABASE.md`, `AGENTS.md`, `src/db/schema.ts` |
@@ -27,7 +27,7 @@ This plan groups improvements into themes. Each theme can be implemented indepen
 | §8 Operations | `src/db/schema.ts`, `src/app/api/`, `spec/`, `docs/API.md` |
 | §9 Polish | `src/app/layout.tsx`, cronograma routes, PWA config |
 | §10 More product | `src/components/`, conflict logic in `src/app/api/user/dashboard/route.ts`, `src/app/[slug]/config/schedules/[id]/page.tsx` |
-| §11 Simpler usage / conflicts | `src/app/asignaciones/page.tsx`, `src/lib/holiday-conflicts.ts`, `src/lib/schedule-helpers.ts`, scheduler, `SharedScheduleView.tsx`, schedule detail page |
+| §11 Simpler usage / conflicts | `src/app/asignaciones/page.tsx`, `src/lib/holiday-conflicts.ts`, `src/lib/schedule-helpers.ts`, scheduler, `src/components/SharedScheduleView/`, schedule detail page |
 
 ---
 
@@ -112,11 +112,6 @@ Install only what you need for the phase you’re implementing. Dependencies: Zo
 
 Findings from auditing current dependencies against recommended or standard usage. Address when touching the relevant areas.
 
-**next-intl**  
-Root layout loads messages via direct import (`import("../../messages/es.json")`) instead of `getMessages()` from `next-intl/server`. The project already uses `getRequestConfig` in `src/i18n/request.ts` and the next-intl plugin. For a single source of truth, prefer `getMessages()` in the root layout (with a fallback for edge cases where it can be undefined, e.g. `_not-found`), so server and client both use the same config. See [next-intl configuration](https://next-intl.dev/docs/usage/configuration).
-
-- **Where to look:** `src/app/layout.tsx` (message loading); `src/i18n/request.ts`. **Done when:** Root layout uses `getMessages()`; fallback for undefined where needed (e.g. not-found). **Done:** Layout now uses `getMessages() ?? (await import("../../messages/es.json")).default`.
-
 **TanStack Query**  
 Config flows use `useConfigContext` (useQuery) and `refetchContext` (invalidation) correctly. The **home page** (`src/app/page.tsx`) and **admin page** (`src/app/admin/page.tsx`) still use manual `fetch` + `useState` + `useEffect` for groups and dashboard data. Recommended approach: use **useQuery** (and **useMutation** where appropriate) for all server state so the app benefits from caching, request deduplication, loading/error states, and refetch on focus. Align home and admin with the same pattern as config (e.g. `useQuery({ queryKey: ['groups'], queryFn: ... })`).
 
@@ -142,15 +137,15 @@ Ensure each page has a single logical `<main>` and an `<h1>` that describes the 
 **Cronograma grid semantics**  
 The public schedule grid is complex. Add an `<h1>` with month/year (and optionally group name). Give the grid (or table) an `aria-label` or brief summary. If the structure is tabular, consider using a real `<table>` with `<th>` for day/role so screen readers can announce structure; otherwise keep consistent roles and labels for rows/columns.
 
-- **Where to look:** `src/components/SharedScheduleView.tsx`; cronograma page. **Done when:** Grid has aria-label/summary; h1 present; copy in `messages/es.json`.
+- **Where to look:** `src/components/SharedScheduleView/`; cronograma page. **Done when:** Grid has aria-label/summary; h1 present; copy in `messages/es.json`.
 
 **Modals**  
-Use **Radix UI** `@radix-ui/react-dialog` for new modals (focus trap, aria, restore focus on close). If you prefer not to add Radix, use **focus-trap-react** (or **react-focus-on**) around existing modal markup. Apply to the date-detail modal in SharedScheduleView and any confirm dialogs that do not yet follow this pattern.
+Use **Radix UI** `@radix-ui/react-dialog` for new modals (focus trap, aria, restore focus on close). If you prefer not to add Radix, use **focus-trap-react** (or **react-focus-on**) around existing modal markup. The date-detail modal in SharedScheduleView now uses Radix Dialog (`DateDetailModal.tsx`). Apply to any other modals that do not yet follow this pattern.
 
-- **Where to look:** `src/components/SharedScheduleView.tsx` (date-detail modal); `src/components/ConfirmDialog.tsx` for reference. **Done when:** Date-detail modal uses Radix Dialog or focus trap; Escape closes and restores focus.
+- **Where to look:** `src/components/SharedScheduleView/DateDetailModal.tsx` for reference; `src/components/ConfirmDialog.tsx`. **Done when:** All modals use Radix Dialog or focus trap; Escape closes and restores focus.
 
 **No hardcoded copy**  
-Move remaining hardcoded Spanish (e.g. “Cerrar,” “Ensayo” in SharedScheduleView, month names if duplicated) into `messages/es.json` and use `useTranslations` / `t()`. Use next-intl plural rules where applicable (e.g. “1 día” vs “2 días”).
+Move remaining hardcoded Spanish (e.g. “Cerrar,” “Ensayo” in SharedScheduleView components, month names if duplicated) into `messages/es.json` and use `useTranslations` / `t()`. Use next-intl plural rules where applicable (e.g. “1 día” vs “2 días”).
 
 **Focus and contrast**  
 Audit interactive elements for keyboard reachability and visible focus indicators. Verify text/background contrast (WCAG AA) for body text, labels, and disabled states in both themes.
@@ -162,14 +157,9 @@ Audit interactive elements for keyboard reachability and visible focus indicator
 ## 3. Performance
 
 **Cache public cronograma API**  
-Public cronograma GET endpoints are read-heavy and unauthenticated. Add caching (e.g. Next.js `revalidate` on a route that uses fetch, or `unstable_cache` in `src/lib/public-schedule.ts` keyed by slug + year + month) so repeated reads do not hit the DB every time. Consider a short TTL (e.g. 60–300 seconds) and document cache behavior.
+Public cronograma GET endpoints are read-heavy and unauthenticated. Add caching (e.g. Next.js `revalidate` on a route that uses fetch, or `unstable_cache` in `src/lib/public-schedule.ts` keyed by slug + year + month) so repeated reads do not hit the DB every time. Consider a short TTL (e.g. 60–300 seconds) and document cache behavior. When adding caching, also set **Cache-Control** or **ETag** / **Last-Modified** for the response (see §9 "Cache headers for public cronograma") so browsers and CDNs can cache appropriately.
 
 - **Where to look:** `src/lib/public-schedule.ts`; `src/app/api/cronograma/[slug]/route.ts`, `.../[slug]/[year]/[month]/route.ts`. **Done when:** Repeated requests for same slug+year+month use cache; TTL documented.
-
-**Split SharedScheduleView**  
-`src/components/SharedScheduleView.tsx` is very large (~1.4k lines). Split into smaller components (e.g. month header, week rows, date cell, date detail modal). When extracting the date-detail modal, consider **Radix UI Dialog** for consistent a11y. Keep the same public interface so callers do not change.
-
-- **Where to look:** `src/components/SharedScheduleView.tsx`; extract to e.g. `SharedScheduleView/MonthHeader.tsx`, `WeekRows.tsx`, `DateCell.tsx`, `DateDetailModal.tsx`. **Done when:** Same props/behavior; file(s) under ~400 lines each; callers unchanged.
 
 **Optional: background job for heavy rebuild**  
 If “Rebuild” or “Fill empty” can be slow for large groups, consider running the scheduler in a background job (e.g. queue + polling or server action with streaming) and show “Procesando…” until completion, so the request does not time out and the UI stays responsive.
@@ -211,8 +201,6 @@ Add optional tooltips or “?” icons next to config labels that need explanati
 **Explicit draft vs published**  
 If the intended flow is “edit schedule then publish,” make it explicit in the model or docs: e.g. `schedules.status` or `publishedAt`, and document that public cronograma reads only “published” or “latest committed.” If the current behavior is already “last saved = public,” document it in `docs/DATABASE.md` and AGENTS.md so future changes (e.g. version history) are easier.
 
-**Domain glossary**  
-Add a short glossary to AGENTS.md (or DATABASE.md): “event” = recurring weekday config, “schedule date” = concrete date in a schedule, “assignment” = member-role on a date. Use this vocabulary consistently in schema, API, and UI labels.
 
 **Optional: unify absence model**  
 User holidays and member holidays could be one table with scope (user vs member). This is a larger refactor; only do if it simplifies code and UX (e.g. one “Add absence” flow with “for me” vs “for [member]” in group context). Otherwise, keep current model and document it.
@@ -300,7 +288,7 @@ Audit tap targets: ensure buttons and links meet a minimum touch size (e.g. 44px
 ## 10. More product and DX ideas
 
 **Component library / Storybook (optional)**  
-Add **Storybook** (or similar) for shared components: LoadingScreen, OptionToggleGroup, form fields, empty states, dialogs. Enables visual regression and safer refactors when splitting SharedScheduleView or changing design tokens. Optional; useful once the component set stabilizes.
+Add **Storybook** (or similar) for shared components: LoadingScreen, OptionToggleGroup, form fields, empty states, dialogs. Enables visual regression and safer refactors when changing SharedScheduleView or design tokens. Optional; useful once the component set stabilizes.
 
 **Changelog or “What’s new”**  
 Keep a **CHANGELOG.md** in the repo (and optionally a short “Qué hay de nuevo” in-app modal or link after deployments) so users and contributors see improvements over time. No feature change; improves transparency.
@@ -396,10 +384,10 @@ Use consistent wording and icons for the three sources (cross-group, holiday, av
 
 ## Suggested order of implementation
 
-- **Library standards (§1):** Address next-intl message source and TanStack Query on home/admin when touching those pages.
+- **Library standards (§1):** Address TanStack Query on home/admin when touching those pages.
 - **Phase 1 (Server and data):** Server group resolution.
-- **Phase 2 (A11y and perf):** Skip link + landmarks, cronograma grid semantics, move hardcoded strings, cache public API, split SharedScheduleView.
-- **Phase 3 (Product and ops):** Glossary + draft/published docs, guided setup + My assignments, shared forms, audit log + export, E2E + seed.
+- **Phase 2 (A11y and perf):** Skip link + landmarks, cronograma grid semantics, move hardcoded strings, cache public API.
+- **Phase 3 (Product and ops):** Draft/published docs, guided setup + My assignments, shared forms, audit log + export, E2E + seed.
 - **§11 Simpler usage and new features:** Pick items from section 11 (e.g. persist Mis asignaciones filters, copy from previous month, iCal/PDF export, balance report) as product priorities; no hard dependency on earlier phases. For **conflicts and availability** (§11), start with “Revalidar cronograma” (holiday + availability) and cross-group warn-when-assigning; then make conflicts actionable and add availability conflict detection.
 
 *Loading, errors, empty states, and unsaved banner (formerly Phase 1) are done; see AGENTS.md Features.*

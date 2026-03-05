@@ -46,6 +46,18 @@ This file is the single source for product behaviour, scripts, migrations, and a
 
 ---
 
+# Domain glossary
+
+Use these terms consistently in schema, API, UI labels, and docs:
+
+| Term | Meaning |
+|------|--------|
+| **Event** | Recurring weekday config: one row per weekday in `recurring_events` (type assignable \| for_everyone, label, optional time window). Defines *what* happens on that day of the week; not a calendar date. |
+| **Schedule date** | A concrete date in a schedule: one row in `schedule_date` for a given schedule (month/year). Tied to an event for type/label; only assignable schedule dates have assignments. |
+| **Assignment** | A member assigned to a role on a specific schedule date: one row in `schedule_date_assignments` (scheduleDateId + roleId + memberId). "Mis asignaciones" = the user's assignments across groups. |
+
+---
+
 # Workflow (mandatory)
 
 1. **Plan:** Split work into units that can be done in parallel when possible; use subagents for parallel work. Get explicit confirmation before making changes; explain what you will do.
@@ -83,6 +95,9 @@ Skills: `next-auth`, `next-intl`, `react`, `tanstack-react-query`, `drizzle-orm`
 *(Add new items here when you implement a feature.)*
 
 *Feature index (where to look):* API consistency & validation → "API consistency, security, and validation". Config & BFF → "Config BFF", "View-scoped config", "Server-side group resolution", "Configuration". Schedule model → "Schedule / recurring events", "Schedule generation algorithm", "Schedule generation & preview". Auth & admin → "User authentication", "Admin panel". Calendar export → "Save in Calendar", "Library skills". UX → "Product and UX clarity", "Dashboard, navigation, public view". Data → "Member management", "Role management", "Holidays", "Multi-group architecture".
+
+## Domain glossary
+- **Domain glossary** in AGENTS.md defines **event** (recurring weekday config), **schedule date** (concrete date in a schedule), **assignment** (member–role on a date). Use this vocabulary in schema, API, and UI labels. See also docs/DATABASE.md (glossary reference).
 
 ## Library skills
 - **Project skills** in `.cursor/skills/` document how each major library is used and how it should be used: next-auth, next-intl, react, tanstack-react-query, drizzle-orm, zod, radix-ui-dialog, react-hotkeys-hook, googleapis. Read the relevant skill before changing or adding usage of that library. See "Library skills" above.
@@ -151,7 +166,7 @@ Skills: `next-auth`, `next-intl`, `react`, `tanstack-react-query`, `drizzle-orm`
 - Round-robin with per-day-of-week pointers; event time window filters eligible members; role dependencies = manual selection; exclusive role groups = same member can't get same-exclusive-group roles same date; day role priorities (event_role_priorities) order fill.
 
 ## Member management
-- Members: group, name, optional email, optional user_id. Linked → user holidays + dashboard. API: `GET/POST /api/members?groupId=N`, `GET/PUT/DELETE /api/members/[id]`.
+- Members: group, name, optional email, optional user_id. Linked → user holidays + dashboard. API: `GET/POST /api/members?groupId=N`, `GET/PUT/DELETE /api/members/[id]`. Members list (config context and GET members) uses batched queries: one for members+users, one for all member_roles, one for all member_availability (no N+1).
 
 ## Role management
 - `/:slug/config/roles`. New role: name, optional member assignments on "Agregar rol". Edit: fields + "Personas con este rol"; "Actualizar" persists. Unsaved changes: UnsavedConfigProvider, config layout guards nav when configDirty. API: `/api/configuration/roles?groupId=N`, `/api/configuration/exclusive-groups?groupId=N`.
@@ -164,9 +179,9 @@ Skills: `next-auth`, `next-intl`, `react`, `tanstack-react-query`, `drizzle-orm`
 - `/:slug/config/schedules`. One row per date in `schedule_date` (type assignable | for_everyone, label, note). Assignments in schedule_date_assignments. Add/remove date; notes in Editar modal; times in UTC in DB, shown/edited in user TZ. Rebuild from today: Overwrite or Fill empty, with preview. Audit log: "Historial de cambios". API: `/api/schedules?groupId=N`, `/api/schedules/[id]`, `/api/schedules/[id]/notes`.
 
 ## Dashboard, navigation, public view
-- **Dashboard**: `/`, cross-group assignments, conflicts (same date multiple groups). API `GET /api/user/dashboard`.
+- **Dashboard**: `/`, cross-group assignments, conflicts (same date multiple groups). API `GET /api/user/dashboard`. Assignments loaded via `getAssignments()` in `src/lib/user-assignments.ts` with batched role lookup (no N+1).
 - **Nav**: AppNavBar (root layout): Cronogramas, Inicio, Mis asignaciones (when signed in), Ajustes, auth. GroupSubNav (config layout): group name, "Ir a…" quick jump (⌘K), Miembros, Roles, Configuración, Vacaciones, Colaboradores, Cronograma.
-- **Public view**: `/:slug/cronograma` redirects (302) to `/:slug/cronograma/:year/:month` for current month; `/:slug/cronograma/:year/:month` is the canonical schedule view. API `/api/cronograma/:slug`, `/api/cronograma/:slug/:year/:month`. "Guardar en calendario" for **my assignments** lives on **Mis asignaciones** (see below).
+- **Public view**: `/:slug/cronograma` redirects (302) to `/:slug/cronograma/:year/:month` for current month; `/:slug/cronograma/:year/:month` is the canonical schedule view. API `/api/cronograma/:slug`, `/api/cronograma/:slug/:year/:month`. "Guardar en calendario" for **my assignments** lives on **Mis asignaciones** (see below). **SharedScheduleView** is split into `src/components/SharedScheduleView/` (index, types, MonthHeader, DateDetailModal with Radix Dialog, WeekSection, CalendarGrid); same public API.
 
 ## Product and UX clarity
 - **One schedule mental model**: Copy and nav treat "schedule" as one entity per group with months as views. Config nav label "Cronograma"; schedules page "Meses del cronograma"; config home "Ver cronograma" and "Cronograma" card.

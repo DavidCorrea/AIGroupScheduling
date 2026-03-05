@@ -50,3 +50,7 @@ All tables are defined there. Exported table names and purpose:
 - **To add a table or column:** Edit `src/db/schema.ts`, then run `npm run db:generate` (descriptive name), then `npm run db:migrate`.
 - **To find which table holds X:** Use section 2 above (tables grouped by Auth, App core, Roles & config, Holidays, Schedules); or open `src/db/schema.ts` and search for the concept (e.g. "holiday", "availability", "assignment").
 - **To see current schema:** Inspect `src/db/schema.ts`; or run `npm run db:studio` and browse the database; or query `drizzle.__drizzle_migrations` to see which migrations are applied.
+
+## 5. Domain vocabulary
+
+For consistent naming in schema and docs: **event** = recurring weekday config (`recurring_events`); **schedule date** = concrete date in a schedule (`schedule_date`); **assignment** = member–role on a date (`schedule_date_assignments`). Full definitions: **Domain glossary** in **AGENTS.md**.
