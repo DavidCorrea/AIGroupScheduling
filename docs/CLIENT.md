@@ -53,6 +53,8 @@ The app uses **Next.js App Router**, is **mobile-first**, and all user-facing co
 
 **Loading UI:** `src/app/loading.tsx` (dashboard/generic skeleton), `src/app/[slug]/config/loading.tsx` (config list skeleton), `src/app/[slug]/cronograma/[year]/[month]/loading.tsx` (cronograma grid skeleton) show route-level skeletons during navigation.
 
+**Error boundaries:** `src/app/error.tsx` (root), `src/app/[slug]/config/error.tsx`, `src/app/[slug]/cronograma/error.tsx` catch runtime/fetch errors and show a message with "Reintentar" and "Volver".
+
 ## 3. Layouts and nav
 
 - **Root layout** — `src/app/layout.tsx`  

@@ -488,6 +488,7 @@
     "loading": "Cargando...",
     "cancel": "Cancelar",
     "back": "Volver",
+    "retry": "Reintentar",
     "close": "Cerrar",
     "save": "Guardar",
     "delete": "Eliminar",
@@ -510,7 +511,10 @@
     "dangerZone": "Zona de peligro",
     "dangerZoneDescription": "Esta acción no se puede deshacer."
   },
-  "weekdays": [
+  "errorBoundary": {
+    "title": "Algo salió mal",
+    "message": "Ha ocurrido un error inesperado. Puedes intentar de nuevo o volver."
+  },
     "Lunes",
     "Martes",
     "Miércoles",
