@@ -11,7 +11,8 @@
     "goToAssignments": "Ir a Mis asignaciones",
     "pressGThen": "Pulsa «g» y luego:",
     "inConfig": "En configuración:",
-    "goToSearch": "Ir a… (buscar)"
+    "goToSearch": "Ir a… (buscar)",
+    "esc": "Esc"
   },
   "nav": {
     "appName": "Cronogramas",
@@ -185,7 +186,12 @@
     "errorLink": "Error al vincular",
     "confirmDelete": "¿Estás seguro de que deseas eliminar este miembro?",
     "errorDelete": "Error al eliminar el miembro",
-    "deleteMemberTitle": "Eliminar miembro"
+    "deleteMemberTitle": "Eliminar miembro",
+    "hour": "Hora",
+    "removeAllDay": "Quitar todo {day}",
+    "removeBlock": "Quitar bloque {time}",
+    "removeTime": "Quitar {time}",
+    "tapToAdd": "+ Toca para agregar"
   },
   "roles": {
     "title": "Roles",
@@ -468,6 +474,7 @@
     "role": "Rol",
     "date": "Fecha",
     "actions": "Acciones",
+    "dayHeaders": ["L", "M", "X", "J", "V", "S", "D"],
     "saveInCalendar": "Guardar en calendario",
     "saveInCalendarSuccess": "Eventos añadidos a tu Google Calendar.",
     "saveInCalendarError": "No se pudieron añadir los eventos. Intenta de nuevo."

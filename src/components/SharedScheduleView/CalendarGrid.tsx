@@ -1,5 +1,8 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+import { getRawArray } from "@/lib/intl-utils";
+
 export interface CalendarGridProps {
   year: number;
   month: number;
@@ -15,7 +18,7 @@ export interface CalendarGridProps {
   t: (key: string) => string;
 }
 
-const CAL_DAY_HEADERS = ["L", "M", "X", "J", "V", "S", "D"];
+const CAL_DAY_HEADERS_FALLBACK = ["L", "M", "X", "J", "V", "S", "D"];
 
 export function CalendarGrid({
   year,
@@ -31,6 +34,10 @@ export function CalendarGrid({
   onSelectDate,
   t,
 }: CalendarGridProps) {
+  const tOwn = useTranslations("cronograma");
+  const dayHeaders = getRawArray(tOwn, "dayHeaders").length > 0
+    ? getRawArray(tOwn, "dayHeaders")
+    : CAL_DAY_HEADERS_FALLBACK;
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
   const firstDayDow = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
   const leadingBlanks = firstDayDow === 0 ? 6 : firstDayDow - 1;
@@ -41,7 +48,7 @@ export function CalendarGrid({
         {t("calendar")}
       </h2>
       <div className="grid grid-cols-7 gap-1 mb-1">
-        {CAL_DAY_HEADERS.map((d) => (
+        {dayHeaders.map((d) => (
           <div
             key={d}
             className="text-center text-xs font-medium text-muted-foreground py-1"

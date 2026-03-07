@@ -384,7 +384,7 @@ export default function AvailabilityWeekGrid({
       >
         <div className="flex flex-col shrink-0 w-12 border-r border-border bg-muted/30">
           <div className="h-10 shrink-0 border-b border-border flex items-center justify-center text-xs text-muted-foreground font-medium">
-            Hora
+            {t("hour")}
           </div>
           <div
             className="shrink-0"
@@ -443,8 +443,8 @@ export default function AvailabilityWeekGrid({
                     type="button"
                     onClick={(e) => handleRemoveAllDay(e, d.weekdayId)}
                     className="rounded p-1.5 min-w-[28px] min-h-[28px] flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                    aria-label={`Quitar todo ${d.dayOfWeek}`}
-                    title={`Quitar todo ${d.dayOfWeek}`}
+                    aria-label={t("removeAllDay", { day: d.dayOfWeek })}
+                    title={t("removeAllDay", { day: d.dayOfWeek })}
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -534,8 +534,8 @@ export default function AvailabilityWeekGrid({
                             type="button"
                             onClick={(ev) => handleRemoveBlock(ev, d.weekdayId, blockIndex)}
                             className="rounded p-1 min-w-[28px] min-h-[28px] flex items-center justify-center text-primary-foreground/90 touch-manipulation"
-                            aria-label={`Quitar bloque ${timeLabel}`}
-                            title={`Quitar bloque ${timeLabel}`}
+                            aria-label={t("removeBlock", { time: timeLabel })}
+                            title={t("removeBlock", { time: timeLabel })}
                           >
                             <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -596,8 +596,8 @@ export default function AvailabilityWeekGrid({
                       type="button"
                       onClick={(e) => handleRemoveAllDay(e, d.weekdayId)}
                       className="rounded p-1.5 flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 touch-manipulation -m-1.5"
-                      aria-label={`Quitar todo ${d.dayOfWeek}`}
-                      title={`Quitar todo ${d.dayOfWeek}`}
+                      aria-label={t("removeAllDay", { day: d.dayOfWeek })}
+                      title={t("removeAllDay", { day: d.dayOfWeek })}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -644,7 +644,7 @@ export default function AvailabilityWeekGrid({
                 </div>
                 {!hasBlocks && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <span className="text-xs text-muted-foreground/60 group-hover:text-muted-foreground">+ Toca para agregar</span>
+                    <span className="text-xs text-muted-foreground/60 group-hover:text-muted-foreground">{t("tapToAdd")}</span>
                   </div>
                 )}
                 {blocks.map((range, blockIndex) => {
@@ -702,8 +702,8 @@ export default function AvailabilityWeekGrid({
                           type="button"
                           onClick={(ev) => handleRemoveBlock(ev, d.weekdayId, blockIndex)}
                           className="shrink-0 rounded p-1 min-w-[28px] min-h-[28px] flex items-center justify-center text-primary-foreground/90 touch-manipulation pointer-events-auto"
-                          aria-label={`Quitar ${timeLabel}`}
-                          title={`Quitar ${timeLabel}`}
+                          aria-label={t("removeTime", { time: timeLabel })}
+                          title={t("removeTime", { time: timeLabel })}
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

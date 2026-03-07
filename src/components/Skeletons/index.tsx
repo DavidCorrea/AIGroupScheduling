@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useTranslations } from "next-intl";
 
 /**
  * Shared skeleton primitives for loading states.
@@ -103,7 +104,7 @@ export function SkeletonGrid({
  * Remove or replace with real content when data is ready.
  */
 export function SkeletonRegion({
-  "aria-label": ariaLabel = "Cargando…",
+  "aria-label": ariaLabel,
   children,
   className = "",
 }: {
@@ -111,11 +112,13 @@ export function SkeletonRegion({
   children: ReactNode;
   className?: string;
 }) {
+  const t = useTranslations("common");
+  const resolvedLabel = ariaLabel ?? t("loading");
   return (
     <div
       className={className}
       aria-busy="true"
-      aria-label={ariaLabel}
+      aria-label={resolvedLabel}
       role="status"
     >
       {children}
@@ -130,7 +133,7 @@ export function RootLoadingSkeleton() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <SkeletonRegion className="mb-12" aria-label="Cargando…">
+        <SkeletonRegion className="mb-12">
           <div className="h-10 w-3/4 max-w-md animate-pulse rounded bg-muted" aria-hidden />
           <div className="mt-3 h-5 w-full max-w-lg animate-pulse rounded bg-muted" aria-hidden />
         </SkeletonRegion>
@@ -185,7 +188,7 @@ export function RootLoadingSkeleton() {
  */
 export function ConfigContentSkeleton() {
   return (
-    <SkeletonRegion className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8" aria-label="Cargando…">
+    <SkeletonRegion className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
       <div className="space-y-12">
         <div>
           <div className="h-9 w-48 animate-pulse rounded bg-muted" aria-hidden />

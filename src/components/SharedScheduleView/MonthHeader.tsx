@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+import { getRawArray } from "@/lib/intl-utils";
 import { MONTH_NAMES } from "./types";
 import type { SharedScheduleData } from "./types";
 import { TogglePill } from "@/components/TogglePill";
@@ -48,6 +50,10 @@ export function MonthHeader({
   availableWeekdays,
   calendarResult,
 }: MonthHeaderProps) {
+  const tSchedules = useTranslations("schedules");
+  const monthNames = getRawArray(tSchedules, "months").length > 0
+    ? getRawArray(tSchedules, "months")
+    : MONTH_NAMES;
   const filterCount = [
     filteredMemberId,
     filteredRoleId,
@@ -78,7 +84,7 @@ export function MonthHeader({
               </p>
             )}
             <h1 className="font-[family-name:var(--font-display)] font-semibold text-2xl sm:text-3xl uppercase">
-              {MONTH_NAMES[schedule.month - 1]} {schedule.year}
+              {monthNames[schedule.month - 1]} {schedule.year}
             </h1>
           </div>
           {schedule.nextSchedule ? (

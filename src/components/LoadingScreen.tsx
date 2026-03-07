@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { ConfigContentSkeleton, RootLoadingSkeleton, SkeletonText } from "@/components/Skeletons";
 
 /**
@@ -16,13 +17,15 @@ export default function LoadingScreen({
   /** Inline variant for nav bars: no min-height, small skeleton */
   compact?: boolean;
 }) {
+  const t = useTranslations("common");
+
   if (compact) {
     return (
       <div
         className="min-h-0 flex flex-row items-center justify-center gap-2 py-0"
         role="status"
         aria-live="polite"
-        aria-label="Cargando…"
+        aria-label={t("loading")}
       >
         <SkeletonText lines={1} className="h-4 w-24" />
       </div>
@@ -34,7 +37,7 @@ export default function LoadingScreen({
   }
 
   return (
-    <div className="min-h-[14rem] py-12" role="status" aria-label="Cargando…">
+    <div className="min-h-[14rem] py-12" role="status" aria-label={t("loading")}>
       <ConfigContentSkeleton />
     </div>
   );

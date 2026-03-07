@@ -561,7 +561,7 @@ export default function SharedScheduleView({
                                 </span>
                                 <div className="flex items-center gap-2">
                                   <span className="text-xs text-muted-foreground italic shrink-0">
-                                    {getDateDisplayLabel(sd) || "Ensayo"}
+                                    {getDateDisplayLabel(sd)}
                                   </span>
                                   <span
                                     className="text-xs text-muted-foreground shrink-0"
@@ -674,7 +674,7 @@ export default function SharedScheduleView({
                                 </span>
                                 <div className="flex items-center gap-2">
                                   <span className="text-xs text-muted-foreground italic shrink-0">
-                                    {getDateDisplayLabel(sd) || "Ensayo"}
+                                    {getDateDisplayLabel(sd)}
                                   </span>
                                   <span
                                     className="text-xs text-muted-foreground shrink-0"
@@ -852,7 +852,7 @@ export default function SharedScheduleView({
                                     )}
                                     {isForEveryone ? (
                                       <p className="text-sm text-muted-foreground italic mt-1">
-                                        {getDateDisplayLabel(sd) || "Ensayo"}
+                                        {getDateDisplayLabel(sd)}
                                       </p>
                                     ) : entriesOnDate.length > 0 ? (
                                       <div className="mt-2 rounded-md border border-border/40 overflow-hidden">
@@ -965,7 +965,7 @@ export default function SharedScheduleView({
                                             colSpan={visibleRoles.length}
                                             className="px-4 py-4 text-sm text-muted-foreground italic text-center"
                                           >
-                                            {getDateDisplayLabel(sd) || "Ensayo"}
+                                            {getDateDisplayLabel(sd)}
                                             {getDateDisplayTimeRange(sd) && (
                                               <div className="text-xs mt-0.5 font-normal">
                                                 {getDateDisplayTimeRange(sd)}
@@ -1033,7 +1033,7 @@ export default function SharedScheduleView({
           <div className="text-center py-12">
             <p className="text-muted-foreground">
               {filteredMemberId
-                ? "Este miembro no tiene asignaciones este mes."
+                ? t("noAssignmentsThisMonth")
                 : hasActiveFilter
                   ? t("noAssignmentsFilter")
                   : t("noEntries")}

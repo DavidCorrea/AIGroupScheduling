@@ -1,6 +1,7 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
+import { useTranslations } from "next-intl";
 import { formatDateLong } from "@/lib/timezone-utils";
 import type {
   ScheduleDateInfo,
@@ -36,6 +37,8 @@ export function DateDetailModal({
   filteredMemberId,
   t,
 }: DateDetailModalProps) {
+  const tCommon = useTranslations("common");
+
   if (!selectedDate) return null;
 
   const sd =
@@ -43,8 +46,7 @@ export function DateDetailModal({
       date: selectedDate,
       type: "assignable" as const,
     });
-  const isForEveryone = sd.type === "for_everyone";
-  const label = getDateDisplayLabel(sd) || (isForEveryone ? "Ensayo" : "");
+  const label = getDateDisplayLabel(sd);
   const timeRange = getDateDisplayTimeRange(sd);
   const entriesOnDate = schedule.entries.filter((e) => e.date === selectedDate);
   const roleIdsOnDate = [...new Set(entriesOnDate.map((e) => e.roleId))];
@@ -80,7 +82,7 @@ export function DateDetailModal({
               <button
                 type="button"
                 className="text-muted-foreground hover:text-foreground transition-colors text-lg leading-none ml-3"
-                aria-label="Cerrar"
+                aria-label={tCommon("close")}
               >
                 &times;
               </button>

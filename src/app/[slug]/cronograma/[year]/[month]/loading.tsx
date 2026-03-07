@@ -8,7 +8,6 @@ export default function CronogramaLoading() {
   return (
     <SkeletonRegion
       className="min-h-[calc(100dvh-3.5rem)] bg-background text-foreground px-4 py-6 sm:px-6"
-      aria-label="Cargando…"
     >
       <div className="mx-auto max-w-6xl">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">

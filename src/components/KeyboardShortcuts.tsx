@@ -77,7 +77,7 @@ export default function KeyboardShortcuts() {
             onClick={closeHelp}
             className="text-muted-foreground hover:text-foreground text-sm"
           >
-            Esc
+            {t("esc")}
           </button>
         </div>
         <ul className="space-y-2 text-sm text-muted-foreground">
