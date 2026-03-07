@@ -1,126 +1,76 @@
-"use client";
-
-import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
-import Link from "next/link";
-import { useTranslations } from "next-intl";
-import { useGroup } from "@/lib/group-context";
-import EventForm from "../EventForm";
+import { notFound } from "next/navigation";
+import dynamic from "next/dynamic";
+import { getTranslations } from "next-intl/server";
+import { getGroupForConfigLayout } from "@/lib/config-server";
+import { loadConfigContextForGroup } from "@/lib/load-config-context";
+import { loadEventPriorities } from "@/lib/data-access";
+import { ConfigContentSkeleton } from "@/components/Skeletons";
 import BackLink from "@/components/BackLink";
-import LoadingScreen from "@/components/LoadingScreen";
 
-interface EventData {
-  id: number;
-  weekdayId: number;
-  dayOfWeek: string;
-  active: boolean;
-  type: string;
-  label: string;
-  startTimeUtc?: string;
-  endTimeUtc?: string;
-  groupId: number;
-}
+const EventForm = dynamic(() => import("../EventForm"), {
+  loading: () => <ConfigContentSkeleton />,
+});
 
-interface Role {
-  id: number;
-  name: string;
-  requiredCount: number;
-  displayOrder: number;
-  dependsOnRoleId: number | null;
-  exclusiveGroupId: number | null;
-}
-
-interface PriorityRow {
-  id: number;
-  recurringEventId: number;
-  roleId: number;
-  priority: number;
-  dayOfWeek: string;
-  roleName: string;
-}
-
-export default function EditEventPage() {
-  const params = useParams();
-  const slug = params.slug as string;
-  const id = params.id as string;
-  const t = useTranslations("events");
+export default async function EditEventPage({
+  params,
+}: {
+  params: Promise<{ slug: string; id: string }>;
+}) {
+  const { slug, id } = await params;
   const eventId = parseInt(id, 10);
-  const { groupId, loading: groupLoading } = useGroup();
-  const [event, setEvent] = useState<EventData | null>(null);
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [priorities, setPriorities] = useState<PriorityRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
+  const group = await getGroupForConfigLayout(slug);
+  const t = await getTranslations("events");
 
-  const fetchData = useCallback(async () => {
-    if (!groupId || isNaN(eventId)) return;
-    const [daysRes, rolesRes, prioritiesRes] = await Promise.all([
-      fetch(`/api/configuration/days?groupId=${groupId}`),
-      fetch(`/api/configuration/roles?groupId=${groupId}`),
-      fetch(`/api/configuration/priorities?groupId=${groupId}`),
-    ]);
-    const daysData: EventData[] = await daysRes.json();
-    const rolesData = await rolesRes.json();
-    const prioritiesData: PriorityRow[] = await prioritiesRes.json();
+  const [ctx, priorities] = await Promise.all([
+    loadConfigContextForGroup(group.id, { include: ["days", "roles"] }),
+    loadEventPriorities(group.id),
+  ]);
 
-    const found = daysData.find((d) => d.id === eventId) ?? null;
-    setEvent(found);
-    setRoles(rolesData);
-    setPriorities(prioritiesData.filter((p) => p.recurringEventId === eventId));
-    setNotFound(!found);
-    setLoading(false);
-  }, [groupId, eventId]);
+  const days = ctx?.days ?? [];
+  const roles = (ctx?.roles ?? []) as Array<{
+    id: number;
+    name: string;
+    requiredCount: number;
+    displayOrder: number;
+    dependsOnRoleId: number | null;
+    exclusiveGroupId: number | null;
+  }>;
 
-  useEffect(() => {
-    queueMicrotask(() => {
-      if (!groupId || isNaN(eventId)) {
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      fetchData();
-    });
-  }, [groupId, eventId, fetchData]);
-
-  if (groupLoading || loading) {
-    return <LoadingScreen fullPage={false} />;
+  const event = days.find((d) => d.id === eventId);
+  if (!event) {
+    notFound();
   }
 
-  if (notFound || !event) {
-    return (
-      <div className="space-y-4">
-        <h1 className="font-[family-name:var(--font-display)] font-semibold text-2xl uppercase">
-          {t("eventNotFound")}
-        </h1>
-        <p className="text-muted-foreground">
-          {t("eventNotFoundDesc")}
-        </p>
-        <Link
-          href={`/${slug}/config/events`}
-          className="text-sm text-accent hover:opacity-80"
-        >
-          {t("backToEvents")}
-        </Link>
-      </div>
-    );
-  }
+  const eventData = {
+    id: event.id,
+    weekdayId: event.weekdayId,
+    dayOfWeek: event.dayOfWeek ?? "",
+    active: event.active,
+    type: event.type,
+    label: event.label ?? "",
+    startTimeUtc: event.startTimeUtc ?? undefined,
+    endTimeUtc: event.endTimeUtc ?? undefined,
+    groupId: event.groupId,
+  };
 
-  const initialPriorities = priorities.map((p) => ({
-    roleId: p.roleId,
-    priority: p.priority,
-    roleName: p.roleName,
-  }));
+  const eventPriorities = priorities
+    .filter((p) => p.recurringEventId === eventId)
+    .map((p) => ({
+      roleId: p.roleId,
+      priority: p.priority,
+      roleName: p.roleName,
+    }));
 
   return (
     <div className="space-y-12">
       <BackLink href={`/${slug}/config/events`} label={t("backToEvents")} />
       <EventForm
         slug={slug}
-        groupId={groupId ?? null}
+        groupId={group.id}
         isNew={false}
-        initialEvent={event}
+        initialEvent={eventData}
         roles={roles}
-        initialPriorities={initialPriorities}
+        initialPriorities={eventPriorities}
       />
     </div>
   );

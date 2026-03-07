@@ -7,7 +7,7 @@ This file is the single source for product behaviour, scripts, migrations, and a
 # When you begin
 
 - **In a specific folder?** Read its `CONTEXT.md` first (what lives there, where to look next). Prefer that over broad searches.
-- **Touching a library we use?** Read the matching skill in **`.cursor/skills/<name>/SKILL.md`** before changing or adding usage. Skills: `nextjs`, `next-auth`, `next-intl`, `react`, `tanstack-react-query`, `drizzle-orm`, `zod`, `radix-ui-dialog`, `react-hotkeys-hook`, `googleapis`, `tailwind`, `typescript`.
+- **Touching a library we use?** Read the matching skill in **`.cursor/skills/<name>/SKILL.md`** before changing or adding usage. Skills: `nextjs`, `next-auth`, `next-intl`, `react`, `tanstack-react-query`, `drizzle-orm`, `zod`, `radix-ui-dialog`, `react-hotkeys-hook`, `googleapis`, `tailwind`, `typescript`, `web-vitals`.
 - **Adding or changing API routes?** See **docs/API.md** (route index, auth, which file to edit).
 - **Adding or changing pages or nav?** See **docs/CLIENT.md** (route map, layouts, components).
 - **Changing schema or migrations?** See **docs/DATABASE.md** and the "Database and migrations" section below.
@@ -82,9 +82,10 @@ Project skills in **`.cursor/skills/`** document how each major library is used 
 
 **Before using any library in a new use case:** Investigate the proper way to do it (official docs, best practices) and document the approach in that library’s skill file. Update the skill with patterns, gotchas, and “how it should be used” so future work stays consistent.
 
-Skills: `nextjs`, `next-auth`, `next-intl`, `react`, `tanstack-react-query`, `drizzle-orm`, `zod`, `radix-ui-dialog`, `react-hotkeys-hook`, `googleapis`, `tailwind`, `typescript`.
+Skills: `nextjs`, `next-auth`, `next-intl`, `react`, `tanstack-react-query`, `drizzle-orm`, `zod`, `radix-ui-dialog`, `react-hotkeys-hook`, `googleapis`, `tailwind`, `typescript`, `web-vitals`.
 
 - **Next.js:** **`.cursor/skills/nextjs/SKILL.md`** — App Router rendering model (Server vs Client Components, interleaving, context providers), routing (file conventions, dynamic routes, route groups), layouts, data fetching (server-side direct, client-side with TanStack Query), route handlers, middleware, loading/error/streaming, redirects, and configuration. Use when adding or changing pages, layouts, route handlers, middleware, data fetching, or routing patterns.
+- **Web Vitals:** **`.cursor/skills/web-vitals/SKILL.md`** — Core Web Vitals (LCP, CLS, INP) best practices for this project. `next/image` with `priority` and `sizes`, `next/dynamic` for code splitting, `useTransition` for INP, `<Suspense>` for streaming, `next/script` for third parties, measurement with `useReportWebVitals`. Use when adding or changing pages, layouts, images, or components that affect performance.
 
 ---
 
@@ -111,7 +112,7 @@ Skills: `nextjs`, `next-auth`, `next-intl`, `react`, `tanstack-react-query`, `dr
 - **Domain glossary** in AGENTS.md defines **event** (recurring weekday config), **schedule date** (concrete date in a schedule), **assignment** (member–role on a date). Use this vocabulary in schema, API, and UI labels. See also docs/DATABASE.md (glossary reference).
 
 ## Library skills
-- **Skills creation and usage:** Rule `.cursor/rules/skills-creation-usage.mdc`: create a project skill for each **new** library (best practices in `.cursor/skills/<name>/`); **update** existing skills when using a documented library in a new way or adopting a new best practice. Use create-skill skill for structure. Skills: `nextjs`, `next-auth`, `next-intl`, `react`, `tanstack-react-query`, `drizzle-orm`, `zod`, `radix-ui-dialog`, `react-hotkeys-hook`, `googleapis`, `tailwind`, `typescript`.
+- **Skills creation and usage:** Rule `.cursor/rules/skills-creation-usage.mdc`: create a project skill for each **new** library (best practices in `.cursor/skills/<name>/`); **update** existing skills when using a documented library in a new way or adopting a new best practice. Use create-skill skill for structure. Skills: `nextjs`, `next-auth`, `next-intl`, `react`, `tanstack-react-query`, `drizzle-orm`, `zod`, `radix-ui-dialog`, `react-hotkeys-hook`, `googleapis`, `tailwind`, `typescript`, `web-vitals`.
 - **React:** **`.cursor/skills/react/SKILL.md`** — when to use client vs server components, list keys (stable id or composite key; no index for dynamic lists), hooks (useEffect deps and cleanup, useCallback/useMemo), and patterns we use. Use when adding or changing components or hooks.
 - **Tailwind:** **`.cursor/skills/tailwind/SKILL.md`** — Tailwind v4 CSS-first config, semantic tokens in `globals.css`, utility-first in components, when to use `@theme` or a shared class. Use when adding or changing styles, layout, or theme.
 - **TypeScript:** **`.cursor/skills/typescript/SKILL.md`** — strict mode, interface vs type, path alias `@/*`, avoid `any`, Zod-inferred types. Use when adding or changing types or tsconfig.
@@ -209,7 +210,25 @@ Skills: `nextjs`, `next-auth`, `next-intl`, `react`, `tanstack-react-query`, `dr
 - **Keyboard shortcuts**: `react-hotkeys-hook`. **?** opens help overlay (shortcuts list). **g** then **h** → Inicio, **g** then **a** → Mis asignaciones. In config: **⌘K** (or Ctrl+K) opens "Ir a…" search. Component: `src/components/KeyboardShortcuts.tsx`.
 - **Danger zones and destructive confirmations**: Views where a resource can be deleted have a **"Zona de peligro"** section at the bottom (bordered, destructive tint; title/description from `common.dangerZone` / `common.dangerZoneDescription` or page-specific keys). Delete (or remove) actions live inside that section or are clearly tied to it. Every destructive action uses **ConfirmDialog** (`src/components/ConfirmDialog.tsx`, **@radix-ui/react-dialog**) for focus trap, aria-modal, and keyboard; no `window.confirm()`. Applied to: member edit, role edit, event edit (EventForm), schedule-detail delete schedule and delete date, collaborators, group holidays, user holidays (settings), exclusive groups (roles list), admin delete user, **admin delete group**. Shared **DangerZone** component: `src/components/DangerZone.tsx`.
 - **Quick jump (config)**: "Ir a…" in GroupSubNav + ⌘K: search by name over members, roles, events, schedule months; select to navigate. Data from `configContext`. Component: `src/components/ConfigGoTo.tsx`.
-- **Loading, errors, and empty states**: **Skeletons** (`src/components/Skeletons/`): SkeletonCard, SkeletonRow, SkeletonText, SkeletonGrid, SkeletonRegion (aria-busy/aria-label). **Route-level loading:** `loading.tsx` for `/`, `[slug]/config`, `[slug]/cronograma/[year]/[month]`. **Error boundaries:** `error.tsx` at root, config, and cronograma with "Reintentar" and "Volver". **Empty states:** `EmptyState` component on members, roles, events, schedules when list is empty (message + primary CTA). **Unsaved config:** `UnsavedBanner` when dirty ("Tienes cambios sin guardar"); `beforeunload` on tab close. See docs/IMPROVEMENT_ROADMAP.md §2.
+- **Loading, errors, and empty states**: **Skeletons** (`src/components/Skeletons/`): SkeletonCard, SkeletonRow, SkeletonText, SkeletonGrid, SkeletonRegion (aria-busy/aria-label). **Route-level loading:** `loading.tsx` for `/`, `[slug]/config`, `[slug]/cronograma/[year]/[month]`, `/asignaciones`, `/settings`, `/admin`. **Error boundaries:** `error.tsx` at root, config, and cronograma with "Reintentar" and "Volver". **Empty states:** `EmptyState` component on members, roles, events, schedules when list is empty (message + primary CTA). **Unsaved config:** `UnsavedBanner` when dirty ("Tienes cambios sin guardar"); `beforeunload` on tab close. See docs/IMPROVEMENT_ROADMAP.md §2.
+
+**Web Vitals Phase 1 (quick wins)**
+- **`next/dynamic` code splitting:** Heavy client components are lazy-loaded to reduce initial JS bundle. `EventForm` (828 lines, events pages), `AvailabilityWeekGrid` (723 lines, member pages), and `DateDetailModal` (188 lines, SharedScheduleView) use `next/dynamic` with skeleton fallbacks.
+- **`useTransition` for filters:** Filter/sort state setters wrapped in `startTransition` for responsive UI during re-renders. Applied to: `/asignaciones` (4 filter selects), `SharedScheduleView` (member/role/day/view-mode filters), dashboard calendar selection, and schedule detail `showPastDates` toggle.
+- **Route-level `loading.tsx`:** Added for `/asignaciones`, `/settings`, `/admin` (uses `RootLoadingSkeleton`). Config sub-routes inherit from `[slug]/config/loading.tsx`.
+
+**Web Vitals Phase 2 (Server Component refactoring)**
+- **All 21 `"use client"` pages converted** to Server Component shells with client leaves. Pages now fetch data server-side and pass it as props — no JS download → hydrate → useEffect → fetch → render waterfall. Three pages (`/login`, `/groups/new`, `/admin/login`) became fully static (`○`).
+- **Data access layer:** `src/lib/data-access.ts` — 9 server-only functions extracted from API routes (`loadUserGroups`, `loadUserHolidays`, `loadMemberById`, `loadGroupHolidays`, `loadGroupCollaborators`, `loadEventPriorities`, `loadScheduleDetail`, `loadAdminUsers`, `loadAdminGroups`). Server Components call these directly instead of HTTP round-trips. API routes updated to call the shared functions.
+- **React.cache() for group resolution:** `getGroupForConfigLayout` in `src/lib/config-server.ts` wrapped in `React.cache()` so both the config layout and page can call it without duplicate DB queries in the same request.
+
+**Web Vitals Phase 3 (measurement, streaming, bundle cleanup)**
+- **Web Vitals measurement:** `src/components/WebVitals.tsx` uses `useReportWebVitals` to log CWV metrics in dev; wired in `src/app/layout.tsx`. `src/instrumentation-client.ts` fires `app-init` mark before hydration and `nav-start-*` on router transitions.
+- **Suspense streaming on heavy pages:** Dashboard (`/`), assignments (`/asignaciones`), settings (`/settings`), and admin (`/admin`) pages wrap data-fetching in `<Suspense>` with `RootLoadingSkeleton` fallback so the page shell streams immediately while data loads. Auth check stays outside Suspense for fast redirects.
+- **Barrel export cleanup:** Removed `src/lib/schemas/index.ts` barrel file. All 9 API routes now import directly from specific schema modules (e.g. `@/lib/schemas/members`) for reliable tree-shaking.
+- **Client components:** Each page's interactive UI extracted to `*Client.tsx` (e.g. `DashboardClient.tsx`, `SettingsClient.tsx`, `ScheduleDetailClient.tsx`). Client components receive server-fetched data as props, keep all mutation logic (API calls), and use `router.refresh()` after mutations.
+- **Pure server pages (Batch A):** `/login`, config home, members list, events list — render entirely on the server with `getTranslations`. Login page: tiny `LoginButton.tsx` client component for `signIn("google")`.
+- **Files:** ~17 new client components, ~24 modified pages/routes, 1 new data access module.
 
 ## Locale, seeds, env
 - UI in Spanish. App name **Cronogramas**.

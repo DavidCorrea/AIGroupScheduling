@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { members, memberRoles, memberAvailability, users } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireGroupAccess, parseBody, apiError } from "@/lib/api-helpers";
-import { memberCreateSchema } from "@/lib/schemas";
+import { memberCreateSchema } from "@/lib/schemas/members";
 
 export async function GET(request: NextRequest) {
   const accessResult = await requireGroupAccess(request);

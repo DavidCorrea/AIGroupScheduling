@@ -1,49 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { eventRolePriorities, recurringEvents, weekdays, roles } from "@/db/schema";
+import { eventRolePriorities, recurringEvents, roles } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireGroupAccess, apiError } from "@/lib/api-helpers";
+import { loadEventPriorities } from "@/lib/data-access";
 
 export async function GET(request: NextRequest) {
   const accessResult = await requireGroupAccess(request);
   if (accessResult.error) return accessResult.error;
   const { groupId } = accessResult;
 
-  const allRecurring = await db
-    .select({
-      id: recurringEvents.id,
-      weekdayId: recurringEvents.weekdayId,
-      dayOfWeek: weekdays.name,
-      active: recurringEvents.active,
-      type: recurringEvents.type,
-      label: recurringEvents.label,
-      groupId: recurringEvents.groupId,
-    })
-    .from(recurringEvents)
-    .innerJoin(weekdays, eq(recurringEvents.weekdayId, weekdays.id))
-    .where(eq(recurringEvents.groupId, groupId));
-  const assignableDays = allRecurring.filter((d) => d.type === "assignable");
-
-  const allRoles = await db
-    .select()
-    .from(roles)
-    .where(eq(roles.groupId, groupId));
-
-  const allPriorities = await db.select().from(eventRolePriorities);
-
-  const assignableIds = new Set(assignableDays.map((d) => d.id));
-  const roleIds = new Set(allRoles.map((r) => r.id));
-  const filtered = allPriorities.filter(
-    (p) => assignableIds.has(p.recurringEventId) && roleIds.has(p.roleId)
-  );
-
-  const enriched = filtered.map((p) => ({
-    ...p,
-    dayOfWeek: assignableDays.find((d) => d.id === p.recurringEventId)?.dayOfWeek ?? "Unknown",
-    roleName: allRoles.find((r) => r.id === p.roleId)?.name ?? "Unknown",
-  }));
-
-  return NextResponse.json(enriched);
+  const result = await loadEventPriorities(groupId);
+  return NextResponse.json(result);
 }
 
 export async function POST(request: NextRequest) {

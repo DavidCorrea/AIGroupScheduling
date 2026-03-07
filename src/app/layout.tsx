@@ -8,6 +8,7 @@ import SessionProvider from "@/components/SessionProvider";
 import QueryProvider from "@/components/QueryProvider";
 import AppNavBar from "@/components/AppNavBar";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
+import { WebVitals } from "@/components/WebVitals";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -65,6 +66,7 @@ export default async function RootLayout({
               {children}
               <Analytics />
               <SpeedInsights />
+              <WebVitals />
             </SessionProvider>
           </QueryProvider>
         </NextIntlClientProvider>

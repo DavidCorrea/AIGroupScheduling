@@ -1,0 +1,16 @@
+---
+description: Core Web Vitals (LCP, CLS, INP) checklist when changing pages, components, or layouts
+globs: src/app/**/*.tsx, src/components/**/*.tsx
+alwaysApply: false
+---
+
+# Web Vitals
+
+- **Images:** Use `next/image` for any image that could be the LCP element. Set `priority` on the single above-the-fold hero/banner per page. Always provide `width`+`height` (or `fill` with sized container) and `sizes` for responsive layouts. Small decorative images (avatars ≤ 48 px, icons) may use plain `<img>`.
+- **Code splitting:** Lazy-load heavy client components with `next/dynamic` (modals, editors, large forms). Push `"use client"` as deep as possible — only the interactive leaf needs it.
+- **INP:** Wrap expensive state transitions (`setFilter`, sorting large lists) in `useTransition`. Keep event handlers under 50 ms; offload heavy work to `startTransition` or Web Workers.
+- **CLS:** Every image, iframe, and dynamic content area needs explicit dimensions or a skeleton placeholder matching the final size. Don't inject banners/toasts above existing content without reserved space.
+- **Streaming:** Wrap slow data fetches in `<Suspense>` with a skeleton fallback. Avoid top-level `await` in page components when the page has other content to show.
+- **Scripts:** Use `next/script` with `afterInteractive` (analytics) or `lazyOnload` (widgets) — never raw `<script>` tags for third-party code.
+- **Fonts:** Use `next/font` for zero-CLS font loading. Never add manual `<link>` or CSS `@import` for external fonts.
+- **Skill:** Read `.cursor/skills/web-vitals/SKILL.md` for detailed patterns, measurement, and checklist.

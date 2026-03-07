@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { roles, scheduleDateAssignments, eventRolePriorities } from "@/db/schema";
 import { eq, max } from "drizzle-orm";
 import { requireGroupAccess, apiError, parseBody } from "@/lib/api-helpers";
-import { roleCreateSchema, roleUpdateSchema, roleReorderSchema } from "@/lib/schemas";
+import { roleCreateSchema, roleUpdateSchema, roleReorderSchema } from "@/lib/schemas/roles";
 
 export async function GET(request: NextRequest) {
   const accessResult = await requireGroupAccess(request);

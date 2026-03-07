@@ -4,16 +4,13 @@ import {
   schedules,
   scheduleDateAssignments,
   scheduleDate,
-  scheduleAuditLog,
   members,
   roles,
-  users,
-  recurringEvents,
 } from "@/db/schema";
-import { eq, and, or, lt, gt, asc, desc, inArray } from "drizzle-orm";
+import { eq, and, asc, inArray } from "drizzle-orm";
 import { requireAuth, hasGroupAccess, apiError } from "@/lib/api-helpers";
-import { getHolidayConflicts } from "@/lib/holiday-conflicts";
 import { loadScheduleConfig, getPreviousAssignments } from "@/lib/schedule-helpers";
+import { loadScheduleDetail } from "@/lib/data-access";
 import {
   generateGroupSchedule,
   validateDependentRoleAssignment,
@@ -36,146 +33,17 @@ export async function GET(
   const { id } = await params;
   const scheduleId = parseInt(id, 10);
 
-  const schedule = (await db
-    .select()
-    .from(schedules)
-    .where(eq(schedules.id, scheduleId)))[0];
-
-  if (!schedule) {
+  const detail = await loadScheduleDetail(scheduleId);
+  if (!detail) {
     return apiError("Cronograma no encontrado", 404, "NOT_FOUND");
   }
 
-  const access = await hasGroupAccess(authResult.user.id, schedule.groupId);
+  const access = await hasGroupAccess(authResult.user.id, detail.groupId);
   if (!access) {
     return apiError("Forbidden", 403, "FORBIDDEN");
   }
 
-  const allMembers = await db
-    .select({
-      id: members.id,
-      name: members.name,
-      groupId: members.groupId,
-    })
-    .from(members)
-    .where(eq(members.groupId, schedule.groupId));
-
-  const allRoles = await db
-    .select()
-    .from(roles)
-    .where(eq(roles.groupId, schedule.groupId));
-
-  const entriesWithDate = await db
-    .select({
-      id: scheduleDateAssignments.id,
-      scheduleDateId: scheduleDateAssignments.scheduleDateId,
-      date: scheduleDate.date,
-      roleId: scheduleDateAssignments.roleId,
-      memberId: scheduleDateAssignments.memberId,
-    })
-    .from(scheduleDateAssignments)
-    .innerJoin(scheduleDate, eq(scheduleDateAssignments.scheduleDateId, scheduleDate.id))
-    .where(eq(scheduleDate.scheduleId, scheduleId));
-
-  const enrichedEntries = entriesWithDate.map((entry) => ({
-    id: entry.id,
-    scheduleDateId: entry.scheduleDateId,
-    date: entry.date,
-    roleId: entry.roleId,
-    memberId: entry.memberId,
-    memberName:
-      allMembers.find((m) => m.id === entry.memberId)?.name ?? "Desconocido",
-    roleName: allRoles.find((r) => r.id === entry.roleId)?.name ?? "Desconocido",
-  }));
-
-  const scheduleDates = await db
-    .select({
-      id: scheduleDate.id,
-      date: scheduleDate.date,
-      type: scheduleDate.type,
-      label: scheduleDate.label,
-      note: scheduleDate.note,
-      startTimeUtc: scheduleDate.startTimeUtc,
-      endTimeUtc: scheduleDate.endTimeUtc,
-      recurringEventId: scheduleDate.recurringEventId,
-      recurringEventLabel: recurringEvents.label,
-    })
-    .from(scheduleDate)
-    .leftJoin(recurringEvents, eq(scheduleDate.recurringEventId, recurringEvents.id))
-    .where(eq(scheduleDate.scheduleId, scheduleId))
-    .orderBy(asc(scheduleDate.date), asc(scheduleDate.startTimeUtc));
-
-  // Find previous and next schedules
-  const { month, year, groupId } = schedule;
-
-  const prevSchedule = (await db
-    .select({ id: schedules.id })
-    .from(schedules)
-    .where(
-      and(
-        eq(schedules.groupId, groupId),
-        or(
-          lt(schedules.year, year),
-          and(eq(schedules.year, year), lt(schedules.month, month))
-        )
-      )
-    )
-    .orderBy(desc(schedules.year), desc(schedules.month))
-    .limit(1))[0] ?? null;
-
-  const nextSchedule = (await db
-    .select({ id: schedules.id })
-    .from(schedules)
-    .where(
-      and(
-        eq(schedules.groupId, groupId),
-        or(
-          gt(schedules.year, year),
-          and(eq(schedules.year, year), gt(schedules.month, month))
-        )
-      )
-    )
-    .orderBy(asc(schedules.year), asc(schedules.month))
-    .limit(1))[0] ?? null;
-
-  const holidayConflicts = await getHolidayConflicts(
-    enrichedEntries.map((e) => ({ date: e.date, memberId: e.memberId })),
-    groupId
-  );
-
-  const auditLogRows = await db
-    .select({
-      id: scheduleAuditLog.id,
-      action: scheduleAuditLog.action,
-      detail: scheduleAuditLog.detail,
-      createdAt: scheduleAuditLog.createdAt,
-      userName: users.name,
-    })
-    .from(scheduleAuditLog)
-    .leftJoin(users, eq(scheduleAuditLog.userId, users.id))
-    .where(eq(scheduleAuditLog.scheduleId, scheduleId))
-    .orderBy(desc(scheduleAuditLog.createdAt));
-
-  return NextResponse.json({
-    ...schedule,
-    scheduleDates: scheduleDates.map((sd) => ({
-      id: sd.id,
-      date: sd.date,
-      type: String(sd.type).toLowerCase() === "for_everyone" ? "for_everyone" : "assignable",
-      label: sd.label,
-      note: sd.note,
-      startTimeUtc: sd.startTimeUtc ?? "00:00",
-      endTimeUtc: sd.endTimeUtc ?? "23:59",
-      recurringEventId: sd.recurringEventId ?? null,
-      recurringEventLabel: sd.recurringEventLabel ?? null,
-      entries: enrichedEntries.filter((e) => e.scheduleDateId === sd.id),
-    })),
-    entries: enrichedEntries,
-    roles: allRoles,
-    prevScheduleId: prevSchedule?.id ?? null,
-    nextScheduleId: nextSchedule?.id ?? null,
-    holidayConflicts,
-    auditLog: auditLogRows,
-  });
+  return NextResponse.json(detail);
 }
 
 /**

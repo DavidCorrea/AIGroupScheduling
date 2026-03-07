@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { exclusiveGroups } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireGroupAccess, apiError, parseBody } from "@/lib/api-helpers";
-import { exclusiveGroupCreateSchema } from "@/lib/schemas";
+import { exclusiveGroupCreateSchema } from "@/lib/schemas/exclusive-groups";
 
 export async function GET(request: NextRequest) {
   const accessResult = await requireGroupAccess(request);

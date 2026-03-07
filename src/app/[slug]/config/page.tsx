@@ -1,17 +1,15 @@
-"use client";
-
 import Link from "next/link";
-import { useTranslations } from "next-intl";
-import { useGroup } from "@/lib/group-context";
-import LoadingScreen from "@/components/LoadingScreen";
+import { getTranslations } from "next-intl/server";
+import { getGroupForConfigLayout } from "@/lib/config-server";
 
-export default function AdminHome() {
-  const { slug, groupName, loading, error } = useGroup();
-  const tConfig = useTranslations("configHome");
-  const tNav = useTranslations("configNav");
-
-  if (loading) return <LoadingScreen fullPage={false} />;
-  if (error) return <p className="text-sm text-destructive">{tNav("groupNotFound")}</p>;
+export default async function AdminHome({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const group = await getGroupForConfigLayout(slug);
+  const tConfig = await getTranslations("configHome");
 
   const cards = [
     { href: `/${slug}/config/members`, label: tConfig("membersCard"), description: tConfig("membersDesc") },
@@ -27,7 +25,7 @@ export default function AdminHome() {
     <div className="space-y-12">
       <div>
         <h1 className="font-[family-name:var(--font-display)] font-semibold text-3xl sm:text-4xl uppercase">
-          {groupName}
+          {group.name}
         </h1>
         <p className="mt-3 text-muted-foreground">
           {tConfig("subtitle")}

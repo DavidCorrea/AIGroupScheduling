@@ -1,24 +1,20 @@
-"use client";
-
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useTranslations } from "next-intl";
-import { useGroup } from "@/lib/group-context";
-import { useConfigContext } from "@/lib/config-queries";
+import { getTranslations } from "next-intl/server";
+import { getGroupForConfigLayout } from "@/lib/config-server";
+import { loadConfigContextForGroup } from "@/lib/load-config-context";
 import { utcTimeToLocalDisplay } from "@/lib/timezone-utils";
-import LoadingScreen from "@/components/LoadingScreen";
 import { EmptyState } from "@/components/EmptyState";
 
-export default function EventsPage() {
-  const params = useParams();
-  const slug = params.slug as string;
-  const t = useTranslations("events");
-  const { slug: groupSlug } = useGroup();
-  const { days, isLoading } = useConfigContext(slug ?? groupSlug ?? "", ["days"]);
-
-  if (isLoading) {
-    return <LoadingScreen fullPage={false} />;
-  }
+export default async function EventsPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const group = await getGroupForConfigLayout(slug);
+  const ctx = await loadConfigContextForGroup(group.id, { include: ["days"] });
+  const days = ctx?.days ?? [];
+  const t = await getTranslations("events");
 
   return (
     <div className="space-y-12">

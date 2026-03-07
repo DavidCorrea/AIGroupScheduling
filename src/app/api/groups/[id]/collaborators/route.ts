@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { groupCollaborators, groups, users, members } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireAuth, hasGroupAccess, apiError } from "@/lib/api-helpers";
+import { loadGroupCollaborators } from "@/lib/data-access";
 
 export async function GET(
   _request: NextRequest,
@@ -19,32 +20,8 @@ export async function GET(
     return apiError("Forbidden", 403, "FORBIDDEN");
   }
 
-  const collabs = await db
-    .select({
-      id: groupCollaborators.id,
-      userId: groupCollaborators.userId,
-      userName: users.name,
-      userEmail: users.email,
-      userImage: users.image,
-    })
-    .from(groupCollaborators)
-    .innerJoin(users, eq(groupCollaborators.userId, users.id))
-    .where(eq(groupCollaborators.groupId, groupId));
-
-  // Also get the owner info
-  const group = (await db
-    .select({ ownerId: groups.ownerId })
-    .from(groups)
-    .where(eq(groups.id, groupId)))[0];
-
-  const owner = group
-    ? (await db
-        .select({ id: users.id, name: users.name, email: users.email, image: users.image })
-        .from(users)
-        .where(eq(users.id, group.ownerId)))[0]
-    : null;
-
-  return NextResponse.json({ owner, collaborators: collabs });
+  const result = await loadGroupCollaborators(groupId);
+  return NextResponse.json(result);
 }
 
 export async function POST(

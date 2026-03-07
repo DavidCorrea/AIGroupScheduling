@@ -1,53 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { groups, members, recurringEvents, schedules } from "@/db/schema";
-import { eq, count } from "drizzle-orm";
+import { groups } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/api-helpers";
+import { loadAdminGroups } from "@/lib/data-access";
 
 export async function GET(request: NextRequest) {
   const adminResult = await requireAdmin(request);
   if (adminResult.error) return adminResult.error;
 
-  const allGroups = await db
-    .select({
-      id: groups.id,
-      name: groups.name,
-      slug: groups.slug,
-      ownerId: groups.ownerId,
-      calendarExportEnabled: groups.calendarExportEnabled,
-    })
-    .from(groups)
-    .orderBy(groups.name);
-
-  const [memberCounts, scheduleCounts, eventCounts] = await Promise.all([
-    db
-      .select({ groupId: members.groupId, count: count() })
-      .from(members)
-      .groupBy(members.groupId),
-    db
-      .select({ groupId: schedules.groupId, count: count() })
-      .from(schedules)
-      .groupBy(schedules.groupId),
-    db
-      .select({ groupId: recurringEvents.groupId, count: count() })
-      .from(recurringEvents)
-      .groupBy(recurringEvents.groupId),
-  ]);
-
-  const byGroup = (rows: { groupId: number; count: number }[]) =>
-    Object.fromEntries(rows.map((r) => [r.groupId, Number(r.count)]));
-
-  const membersByGroup = byGroup(memberCounts);
-  const schedulesByGroup = byGroup(scheduleCounts);
-  const eventsByGroup = byGroup(eventCounts);
-
-  const result = allGroups.map((g) => ({
-    ...g,
-    membersCount: membersByGroup[g.id] ?? 0,
-    schedulesCount: schedulesByGroup[g.id] ?? 0,
-    eventsCount: eventsByGroup[g.id] ?? 0,
-  }));
-
+  const result = await loadAdminGroups();
   return NextResponse.json(result);
 }
 

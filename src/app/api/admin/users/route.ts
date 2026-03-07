@@ -3,24 +3,13 @@ import { db } from "@/lib/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/api-helpers";
+import { loadAdminUsers } from "@/lib/data-access";
 
 export async function GET(request: NextRequest) {
   const adminResult = await requireAdmin(request);
   if (adminResult.error) return adminResult.error;
 
-  const allUsers = await db
-    .select({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-      image: users.image,
-      isAdmin: users.isAdmin,
-      canCreateGroups: users.canCreateGroups,
-      canExportCalendars: users.canExportCalendars,
-    })
-    .from(users)
-    .orderBy(users.name);
-
+  const allUsers = await loadAdminUsers();
   return NextResponse.json(allUsers);
 }
 

@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { parseBody } from "@/lib/api-helpers";
-import { adminAuthSchema } from "@/lib/schemas";
+import { adminAuthSchema } from "@/lib/schemas/admin";
 import { createBootstrapToken } from "@/lib/admin-bootstrap-token";
 import { checkAdminAuthRateLimit } from "@/lib/rate-limit";
 

@@ -4,7 +4,7 @@ import { scheduleDate, schedules } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireAuth, hasGroupAccess, apiError, parseBody } from "@/lib/api-helpers";
 import { logScheduleAction } from "@/lib/audit-log";
-import { scheduleNoteSchema } from "@/lib/schemas";
+import { scheduleNoteSchema } from "@/lib/schemas/schedule-notes";
 import { revalidateCronograma } from "@/lib/public-schedule";
 
 export async function GET(

@@ -1,59 +1,38 @@
-"use client";
-
-import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
-import { useTranslations } from "next-intl";
-import { useGroup } from "@/lib/group-context";
-import EventForm from "../EventForm";
+import dynamic from "next/dynamic";
+import { getTranslations } from "next-intl/server";
+import { getGroupForConfigLayout } from "@/lib/config-server";
+import { loadConfigContextForGroup } from "@/lib/load-config-context";
+import { ConfigContentSkeleton } from "@/components/Skeletons";
 import BackLink from "@/components/BackLink";
-import LoadingScreen from "@/components/LoadingScreen";
 
-interface Role {
-  id: number;
-  name: string;
-  requiredCount: number;
-  displayOrder: number;
-  dependsOnRoleId: number | null;
-  exclusiveGroupId: number | null;
-}
+const EventForm = dynamic(() => import("../EventForm"), {
+  loading: () => <ConfigContentSkeleton />,
+});
 
-export default function NewEventPage() {
-  const params = useParams();
-  const slug = params.slug as string;
-  const t = useTranslations("events");
-  const { groupId, loading: groupLoading } = useGroup();
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchData = useCallback(async () => {
-    if (!groupId) return;
-    const res = await fetch(`/api/configuration/roles?groupId=${groupId}`);
-    const data = await res.json();
-    setRoles(data);
-    setLoading(false);
-  }, [groupId]);
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      if (!groupId) {
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      fetchData();
-    });
-  }, [groupId, fetchData]);
-
-  if (groupLoading || loading) {
-    return <LoadingScreen fullPage={false} />;
-  }
+export default async function NewEventPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const group = await getGroupForConfigLayout(slug);
+  const t = await getTranslations("events");
+  const ctx = await loadConfigContextForGroup(group.id, { include: ["roles"] });
+  const roles = (ctx?.roles ?? []) as Array<{
+    id: number;
+    name: string;
+    requiredCount: number;
+    displayOrder: number;
+    dependsOnRoleId: number | null;
+    exclusiveGroupId: number | null;
+  }>;
 
   return (
     <div className="space-y-12">
       <BackLink href={`/${slug}/config/events`} label={t("backToEvents")} />
       <EventForm
         slug={slug}
-        groupId={groupId ?? null}
+        groupId={group.id}
         isNew={true}
         initialEvent={null}
         roles={roles}

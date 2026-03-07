@@ -1,9 +1,10 @@
 "use client";
 
 /* eslint-disable react-hooks/preserve-manual-memoization -- Dependencies are derived arrays (e.g. .filter()); compiler flags them as potentially mutable but they are not. */
-import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import React, { useEffect, useState, useMemo, useRef, useCallback, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   formatDateLong,
   formatDateWeekdayDay,
@@ -20,9 +21,12 @@ import {
   groupScheduleDatesByWeek,
 } from "./types";
 import { MonthHeader } from "./MonthHeader";
-import { DateDetailModal } from "./DateDetailModal";
 import { WeekSection } from "./WeekSection";
 import { CalendarGrid } from "./CalendarGrid";
+
+const DateDetailModal = dynamic(
+  () => import("./DateDetailModal").then((m) => ({ default: m.DateDetailModal })),
+);
 
 export type {
   ScheduleEntry,
@@ -48,6 +52,7 @@ export default function SharedScheduleView({
   const t = useTranslations("cronograma");
   const searchParams = useSearchParams();
   const calendarResult = searchParams.get("calendar");
+  const [, startTransition] = useTransition();
   const [filteredMemberId, setFilteredMemberId] = useState<number | null>(null);
   const [filteredRoleId, setFilteredRoleId] = useState<number | null>(null);
   const [today, setToday] = useState("");
@@ -57,6 +62,23 @@ export default function SharedScheduleView({
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const [currentTime, setCurrentTime] = useState(() => Date.now());
+
+  const setFilteredMemberIdTransition = useCallback(
+    (id: number | null) => startTransition(() => setFilteredMemberId(id)),
+    [startTransition],
+  );
+  const setFilteredRoleIdTransition = useCallback(
+    (id: number | null) => startTransition(() => setFilteredRoleId(id)),
+    [startTransition],
+  );
+  const setDayFilterTransition = useCallback(
+    (v: string) => startTransition(() => setDayFilter(v)),
+    [startTransition],
+  );
+  const setViewModeTransition = useCallback(
+    (v: "list" | "calendar") => startTransition(() => setViewMode(v)),
+    [startTransition],
+  );
 
   useEffect(() => {
     queueMicrotask(() => setToday(getTodayISO()));
@@ -399,15 +421,15 @@ export default function SharedScheduleView({
         basePath={basePath}
         t={t}
         filteredMemberId={filteredMemberId}
-        setFilteredMemberId={setFilteredMemberId}
+        setFilteredMemberId={setFilteredMemberIdTransition}
         filteredRoleId={filteredRoleId}
-        setFilteredRoleId={setFilteredRoleId}
+        setFilteredRoleId={setFilteredRoleIdTransition}
         dayFilter={dayFilter}
-        setDayFilter={setDayFilter}
+        setDayFilter={setDayFilterTransition}
         showPastDates={showPastDates}
         setShowPastDates={setShowPastDates}
         viewMode={viewMode}
-        setViewMode={setViewMode}
+        setViewMode={setViewModeTransition}
         mobileFiltersOpen={mobileFiltersOpen}
         setMobileFiltersOpen={setMobileFiltersOpen}
         roleOrder={roleOrder}

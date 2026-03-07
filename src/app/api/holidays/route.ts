@@ -3,16 +3,13 @@ import { db } from "@/lib/db";
 import { holidays } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAuth, apiError } from "@/lib/api-helpers";
+import { loadUserHolidays } from "@/lib/data-access";
 
 export async function GET() {
   const authResult = await requireAuth();
   if (authResult.error) return authResult.error;
 
-  const userHolidays = await db
-    .select()
-    .from(holidays)
-    .where(eq(holidays.userId, authResult.user.id));
-
+  const userHolidays = await loadUserHolidays(authResult.user.id);
   return NextResponse.json(userHolidays);
 }
 

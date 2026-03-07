@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAdmin, parseBody, apiError } from "@/lib/api-helpers";
-import { adminImpersonateSchema } from "@/lib/schemas";
+import { adminImpersonateSchema } from "@/lib/schemas/admin";
 
 /**
  * Start impersonating a user. Session-based admins only (no bootstrap).

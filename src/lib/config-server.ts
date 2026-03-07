@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect, notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { resolveGroupBySlug } from "@/lib/group";
@@ -7,8 +8,10 @@ import { hasGroupAccess } from "@/lib/api-helpers";
  * Resolve group by slug and verify the current user has config access (owner or collaborator).
  * Use in server components under [slug]/config. Redirects to login if unauthenticated;
  * notFound() if group missing or no access.
+ *
+ * Wrapped in React.cache() so the layout and page can both call it without duplicate DB queries.
  */
-export async function getGroupForConfigLayout(slug: string): Promise<{
+export const getGroupForConfigLayout = cache(async function getGroupForConfigLayout(slug: string): Promise<{
   id: number;
   name: string;
   slug: string;
@@ -29,4 +32,4 @@ export async function getGroupForConfigLayout(slug: string): Promise<{
   }
 
   return { id: group.id, name: group.name, slug: group.slug };
-}
+});

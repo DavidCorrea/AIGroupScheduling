@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { groups, groupCollaborators, members, users, recurringEvents, weekdays, roles } from "@/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { groups, groupCollaborators, users, recurringEvents, weekdays, roles } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { requireAuth, hasGroupAccess, apiError, parseBody } from "@/lib/api-helpers";
-import { groupCreateSchema } from "@/lib/schemas";
+import { groupCreateSchema } from "@/lib/schemas/groups";
+import { loadUserGroups } from "@/lib/data-access";
 
 export async function GET(request: NextRequest) {
   const authResult = await requireAuth();
@@ -31,52 +32,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(group);
   }
 
-  // Get groups the user owns
-  const ownedGroups = await db
-    .select({ id: groups.id })
-    .from(groups)
-    .where(eq(groups.ownerId, userId));
-
-  // Get groups the user collaborates on
-  const collabGroups = await db
-    .select({ groupId: groupCollaborators.groupId })
-    .from(groupCollaborators)
-    .where(eq(groupCollaborators.userId, userId));
-
-  // Get groups the user is a member of
-  const memberGroups = await db
-    .select({ groupId: members.groupId })
-    .from(members)
-    .where(eq(members.userId, userId));
-
-  const groupIds = [
-    ...new Set([
-      ...ownedGroups.map((g) => g.id),
-      ...collabGroups.map((g) => g.groupId),
-      ...memberGroups.map((g) => g.groupId),
-    ]),
-  ];
-
-  if (groupIds.length === 0) {
-    return NextResponse.json([]);
-  }
-
-  const allGroups = await db
-    .select()
-    .from(groups)
-    .where(inArray(groups.id, groupIds))
-    .orderBy(groups.name);
-
-  // Annotate each group with the user's role
-  const result = allGroups.map((g) => ({
-    ...g,
-    role: g.ownerId === userId
-      ? "owner"
-      : collabGroups.some((c) => c.groupId === g.id)
-        ? "collaborator"
-        : "member",
-  }));
-
+  const result = await loadUserGroups(userId);
   return NextResponse.json(result);
 }
 

@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import { members, memberRoles, memberAvailability, users, scheduleDateAssignments } from "@/db/schema";
 import { eq, and, ne } from "drizzle-orm";
 import { requireAuth, hasGroupAccess, apiError, parseBody } from "@/lib/api-helpers";
-import { memberUpdateSchema } from "@/lib/schemas";
+import { memberUpdateSchema } from "@/lib/schemas/members";
+import { loadMemberById } from "@/lib/data-access";
 
 function normalizeHHMM(v: unknown): string | null {
   if (v == null) return null;
@@ -25,21 +26,7 @@ export async function GET(
   const { id } = await params;
   const memberId = parseInt(id, 10);
 
-  const member = (await db
-    .select({
-      id: members.id,
-      name: members.name,
-      memberEmail: members.email,
-      userId: members.userId,
-      groupId: members.groupId,
-      userEmail: users.email,
-      userImage: users.image,
-      userName: users.name,
-    })
-    .from(members)
-    .leftJoin(users, eq(members.userId, users.id))
-    .where(eq(members.id, memberId)))[0];
-
+  const member = await loadMemberById(memberId);
   if (!member) {
     return apiError("Miembro no encontrado", 404, "NOT_FOUND");
   }
@@ -49,37 +36,7 @@ export async function GET(
     return apiError("Forbidden", 403, "FORBIDDEN");
   }
 
-  const roles = await db
-    .select()
-    .from(memberRoles)
-    .where(eq(memberRoles.memberId, memberId));
-
-  const availability = await db
-    .select({
-      weekdayId: memberAvailability.weekdayId,
-      startTimeUtc: memberAvailability.startTimeUtc,
-      endTimeUtc: memberAvailability.endTimeUtc,
-    })
-    .from(memberAvailability)
-    .where(eq(memberAvailability.memberId, memberId));
-
-  return NextResponse.json({
-    id: member.id,
-    name: member.name,
-    memberEmail: member.memberEmail,
-    userId: member.userId,
-    groupId: member.groupId,
-    email: member.userEmail,
-    image: member.userImage,
-    userName: member.userName,
-    roleIds: roles.map((r) => r.roleId),
-    availability: availability.map((a) => ({
-      weekdayId: a.weekdayId,
-      startTimeUtc: a.startTimeUtc ?? "00:00",
-      endTimeUtc: a.endTimeUtc ?? "23:59",
-    })),
-    availableDayIds: [...new Set(availability.map((a) => a.weekdayId))],
-  });
+  return NextResponse.json(member);
 }
 
 export async function PUT(

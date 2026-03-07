@@ -1,25 +1,19 @@
-"use client";
-
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useTranslations } from "next-intl";
-import { useGroup } from "@/lib/group-context";
-import { useConfigContext } from "@/lib/config-queries";
-import LoadingScreen from "@/components/LoadingScreen";
+import { getTranslations } from "next-intl/server";
+import { getGroupForConfigLayout } from "@/lib/config-server";
+import { loadConfigContextForGroup } from "@/lib/load-config-context";
 import { EmptyState } from "@/components/EmptyState";
 
-export default function MembersPage() {
-  const params = useParams();
-  const slug = params.slug as string;
-  const t = useTranslations("members");
-  const { slug: groupSlug } = useGroup();
-  const { members, isLoading } = useConfigContext(slug ?? groupSlug ?? "", ["members"]);
-
-  if (isLoading) {
-    return <LoadingScreen fullPage={false} />;
-  }
-
-  const slugOrFallback = slug ?? groupSlug ?? "";
+export default async function MembersPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const group = await getGroupForConfigLayout(slug);
+  const ctx = await loadConfigContextForGroup(group.id, { include: ["members"] });
+  const members = ctx?.members ?? [];
+  const t = await getTranslations("members");
 
   return (
     <div className="space-y-12">
@@ -40,12 +34,12 @@ export default function MembersPage() {
           <EmptyState
             message={t("emptyMessage")}
             ctaLabel={t("addMember")}
-            ctaHref={`/${slugOrFallback}/config/members/new`}
+            ctaHref={`/${slug}/config/members/new`}
           />
         ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Link
-            href={`/${slugOrFallback}/config/members/new`}
+            href={`/${slug}/config/members/new`}
             className="rounded-lg border border-dashed border-border p-4 flex items-center justify-center h-20 text-sm font-medium text-muted-foreground hover:border-foreground hover:text-foreground transition-colors uppercase"
           >
             {t("addMember")}
@@ -53,7 +47,7 @@ export default function MembersPage() {
           {members.map((member) => (
             <Link
               key={member.id}
-              href={`/${slugOrFallback}/config/members/${member.id}`}
+              href={`/${slug}/config/members/${member.id}`}
               className="rounded-lg border border-border bg-card p-4 flex flex-col justify-center gap-3 h-20 hover:border-foreground transition-colors"
             >
               <div className="flex items-center gap-3 min-w-0">
