@@ -18,6 +18,8 @@ This plan groups improvements into themes. Each theme can be implemented indepen
 |--------|----------------------|
 | Security | `src/lib/schemas/`, `src/lib/api-helpers.ts`, routes under `src/app/api/` |
 | §1 Library usage | `src/app/layout.tsx`, `src/i18n/request.ts`, `src/app/page.tsx`, `src/app/admin/page.tsx`, `src/app/settings/page.tsx`, `src/app/asignaciones/page.tsx`, `src/app/[slug]/config/holidays/page.tsx`, `src/app/[slug]/config/collaborators/page.tsx`, `src/app/[slug]/cronograma/[year]/[month]/page.tsx`, `src/lib/group-context.tsx`, `src/lib/config-queries.ts`, `src/components/SharedScheduleView/index.tsx`, `package.json` |
+| §1 React anti-patterns | `src/app/[slug]/config/roles/new/page.tsx`, `src/app/[slug]/config/roles/[id]/page.tsx`, `src/app/[slug]/config/events/EventForm.tsx`, `src/app/[slug]/config/schedules/page.tsx`, `src/app/[slug]/config/schedules/[id]/page.tsx`, `src/components/SharedScheduleView/index.tsx`, `src/app/asignaciones/page.tsx`, `src/components/ConfigGoTo.tsx`, `messages/es.json` |
+| §1 Next.js hardening | All `route.ts` under `src/app/api/` (GET handlers) |
 | §2 Accessibility | `src/app/layout.tsx`, `src/components/AppNavBar.tsx`, `src/components/SharedScheduleView/`, `messages/es.json` |
 | §3 Performance | `src/lib/public-schedule.ts`, `src/components/SharedScheduleView/` |
 | §4 Client data/forms | `src/lib/schemas/`, `src/lib/api-helpers.ts`, forms under `src/app/[slug]/config/` |
@@ -83,13 +85,20 @@ Usage is appropriate: `enableOnFormTags: false` where shortcuts should not fire 
 **Zod** — No change needed. **Auth.js** — No change needed. **Radix UI Dialog** — No change needed. **Drizzle ORM** — No change needed.
 
 **Server/client component boundaries**  
-Several pages are entirely `"use client"` and fetch data with `useEffect` + `fetch`, but could benefit from being server components that fetch data on the server and pass it to smaller client children (faster initial renders, smaller JS bundles, no client-side fetch waterfall). Key candidates:
+All 20 `page.tsx` files with routes are `"use client"`. Several fetch data with `useEffect` + `fetch` and could benefit from being server components that fetch on the server and pass data to smaller client children (faster initial renders, smaller JS bundles, no client-side fetch waterfall). The React skill says: *"Push the `"use client"` boundary as deep as possible."*
 
+Best candidates (highest impact, page has significant static content or server-fetchable data):
+
+- **Login** (`src/app/login/page.tsx`): only needs a small `SignInButton` client component.
 - **Home page** (`src/app/page.tsx`, ~320 lines): server page fetches groups and dashboard, passes to a `DashboardClient` component for calendar, modal, and interactivity.
 - **Cronograma** (`src/app/[slug]/cronograma/[year]/[month]/page.tsx`): server page fetches schedule data, passes to `SharedScheduleView` (already client).
 - **Settings** (`src/app/settings/page.tsx`): server page fetches holidays, passes to client for form interaction.
+- **Config home** (`src/app/[slug]/config/page.tsx`): only uses `useGroup()` for the slug; mostly static Link cards.
+- **Config list pages** (members, events): primarily read from context and render links.
 
-Config pages are correctly client because they use `useConfigContext` (TanStack Query) with view-scoped `include` — no change needed there. The config layout is already server with `getGroupForConfigLayout`, which is the right pattern.
+Other config form/detail pages (roles/new, roles/[id], members/new, members/[id], events/new, events/[id], schedules, schedules/[id], holidays, collaborators) and user pages (admin, admin/login, groups/new, asignaciones) are heavily interactive but could still follow the pattern of a server page rendering a `*PageClient` or `*FormClient` child.
+
+Config pages that use `useConfigContext` (TanStack Query) with view-scoped `include` are correctly client — no change needed there. The config layout is already server with `getGroupForConfigLayout`, which is the right pattern.
 
 - **Where to look:** Pages listed above; `src/app/[slug]/config/layout.tsx` for the reference pattern (server layout + client shell). **Done when:** Target pages are server components that fetch data and render a client child with props; no `useEffect` + `fetch` waterfall on mount.
 
@@ -112,6 +121,54 @@ SharedScheduleView is the largest client component. It already delegates to sub-
 `ConfigContextData` shape is defined in both `src/lib/group-context.tsx` and `src/lib/config-queries.ts`. Not a runtime issue, but types can drift. Define the canonical type in one place (e.g. `config-queries.ts`) and import from both.
 
 - **Where to look:** `src/lib/group-context.tsx`, `src/lib/config-queries.ts`. **Done when:** One shared type; no drift risk.
+
+**React anti-pattern: `useEffect` syncing props/derived values into state**  
+The React skill says: *"Don't use `useEffect` to mirror props or context into state. The pattern `useEffect(() => setX(prop), [prop])` is almost always a mistake — just use the prop directly or compute from it."* Seven instances found:
+
+| File | Pattern | Fix |
+|------|---------|-----|
+| `src/app/[slug]/config/roles/new/page.tsx` (76–78) | `useEffect(() => { setDirty(dirty); }, [dirty, setDirty])` | Refactor dirty tracking (see below) |
+| `src/app/[slug]/config/roles/[id]/page.tsx` (153–155) | Same `setDirty(dirty)` bridge | Same |
+| `src/app/[slug]/config/events/EventForm.tsx` (210–212) | Same `setDirty(dirty)` bridge | Same |
+| `src/app/[slug]/config/schedules/page.tsx` (296–298) | `useEffect(() => { setDirty(orderDirty); }, ...)` | Same |
+| `src/app/[slug]/config/schedules/page.tsx` (277–281) | Syncs `sortedRoles` from context into local state | Derive or use context value directly |
+| `src/app/[slug]/config/events/EventForm.tsx` (223–225) | Syncs `type` prop into `active` state | Derive: `const active = type === "for_everyone" ? true : activeState` |
+| `src/components/SharedScheduleView/index.tsx` (71–73) | Resets modal state when `filteredMemberId` changes | Use `key={filteredMemberId}` on the component to reset state, or derive |
+
+The `setDirty` bridge pattern (4 of 7) is systemic: each form computes a local `dirty` boolean and syncs it to `UnsavedConfigProvider` via effect. Fix by having `UnsavedConfigProvider` accept a compute function or by lifting dirty-checking into the provider. The `ConfigLayoutInner.tsx` (27–31) route-change reset (`setDirty(false)` when pathname changes) is borderline but could also be handled by the provider.
+
+- **Where to look:** Files listed above; `src/lib/unsaved-config-context.tsx` or wherever `UnsavedConfigProvider` is defined. **Done when:** No `useEffect(() => setX(prop), [prop])` pattern; dirty tracking is driven by the provider or by derivation during render.
+
+**React anti-pattern: index as key in dynamic lists**  
+The React skill says: *"Do not use array index when the list can be reordered, filtered, or items added/removed."* Four violations found in dynamic data rendered from API responses:
+
+| File | Key expression | Fix |
+|------|---------------|-----|
+| `src/app/page.tsx` (388) | `key={idx}` on conflict timespans | Use composite: `` `${ts.startUtc}-${ts.endUtc}-${ts.groupNames.join()}` `` |
+| `src/app/asignaciones/page.tsx` (224) | `key={...-${i}}` appends index to composite | Drop the `i`; the composite fields should be unique |
+| `src/app/[slug]/config/schedules/[id]/page.tsx` (1090) | `key={...-${i}}` on audit log changes | Use a unique composite without index, or an audit change ID |
+| `src/app/[slug]/config/schedules/[id]/page.tsx` (1104) | `key={...-${i}}` on audit log added entries | Same |
+
+~12 other `key={i}` uses are acceptable (skeleton placeholders, static month lists, fixed-length grids — per the skill, "index only for static, non-reordered lists").
+
+- **Where to look:** Files listed above. **Done when:** All dynamic list keys use stable IDs or unique composite keys; no index in keys for API data.
+
+**Hardcoded Spanish strings (bypassing next-intl)**  
+The React skill says: *"All user-facing text via next-intl. No hardcoded Spanish strings in components."* Several visible UI strings bypass `t()`:
+
+| String | File | Fix |
+|--------|------|-----|
+| `"Ensayo"`, `"Evento"` (fallback labels) | `src/app/[slug]/config/schedules/[id]/page.tsx` (lines 185, 339, 888, 1006) | Add `scheduleDetail.defaultForEveryoneLabel` / `defaultEventLabel` keys |
+| `"Evento"` (fallback) | `src/components/ConfigGoTo.tsx` (57) | Use `t("defaultEventLabel")` |
+| `"este usuario"`, `"este grupo"` | `src/app/admin/page.tsx` (313, 322) | Add `admin.thisUser` / `admin.thisGroup` keys |
+| `["lunes","martes",...]` (weekday sort order) | `src/components/SharedScheduleView/index.tsx` (188–196) | Use translated weekday names or a dedicated key |
+
+- **Where to look:** Files listed above; `messages/es.json` for existing keys and adding new ones. **Done when:** All user-facing text goes through `t()`; no hardcoded Spanish strings in components.
+
+**GET route handlers: explicit `dynamic`**  
+The Next.js skill notes that GET route handlers are static by default (cached at build time). All current GET handlers are implicitly dynamic because they read `request` or call `requireAuth()` (which reads cookies), so there is no runtime bug. However, no handler explicitly declares `export const dynamic = 'force-dynamic'`. Adding the explicit declaration protects against accidental regressions (e.g. if someone refactors auth out of a handler, the route could silently become static and return stale data).
+
+- **Where to look:** All `route.ts` files under `src/app/api/` that export a GET function. **Done when:** Each GET handler that does auth or DB access has `export const dynamic = 'force-dynamic'`.
 
 ---
 
@@ -361,12 +418,12 @@ Use consistent wording and icons for the three sources (cross-group, holiday, av
 
 ## Suggested order of implementation
 
-- **Library standards (§1):** Address TanStack Query on all manual-fetch pages (home, admin, settings, asignaciones, holidays, collaborators, cronograma). Push server/client boundaries down (home, cronograma, settings pages). Decompose large page components. Deduplicate shared types.
+- **Library standards (§1):** Address TanStack Query on all manual-fetch pages (home, admin, settings, asignaciones, holidays, collaborators, cronograma). Push server/client boundaries down (login, home, cronograma, settings, config home, config list pages — all 20 page.tsx files are candidates). Fix React anti-patterns: remove `useEffect`-syncing-props-into-state (especially the `setDirty` bridge pattern), fix index-as-key on 4 dynamic lists, move hardcoded Spanish strings to `messages/es.json`. Add explicit `dynamic` to GET route handlers. Decompose large page components. Deduplicate shared types.
 - **Phase 2 (A11y and perf):** Skip link + landmarks, cronograma grid semantics, cache public API.
 - **Phase 3 (Product and ops):** Draft/published docs, guided setup + My assignments, shared forms, audit log + export, E2E + seed.
 - **§11 Simpler usage and new features:** Pick items from section 11 (e.g. persist Mis asignaciones filters, copy from previous month, iCal/PDF export, balance report) as product priorities; no hard dependency on earlier phases. For **conflicts and availability** (§11), start with “Revalidar cronograma” (holiday + availability) and cross-group warn-when-assigning; then make conflicts actionable and add availability conflict detection.
 
-*Loading, errors, empty states, and unsaved banner (formerly Phase 1) are done. Hardcoded copy (§2) is done. Server group resolution (formerly Phase 1) is done. prefers-color-scheme (§9) is done. All original Security items are done (only "Inconsistent request body validation" remains). Seeded big group (§8) is done. Slug in URL for config (§7) is done. See AGENTS.md Features.*
+*Loading, errors, empty states, and unsaved banner (formerly Phase 1) are done. Hardcoded copy (§2) is done. Server group resolution (formerly Phase 1) is done. prefers-color-scheme (§9) is done. All original Security items are done (only "Inconsistent request body validation" remains). Seeded big group (§8) is done. Slug in URL for config (§7) is done. See AGENTS.md Features. React/Next.js skill audit (March 2026): no violations for params awaiting, redirect in try/catch, server-to-API fetching, or useEffect cleanup. Findings added to §1: useEffect syncing state (7), index keys (4), hardcoded strings (~8), all pages "use client" (20), GET handlers missing explicit dynamic.*
 
 You can implement individual items out of order (e.g. skip link and cache before server resolution) where there are no hard dependencies. When adding libraries, install only those needed for the phase (e.g. Phase 2: Radix or focus-trap-react; Phase 3: React Hook Form, @hookform/resolvers, Playwright, googleapis, @react-pdf/renderer as needed).
 
