@@ -55,3 +55,44 @@ export interface SchedulerOutput {
   /** Slots that could not be filled due to insufficient eligible members */
   unfilledSlots: { date: string; roleId: number }[];
 }
+
+// ---------------------------------------------------------------------------
+// Group-level scheduling (multi-event orchestration)
+// ---------------------------------------------------------------------------
+
+export interface RecurringEventConfig {
+  id: number;
+  weekdayName: string;
+  type: "assignable" | "for_everyone";
+  label: string;
+  startTimeUtc: string;
+  endTimeUtc: string;
+  rolePriorities: Record<number, number>;
+}
+
+export interface ScheduleDateOutput {
+  date: string;
+  type: "assignable" | "for_everyone";
+  label: string;
+  recurringEventId: number;
+  startTimeUtc: string;
+  endTimeUtc: string;
+}
+
+export interface EventAssignment extends ScheduleAssignment {
+  recurringEventId: number;
+}
+
+export interface GroupScheduleInput {
+  dates: string[];
+  events: RecurringEventConfig[];
+  roles: RoleDefinition[];
+  members: MemberInfo[];
+  previousAssignments?: ScheduleAssignment[];
+}
+
+export interface GroupScheduleResult {
+  scheduleDates: ScheduleDateOutput[];
+  assignments: EventAssignment[];
+  unfilledSlots: { date: string; roleId: number; recurringEventId: number }[];
+}

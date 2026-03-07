@@ -28,7 +28,7 @@ This file is the single source for product behaviour, scripts, migrations, and a
 | App & components | `src/app/`, `src/components/` — map in **docs/CLIENT.md** |
 | Copy (Spanish) | `messages/es.json` — next-intl; client: `useTranslations('namespace')`, `t('key')`, `t('key', { n })` for placeholders |
 | Lint | `eslint.config.mjs`; pre-commit: `.husky/pre-commit` (lint-staged) |
-| Tests | `spec/` — Jest; describe real scenarios, no technical jargon |
+| Tests | `spec/` — Jest; model code must have exhaustive tests; see model-testing rule |
 | Cursor rules | `.cursor/rules/` — workflow, lint, API, DB, UI, testing (always-applied + file-scoped) |
 | Library skills | `.cursor/skills/` — read before changing usage of listed libraries (see Library skills section) |
 
@@ -112,7 +112,7 @@ Skills: `next-auth`, `next-intl`, `react`, `tanstack-react-query`, `drizzle-orm`
 - **TypeScript:** **`.cursor/skills/typescript/SKILL.md`** — strict mode, interface vs type, path alias `@/*`, avoid `any`, Zod-inferred types. Use when adding or changing types or tsconfig.
 - **CONTEXT.md** in key folders (`src/`, `src/app/`, `src/app/api/`, `src/app/api/configuration/`, `src/app/[slug]/config/`, `src/components/`, `src/db/`, `src/lib/`, `spec/`, `docs/`) describe what belongs there and point to docs. Read these before broad searches. New domain or top-level folders get a `CONTEXT.md`. See "Codebase context" above.
 ## Cursor rules (project conventions)
-- **`.cursor/rules/`** contains `.mdc` rules that encode project conventions for the AI: workflow and done criteria, when-you-begin/context, domain-glossary-ask, skills-creation-usage, database and migrations, API conventions, UI/copy/i18n, destructive actions and ConfirmDialog, lint and Git, testing, security (passwords). Always-applied rules: workflow, when-you-begin, lint-and-git, domain-glossary-ask, skills-creation-usage. File-scoped rules apply when matching files are open (see each rule's `globs`). See "Conventions" and "Workflow" in this file for the full text.
+- **`.cursor/rules/`** contains `.mdc` rules that encode project conventions for the AI: workflow and done criteria, when-you-begin/context, domain-glossary-ask, skills-creation-usage, database and migrations, API conventions, UI/copy/i18n, destructive actions and ConfirmDialog, lint and Git, model-boundary, model-testing, security (passwords). Always-applied rules: workflow, when-you-begin, lint-and-git, domain-glossary-ask, skills-creation-usage, model-boundary, model-testing. File-scoped rules apply when matching files are open (see each rule's `globs`). See "Conventions" and "Workflow" in this file for the full text.
 
 - **Guardar en calendario**: On **Mis asignaciones** (`/asignaciones`). Button shown only when (1) user has **canExportCalendars** (set by **admin** in Admin → Usuarios; user cannot change it) and (2) current filter includes at least one assignment from a group with **calendarExportEnabled** (Admin → Grupos). GET `/api/user/assignments/google-calendar` (optional `?groupId=&year=&month=`) → Google OAuth → callback inserts **session user's** assignment dates (never state.userId) into primary Google Calendar. (one all-day event per date, description = "Roles: Role1, Role2"). Only assignments from groups with calendarExportEnabled are included. Redirect to `/asignaciones?calendar=success|error`. Routes: `src/app/api/user/assignments/google-calendar/route.ts`, `src/app/api/auth/callback/google-calendar/route.ts`. Optional legacy flow: public cronograma `.../google-calendar?memberId=` still supported for one member's month (same callback, different state shape).
 
@@ -170,9 +170,12 @@ Skills: `next-auth`, `next-intl`, `react`, `tanstack-react-query`, `drizzle-orm`
 - User-scoped: `/settings`, API `GET/POST/DELETE /api/holidays`. Member-scoped: `/:slug/config/holidays`, API `GET/POST/DELETE /api/configuration/holidays?groupId=N`. Group holidays page shows both (user read-only, member editable). Scheduler: linked members = user + member holidays; unlinked = member only.
 
 ## Schedule generation algorithm
-- `src/lib/scheduler.ts`, types in `src/lib/scheduler.types.ts`. Input: dates, roles (required counts), members (roles, availability, holidays).
+- **Model layer:** `src/lib/schedule-model.ts` — `generateGroupSchedule` orchestrates multi-event-per-day scheduling. Pure function; no DB access. Calls the low-level `generateSchedule` (`src/lib/scheduler.ts`) per event per date, chaining assignments so exclusive-group constraints carry over across events on the same date.
+- **Low-level scheduler:** `src/lib/scheduler.ts`, types in `src/lib/scheduler.types.ts`. Input: dates, roles (required counts), members (roles, availability, holidays). Single-event round-robin with per-day-of-week pointers.
+- **Config loader:** `loadScheduleConfig` (`src/lib/schedule-helpers.ts`) returns all active `RecurringEventConfig[]` (multiple per weekday) with per-event role priorities. No domain logic — pure data fetcher.
+- **API routes and seed:** Thin wrappers — auth + validate + call `generateGroupSchedule` + persist. No scheduling logic in routes.
 - **Full algorithm description:** **docs/SCHEDULE_ALGORITHM.md** (round-robin, eligibility, priorities, exclusive groups, time window, dependent roles).
-- Round-robin with per-day-of-week pointers; event time window filters eligible members; role dependencies = manual selection; exclusive role groups = same member can't get same-exclusive-group roles same date; day role priorities (event_role_priorities) order fill.
+- **Test suite:** `spec/schedule-model.spec.ts` — exhaustive tests for all 40 SCHEDULE_ALGORITHM.md scenarios covering eligibility, role-priority, exclusive groups, cross-event state, and month continuity.
 
 ## Member management
 - Members: group, name, optional email, optional user_id. Linked → user holidays + dashboard. API: `GET/POST /api/members?groupId=N`, `GET/PUT/DELETE /api/members/[id]`. Members list (config context and GET members) uses batched queries: one for members+users, one for all member_roles, one for all member_availability (no N+1).
@@ -219,7 +222,7 @@ Skills: `next-auth`, `next-intl`, `react`, `tanstack-react-query`, `drizzle-orm`
 
 **Code style** — Clean code. No changes without confirmation; explain changes first.
 
-**Testing** — Jest in `spec/`. TDD for new features. Test descriptions = real scenarios, no technical terms.
+**Testing** — Jest in `spec/`. TDD for new features. Test descriptions = real scenarios, no technical terms. **Model code must have exhaustive tests:** read the test file before changing a model module; update tests for every affected scenario; all tests must pass. See model → test mapping in `.cursor/rules/testing.mdc`.
 
 **Security** — Passwords: never plain text. Store with **bcrypt**, unique random salt (stored with hash). Verify by hashing attempt with stored salt and comparing.
 

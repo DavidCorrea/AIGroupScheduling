@@ -976,3 +976,835 @@ describe("Schedule generation", () => {
     });
   });
 });
+
+/**
+ * Tests for all 40 scheduling algorithm scenarios.
+ * Setup: two users (Coni, Dani), two groups (CCMDV, Iglesia Central),
+ * multiple concurrent events with time windows, exclusive groups, and cross-month continuity.
+ *
+ * Scenarios 19, 22 require cross-event exclusive-group tracking on the same date
+ * (not currently supported by the scheduler which processes one event per call).
+ */
+describe("Scheduling algorithm scenarios", () => {
+  const CANTANTES: RoleDefinition = { id: 1, name: "Cantantes", requiredCount: 4 };
+  const MUSICOS: RoleDefinition = { id: 2, name: "Músicos", requiredCount: 2 };
+  const CANTANTES_EX: RoleDefinition = { ...CANTANTES, exclusiveGroupId: 1 };
+  const MUSICOS_EX: RoleDefinition = { ...MUSICOS, exclusiveGroupId: 1 };
+  const ADORACION: RoleDefinition = { id: 3, name: "Adoración", requiredCount: 2 };
+
+  const coniG1: MemberInfo = {
+    id: 1,
+    name: "Coni",
+    roleIds: [1],
+    availableDays: ["Domingo"],
+    holidays: [{ startDate: "2026-01-15", endDate: "2026-01-31" }],
+    availabilityBlocksByDay: {
+      Domingo: [{ startUtc: "09:00", endUtc: "13:00" }],
+    },
+  };
+
+  const daniG1: MemberInfo = {
+    id: 2,
+    name: "Dani",
+    roleIds: [1, 2],
+    availableDays: ["Domingo", "Miércoles"],
+    holidays: [],
+    availabilityBlocksByDay: {
+      Domingo: [{ startUtc: "09:00", endUtc: "21:00" }],
+      Miércoles: [{ startUtc: "18:00", endUtc: "21:00" }],
+    },
+  };
+
+  const coniG2: MemberInfo = {
+    id: 1,
+    name: "Coni",
+    roleIds: [3],
+    availableDays: ["Miércoles", "Domingo"],
+    holidays: [{ startDate: "2026-01-15", endDate: "2026-01-31" }],
+    availabilityBlocksByDay: {
+      Miércoles: [{ startUtc: "18:00", endUtc: "21:00" }],
+      Domingo: [{ startUtc: "08:00", endUtc: "17:00" }],
+    },
+  };
+
+  const CULTO_DIA_TW = { Domingo: { startUtc: "09:00", endUtc: "13:00" } };
+  const CULTO_NOCHE_TW = { Domingo: { startUtc: "19:00", endUtc: "21:00" } };
+  const REUNION_AM_TW = { Domingo: { startUtc: "10:00", endUtc: "12:00" } };
+
+  const CULTO_DIA_PRIO = { Domingo: { 2: 0, 1: 1 } };
+  const CULTO_NOCHE_PRIO = { Domingo: { 1: 0, 2: 1 } };
+
+  const SUN_0104 = "2026-01-04";
+  const SUN_0111 = "2026-01-11";
+  const SUN_0118 = "2026-01-18";
+  const SUN_0125 = "2026-01-25";
+  const WED_0107 = "2026-01-07";
+  const WED_0121 = "2026-01-21";
+  const JAN_SUNDAYS = [SUN_0104, SUN_0111, SUN_0118, SUN_0125];
+
+  const SUN_0201 = "2026-02-01";
+  const SUN_0208 = "2026-02-08";
+  const SUN_0215 = "2026-02-15";
+  const SUN_0222 = "2026-02-22";
+  const FEB_SUNDAYS = [SUN_0201, SUN_0208, SUN_0215, SUN_0222];
+
+  describe("Eligibility (scenarios 1–9)", () => {
+    it("#1 member with matching role, no holidays, and availability that matches event time is eligible", () => {
+      const result = generateSchedule({
+        dates: [SUN_0104],
+        roles: [{ ...CANTANTES, requiredCount: 1 }],
+        members: [coniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+      });
+      expect(result.assignments).toEqual([
+        { date: SUN_0104, roleId: 1, memberId: 1 },
+      ]);
+    });
+
+    it("#2 member whose availability is wider than the event window is still eligible", () => {
+      const result = generateSchedule({
+        dates: [SUN_0104],
+        roles: [{ ...CANTANTES, requiredCount: 1 }],
+        members: [daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+      });
+      expect(result.assignments).toEqual([
+        { date: SUN_0104, roleId: 1, memberId: 2 },
+      ]);
+    });
+
+    it("#3 member holding multiple roles gets assigned to each of them", () => {
+      const result = generateSchedule({
+        dates: [SUN_0104],
+        roles: [
+          { ...CANTANTES, requiredCount: 1 },
+          { ...MUSICOS, requiredCount: 1 },
+        ],
+        members: [daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+        dayRolePriorities: CULTO_DIA_PRIO,
+      });
+      const roleIds = result.assignments.map((a) => a.roleId).sort();
+      expect(roleIds).toEqual([1, 2]);
+      expect(result.assignments.every((a) => a.memberId === 2)).toBe(true);
+    });
+
+    it("#4 member with no holidays is eligible for every date their availability covers", () => {
+      const result = generateSchedule({
+        dates: JAN_SUNDAYS,
+        roles: [{ ...CANTANTES, requiredCount: 1 }],
+        members: [daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+      });
+      expect(result.assignments).toHaveLength(4);
+      expect(result.assignments.every((a) => a.memberId === 2)).toBe(true);
+    });
+
+    it("#5 member with no availability on a day of the week is not eligible for that day", () => {
+      const result = generateSchedule({
+        dates: [WED_0107],
+        roles: [{ ...CANTANTES, requiredCount: 1 }],
+        members: [coniG1],
+      });
+      expect(result.assignments).toEqual([]);
+      expect(result.unfilledSlots).toEqual([{ date: WED_0107, roleId: 1 }]);
+    });
+
+    it("#6 member available on the day but outside the event time window is not eligible", () => {
+      const result = generateSchedule({
+        dates: [SUN_0104],
+        roles: [{ ...CANTANTES, requiredCount: 1 }],
+        members: [coniG1],
+        dayEventTimeWindow: CULTO_NOCHE_TW,
+      });
+      expect(result.assignments).toEqual([]);
+      expect(result.unfilledSlots).toEqual([{ date: SUN_0104, roleId: 1 }]);
+    });
+
+    it("#7 member on holidays is not eligible even when their availability matches the event", () => {
+      const result = generateSchedule({
+        dates: [SUN_0118],
+        roles: [{ ...CANTANTES, requiredCount: 1 }],
+        members: [coniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+      });
+      expect(result.assignments).toEqual([]);
+      expect(result.unfilledSlots).toEqual([{ date: SUN_0118, roleId: 1 }]);
+    });
+
+    it("#8 member on holidays with no availability on that day is doubly ineligible", () => {
+      const result = generateSchedule({
+        dates: [WED_0121],
+        roles: [{ ...CANTANTES, requiredCount: 1 }],
+        members: [coniG1],
+      });
+      expect(result.assignments).toEqual([]);
+      expect(result.unfilledSlots).toEqual([{ date: WED_0121, roleId: 1 }]);
+    });
+
+    it("#9 member on holidays with wrong time availability is not eligible", () => {
+      const result = generateSchedule({
+        dates: [SUN_0118],
+        roles: [{ ...CANTANTES, requiredCount: 1 }],
+        members: [coniG1],
+        dayEventTimeWindow: CULTO_NOCHE_TW,
+      });
+      expect(result.assignments).toEqual([]);
+      expect(result.unfilledSlots).toEqual([{ date: SUN_0118, roleId: 1 }]);
+    });
+  });
+
+  describe("Role-priority assignment without exclusive groups (scenarios 10–17)", () => {
+    it("#10 sole member with a role always fills it when eligible", () => {
+      const result = generateSchedule({
+        dates: JAN_SUNDAYS,
+        roles: [{ ...MUSICOS, requiredCount: 1 }],
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+      });
+      expect(result.assignments).toHaveLength(4);
+      expect(result.assignments.every((a) => a.memberId === 2)).toBe(true);
+    });
+
+    it("#11 member with multiple roles and no exclusive group gets assigned to all of them", () => {
+      const result = generateSchedule({
+        dates: [SUN_0104],
+        roles: [MUSICOS, CANTANTES],
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+        dayRolePriorities: CULTO_DIA_PRIO,
+      });
+      const daniRoles = result.assignments
+        .filter((a) => a.memberId === 2)
+        .map((a) => a.roleId)
+        .sort();
+      expect(daniRoles).toEqual([1, 2]);
+    });
+
+    it("#12 two eligible members are both assigned when max count is not reached", () => {
+      const result = generateSchedule({
+        dates: [SUN_0104],
+        roles: [CANTANTES],
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+      });
+      const memberIds = result.assignments.map((a) => a.memberId).sort();
+      expect(memberIds).toEqual([1, 2]);
+    });
+
+    it("#13 only eligible member for an event gets all their applicable roles", () => {
+      const result = generateSchedule({
+        dates: [SUN_0104],
+        roles: [
+          { ...CANTANTES, requiredCount: 1 },
+          { ...MUSICOS, requiredCount: 1 },
+        ],
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_NOCHE_TW,
+        dayRolePriorities: CULTO_NOCHE_PRIO,
+      });
+      expect(result.assignments).toHaveLength(2);
+      expect(result.assignments.every((a) => a.memberId === 2)).toBe(true);
+    });
+
+    it("#14 when one member is on holidays the other covers all applicable roles", () => {
+      const result = generateSchedule({
+        dates: [SUN_0118],
+        roles: [
+          { ...CANTANTES, requiredCount: 1 },
+          { ...MUSICOS, requiredCount: 1 },
+        ],
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+        dayRolePriorities: CULTO_DIA_PRIO,
+      });
+      expect(result.assignments).toHaveLength(2);
+      expect(result.assignments.every((a) => a.memberId === 2)).toBe(true);
+    });
+
+    it("#15 priority order does not change the result when no exclusive group constrains", () => {
+      const base = {
+        dates: [SUN_0104],
+        roles: [
+          { ...CANTANTES, requiredCount: 1 },
+          { ...MUSICOS, requiredCount: 1 },
+        ],
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+      };
+      const musicosFirst = generateSchedule({
+        ...base,
+        dayRolePriorities: CULTO_DIA_PRIO,
+      });
+      const cantantesFirst = generateSchedule({
+        ...base,
+        dayRolePriorities: CULTO_NOCHE_PRIO,
+      });
+
+      const sortA = (a: ScheduleAssignment[]) =>
+        [...a].sort((x, y) => x.roleId - y.roleId || x.memberId - y.memberId);
+
+      expect(sortA(musicosFirst.assignments)).toEqual(
+        sortA(cantantesFirst.assignments),
+      );
+    });
+
+    it("#16 with exclusive groups the higher-priority role wins and blocks the other", () => {
+      const musicosFirst = generateSchedule({
+        dates: [SUN_0104],
+        roles: [CANTANTES_EX, MUSICOS_EX],
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+        dayRolePriorities: CULTO_DIA_PRIO,
+      });
+      const cantantesFirst = generateSchedule({
+        dates: [SUN_0104],
+        roles: [CANTANTES_EX, MUSICOS_EX],
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+        dayRolePriorities: { Domingo: { 1: 0, 2: 1 } },
+      });
+      const daniRoleA = musicosFirst.assignments.find(
+        (a) => a.memberId === 2,
+      )!.roleId;
+      const daniRoleB = cantantesFirst.assignments.find(
+        (a) => a.memberId === 2,
+      )!.roleId;
+      expect(daniRoleA).not.toEqual(daniRoleB);
+    });
+
+    it("#17 tight max and round-robin determine who gets the single slot", () => {
+      const result = generateSchedule({
+        dates: JAN_SUNDAYS,
+        roles: [{ ...CANTANTES, requiredCount: 1 }],
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+      });
+      expect(result.assignments).toEqual([
+        { date: SUN_0104, roleId: 1, memberId: 1 },
+        { date: SUN_0111, roleId: 1, memberId: 2 },
+        { date: SUN_0118, roleId: 1, memberId: 2 },
+        { date: SUN_0125, roleId: 1, memberId: 2 },
+      ]);
+    });
+  });
+
+  describe("Exclusive-group assignment (scenarios 18–26)", () => {
+    it("#18 exclusive group blocks a member from a second different role on the same date", () => {
+      const result = generateSchedule({
+        dates: [SUN_0104],
+        roles: [
+          { ...CANTANTES_EX, requiredCount: 1 },
+          { ...MUSICOS_EX, requiredCount: 1 },
+        ],
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+        dayRolePriorities: CULTO_DIA_PRIO,
+      });
+      expect(result.assignments).toContainEqual({
+        date: SUN_0104,
+        roleId: 2,
+        memberId: 2,
+      });
+      expect(result.assignments).toContainEqual({
+        date: SUN_0104,
+        roleId: 1,
+        memberId: 1,
+      });
+    });
+
+    it("#19 exclusive group causes higher-priority role to go unfilled when sole eligible member is blocked across events", () => {
+      const roles: RoleDefinition[] = [
+        { ...CANTANTES_EX, requiredCount: 1 },
+        { ...MUSICOS_EX, requiredCount: 1 },
+      ];
+      const diaResult = generateSchedule({
+        dates: [SUN_0104],
+        roles,
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+        dayRolePriorities: CULTO_DIA_PRIO,
+      });
+
+      const nocheResult = generateSchedule({
+        dates: [SUN_0104],
+        roles,
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_NOCHE_TW,
+        dayRolePriorities: CULTO_NOCHE_PRIO,
+        previousAssignments: diaResult.assignments,
+      });
+
+      expect(nocheResult.assignments).toEqual([
+        { date: SUN_0104, roleId: 2, memberId: 2 },
+      ]);
+      expect(nocheResult.unfilledSlots).toContainEqual({
+        date: SUN_0104,
+        roleId: 1,
+      });
+    });
+
+    it("#20 same role on two events on the same date is not blocked by exclusive group", () => {
+      const diaResult = generateSchedule({
+        dates: [SUN_0104],
+        roles: [{ ...MUSICOS_EX, requiredCount: 1 }],
+        members: [daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+      });
+      expect(diaResult.assignments).toHaveLength(1);
+
+      const nocheResult = generateSchedule({
+        dates: [SUN_0104],
+        roles: [{ ...MUSICOS_EX, requiredCount: 1 }],
+        members: [daniG1],
+        dayEventTimeWindow: CULTO_NOCHE_TW,
+        previousAssignments: diaResult.assignments,
+      });
+      expect(nocheResult.assignments).toEqual([
+        { date: SUN_0104, roleId: 2, memberId: 2 },
+      ]);
+    });
+
+    it("#21 single-role member is unaffected by exclusive group constraints", () => {
+      const result = generateSchedule({
+        dates: [SUN_0104],
+        roles: [
+          { ...CANTANTES_EX, requiredCount: 1 },
+          { ...MUSICOS_EX, requiredCount: 1 },
+        ],
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+        dayRolePriorities: CULTO_DIA_PRIO,
+      });
+      const coniAssignment = result.assignments.find((a) => a.memberId === 1);
+      expect(coniAssignment).toBeDefined();
+      expect(coniAssignment!.roleId).toBe(1);
+    });
+
+    it("#22 processing events in different order changes exclusive-group outcome", () => {
+      const roles: RoleDefinition[] = [
+        { ...CANTANTES_EX, requiredCount: 1 },
+        { ...MUSICOS_EX, requiredCount: 1 },
+      ];
+      const members = [coniG1, daniG1];
+
+      const diaA = generateSchedule({
+        dates: [SUN_0104],
+        roles,
+        members,
+        dayEventTimeWindow: CULTO_DIA_TW,
+        dayRolePriorities: CULTO_DIA_PRIO,
+      });
+      const nocheA = generateSchedule({
+        dates: [SUN_0104],
+        roles,
+        members,
+        dayEventTimeWindow: CULTO_NOCHE_TW,
+        dayRolePriorities: CULTO_NOCHE_PRIO,
+        previousAssignments: diaA.assignments,
+      });
+
+      const nocheB = generateSchedule({
+        dates: [SUN_0104],
+        roles,
+        members,
+        dayEventTimeWindow: CULTO_NOCHE_TW,
+        dayRolePriorities: CULTO_NOCHE_PRIO,
+      });
+      const diaB = generateSchedule({
+        dates: [SUN_0104],
+        roles,
+        members,
+        dayEventTimeWindow: CULTO_DIA_TW,
+        dayRolePriorities: CULTO_DIA_PRIO,
+        previousAssignments: nocheB.assignments,
+      });
+
+      const totalA = diaA.assignments.length + nocheA.assignments.length;
+      const totalB = nocheB.assignments.length + diaB.assignments.length;
+
+      expect(totalA).toBe(3);
+      expect(totalB).toBe(2);
+    });
+
+    it("#23 swapping priority order with exclusive groups changes which role a member gets", () => {
+      const musicosFirst = generateSchedule({
+        dates: [SUN_0104],
+        roles: [CANTANTES_EX, MUSICOS_EX],
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+        dayRolePriorities: CULTO_DIA_PRIO,
+      });
+      const cantantesFirst = generateSchedule({
+        dates: [SUN_0104],
+        roles: [CANTANTES_EX, MUSICOS_EX],
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+        dayRolePriorities: { Domingo: { 1: 0, 2: 1 } },
+      });
+
+      expect(musicosFirst.assignments).toContainEqual({
+        date: SUN_0104,
+        roleId: 2,
+        memberId: 2,
+      });
+      expect(musicosFirst.assignments).toContainEqual({
+        date: SUN_0104,
+        roleId: 1,
+        memberId: 1,
+      });
+
+      expect(cantantesFirst.assignments).toContainEqual({
+        date: SUN_0104,
+        roleId: 1,
+        memberId: 2,
+      });
+      expect(cantantesFirst.assignments).toContainEqual({
+        date: SUN_0104,
+        roleId: 1,
+        memberId: 1,
+      });
+      expect(cantantesFirst.unfilledSlots).toContainEqual({
+        date: SUN_0104,
+        roleId: 2,
+      });
+    });
+
+    it("#24 role goes unfilled when all members are either blocked or on holidays", () => {
+      const result = generateSchedule({
+        dates: [SUN_0118],
+        roles: [
+          { ...CANTANTES_EX, requiredCount: 1 },
+          { ...MUSICOS_EX, requiredCount: 1 },
+        ],
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+        dayRolePriorities: CULTO_DIA_PRIO,
+      });
+      expect(result.assignments).toContainEqual({
+        date: SUN_0118,
+        roleId: 2,
+        memberId: 2,
+      });
+      expect(result.unfilledSlots).toContainEqual({
+        date: SUN_0118,
+        roleId: 1,
+      });
+    });
+
+    it("#25 role not in any exclusive group is assigned independently", () => {
+      const result = generateSchedule({
+        dates: [SUN_0104],
+        roles: [{ ...ADORACION, requiredCount: 1 }],
+        members: [coniG2],
+        dayEventTimeWindow: REUNION_AM_TW,
+      });
+      expect(result.assignments).toEqual([
+        { date: SUN_0104, roleId: 3, memberId: 1 },
+      ]);
+    });
+
+    it("#26 exclusive group constraints apply only within a group, not across groups", () => {
+      const g1Result = generateSchedule({
+        dates: [SUN_0104],
+        roles: [{ ...MUSICOS_EX, requiredCount: 1 }],
+        members: [daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+      });
+      expect(g1Result.assignments).toHaveLength(1);
+
+      const g2Result = generateSchedule({
+        dates: [SUN_0104],
+        roles: [{ ...ADORACION, requiredCount: 1 }],
+        members: [coniG2],
+        dayEventTimeWindow: REUNION_AM_TW,
+      });
+      expect(g2Result.assignments).toEqual([
+        { date: SUN_0104, roleId: 3, memberId: 1 },
+      ]);
+    });
+  });
+
+  describe("Month continuity and round-robin (scenarios 32–40)", () => {
+    it("#32 assignment pattern repeats when constraints fully determine outcomes", () => {
+      const roles: RoleDefinition[] = [
+        { ...CANTANTES_EX, requiredCount: 1 },
+        { ...MUSICOS_EX, requiredCount: 1 },
+      ];
+      const janResult = generateSchedule({
+        dates: JAN_SUNDAYS,
+        roles,
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+        dayRolePriorities: CULTO_DIA_PRIO,
+      });
+
+      const coniNoHolidays: MemberInfo = { ...coniG1, holidays: [] };
+      const febResult = generateSchedule({
+        dates: FEB_SUNDAYS,
+        roles,
+        members: [coniNoHolidays, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+        dayRolePriorities: CULTO_DIA_PRIO,
+        previousAssignments: janResult.assignments,
+      });
+
+      for (const date of FEB_SUNDAYS) {
+        expect(febResult.assignments).toContainEqual({
+          date,
+          roleId: 2,
+          memberId: 2,
+        });
+        expect(febResult.assignments).toContainEqual({
+          date,
+          roleId: 1,
+          memberId: 1,
+        });
+      }
+    });
+
+    it("#33 round-robin pointer carries over from previous month", () => {
+      const cantantesMax1: RoleDefinition = {
+        id: 1,
+        name: "Cantantes",
+        requiredCount: 1,
+      };
+      const janResult = generateSchedule({
+        dates: JAN_SUNDAYS,
+        roles: [cantantesMax1],
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+      });
+
+      const coniNoHolidays: MemberInfo = { ...coniG1, holidays: [] };
+      const febResult = generateSchedule({
+        dates: FEB_SUNDAYS,
+        roles: [cantantesMax1],
+        members: [coniNoHolidays, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+        previousAssignments: janResult.assignments,
+      });
+
+      expect(febResult.assignments[0]).toEqual({
+        date: SUN_0201,
+        roleId: 1,
+        memberId: 1,
+      });
+    });
+
+    it("#34 returning member re-enters rotation at the pointer position", () => {
+      const cantantesMax1: RoleDefinition = {
+        id: 1,
+        name: "Cantantes",
+        requiredCount: 1,
+      };
+      const janResult = generateSchedule({
+        dates: JAN_SUNDAYS,
+        roles: [cantantesMax1],
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+      });
+
+      const coniNoHolidays: MemberInfo = { ...coniG1, holidays: [] };
+      const febResult = generateSchedule({
+        dates: [SUN_0201],
+        roles: [cantantesMax1],
+        members: [coniNoHolidays, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+        previousAssignments: janResult.assignments,
+      });
+
+      expect(febResult.assignments).toEqual([
+        { date: SUN_0201, roleId: 1, memberId: 1 },
+      ]);
+    });
+
+    it("#35 pointer does not skip past a member on holidays, preserving fairness on return", () => {
+      const cantantesMax1: RoleDefinition = {
+        id: 1,
+        name: "Cantantes",
+        requiredCount: 1,
+      };
+      const janResult = generateSchedule({
+        dates: JAN_SUNDAYS,
+        roles: [cantantesMax1],
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+      });
+
+      const coniNoHolidays: MemberInfo = { ...coniG1, holidays: [] };
+      const febResult = generateSchedule({
+        dates: FEB_SUNDAYS,
+        roles: [cantantesMax1],
+        members: [coniNoHolidays, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+        previousAssignments: janResult.assignments,
+      });
+
+      expect(febResult.assignments).toEqual([
+        { date: SUN_0201, roleId: 1, memberId: 1 },
+        { date: SUN_0208, roleId: 1, memberId: 2 },
+        { date: SUN_0215, roleId: 1, memberId: 1 },
+        { date: SUN_0222, roleId: 1, memberId: 2 },
+      ]);
+    });
+
+    it("#36 round-robin is irrelevant when exclusive group leaves only one eligible member per role", () => {
+      const roles: RoleDefinition[] = [
+        { ...CANTANTES_EX, requiredCount: 1 },
+        { ...MUSICOS_EX, requiredCount: 1 },
+      ];
+      const result = generateSchedule({
+        dates: FEB_SUNDAYS,
+        roles,
+        members: [{ ...coniG1, holidays: [] }, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+        dayRolePriorities: CULTO_DIA_PRIO,
+      });
+
+      for (const date of FEB_SUNDAYS) {
+        expect(result.assignments).toContainEqual({
+          date,
+          roleId: 2,
+          memberId: 2,
+        });
+        expect(result.assignments).toContainEqual({
+          date,
+          roleId: 1,
+          memberId: 1,
+        });
+      }
+    });
+
+    it("#37 round-robin matters with tight max and multiple eligible members", () => {
+      const cantantesMax1: RoleDefinition = {
+        id: 1,
+        name: "Cantantes",
+        requiredCount: 1,
+      };
+
+      const janResult = generateSchedule({
+        dates: JAN_SUNDAYS,
+        roles: [cantantesMax1],
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+      });
+
+      const coniNoHolidays: MemberInfo = { ...coniG1, holidays: [] };
+      const febResult = generateSchedule({
+        dates: FEB_SUNDAYS,
+        roles: [cantantesMax1],
+        members: [coniNoHolidays, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+        previousAssignments: janResult.assignments,
+      });
+
+      expect(febResult.assignments[0].memberId).toBe(1);
+      expect(febResult.assignments[1].memberId).toBe(2);
+    });
+
+    it("#38 new member joining in a new month enters the rotation at the end", () => {
+      const cantantesMax1: RoleDefinition = {
+        id: 1,
+        name: "Cantantes",
+        requiredCount: 1,
+      };
+
+      const janResult = generateSchedule({
+        dates: JAN_SUNDAYS,
+        roles: [cantantesMax1],
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+      });
+
+      const coniNoHolidays: MemberInfo = { ...coniG1, holidays: [] };
+      const eliG1: MemberInfo = {
+        id: 3,
+        name: "Eli",
+        roleIds: [1],
+        availableDays: ["Domingo"],
+        holidays: [],
+        availabilityBlocksByDay: {
+          Domingo: [{ startUtc: "09:00", endUtc: "13:00" }],
+        },
+      };
+
+      const febResult = generateSchedule({
+        dates: FEB_SUNDAYS,
+        roles: [cantantesMax1],
+        members: [coniNoHolidays, daniG1, eliG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+        previousAssignments: janResult.assignments,
+      });
+
+      expect(febResult.assignments).toEqual([
+        { date: SUN_0201, roleId: 1, memberId: 3 },
+        { date: SUN_0208, roleId: 1, memberId: 1 },
+        { date: SUN_0215, roleId: 1, memberId: 2 },
+        { date: SUN_0222, roleId: 1, memberId: 3 },
+      ]);
+    });
+
+    it("#39 changed availability between months alters eligibility", () => {
+      const daniNarrow: MemberInfo = {
+        ...daniG1,
+        availabilityBlocksByDay: {
+          Domingo: [{ startUtc: "09:00", endUtc: "13:00" }],
+          Miércoles: [{ startUtc: "18:00", endUtc: "21:00" }],
+        },
+      };
+
+      const result = generateSchedule({
+        dates: [SUN_0201],
+        roles: [{ ...CANTANTES, requiredCount: 1 }],
+        members: [{ ...coniG1, holidays: [] }, daniNarrow],
+        dayEventTimeWindow: CULTO_NOCHE_TW,
+      });
+
+      expect(result.assignments).toEqual([]);
+      expect(result.unfilledSlots).toEqual([{ date: SUN_0201, roleId: 1 }]);
+    });
+
+    it("#40 accumulated imbalance does not auto-compensate when constraints are unchanged", () => {
+      const cantantesMax1: RoleDefinition = {
+        id: 1,
+        name: "Cantantes",
+        requiredCount: 1,
+      };
+
+      const janResult = generateSchedule({
+        dates: JAN_SUNDAYS,
+        roles: [cantantesMax1],
+        members: [coniG1, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+      });
+
+      const janDani = janResult.assignments.filter(
+        (a) => a.memberId === 2,
+      ).length;
+      const janConi = janResult.assignments.filter(
+        (a) => a.memberId === 1,
+      ).length;
+      expect(janDani).toBe(3);
+      expect(janConi).toBe(1);
+
+      const coniNoHolidays: MemberInfo = { ...coniG1, holidays: [] };
+      const febResult = generateSchedule({
+        dates: FEB_SUNDAYS,
+        roles: [cantantesMax1],
+        members: [coniNoHolidays, daniG1],
+        dayEventTimeWindow: CULTO_DIA_TW,
+        previousAssignments: janResult.assignments,
+      });
+
+      const febDani = febResult.assignments.filter(
+        (a) => a.memberId === 2,
+      ).length;
+      const febConi = febResult.assignments.filter(
+        (a) => a.memberId === 1,
+      ).length;
+      expect(febConi).toBe(2);
+      expect(febDani).toBe(2);
+    });
+  });
+});

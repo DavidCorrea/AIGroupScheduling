@@ -100,4 +100,60 @@ describe("Dashboard conflict detection (time-aware)", () => {
       expect(buildConflicts([])).toEqual([]);
     });
   });
+
+  describe("Cross-group conflicts (scenarios 27–31)", () => {
+    function a(
+      date: string,
+      groupId: number,
+      groupName: string,
+      start: string,
+      end: string,
+    ): AssignmentWithTime {
+      return {
+        date,
+        groupId,
+        groupName,
+        startTimeUtc: start,
+        endTimeUtc: end,
+      };
+    }
+
+    it("#27 conflict when a member is eligible in two groups with overlapping event times", () => {
+      const assignments = [
+        a("2026-01-04", 1, "CCMDV", "09:00", "13:00"),
+        a("2026-01-04", 2, "Iglesia Central", "10:00", "12:00"),
+      ];
+      const result = buildConflicts(assignments);
+      expect(result).toHaveLength(1);
+      expect(result[0].date).toBe("2026-01-04");
+      expect(result[0].groups).toEqual(["CCMDV", "Iglesia Central"]);
+    });
+
+    it("#28 no conflict when a member is eligible in two groups with non-overlapping times", () => {
+      const assignments = [
+        a("2026-01-04", 1, "CCMDV", "09:00", "13:00"),
+        a("2026-01-04", 2, "Iglesia Central", "15:00", "17:00"),
+      ];
+      expect(buildConflicts(assignments)).toEqual([]);
+    });
+
+    it("#29 no conflict when a member is eligible in only one group on that date", () => {
+      const assignments = [
+        a("2026-01-07", 2, "Iglesia Central", "18:00", "20:00"),
+      ];
+      expect(buildConflicts(assignments)).toEqual([]);
+    });
+
+    it("#30 no conflict when a member is not eligible in either group due to holidays", () => {
+      expect(buildConflicts([])).toEqual([]);
+    });
+
+    it("#31 no conflict when a member belongs to only one group", () => {
+      const assignments = [
+        a("2026-01-04", 1, "CCMDV", "09:00", "13:00"),
+        a("2026-01-04", 1, "CCMDV", "19:00", "21:00"),
+      ];
+      expect(buildConflicts(assignments)).toEqual([]);
+    });
+  });
 });

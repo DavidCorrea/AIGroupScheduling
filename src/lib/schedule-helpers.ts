@@ -13,32 +13,29 @@ import {
   scheduleDate,
 } from "@/db/schema";
 import { eq, and, or, inArray } from "drizzle-orm";
-import { MemberInfo, RoleDefinition } from "./scheduler.types";
-import { generateSchedule } from "./scheduler";
-import { logScheduleAction } from "./audit-log";
+import { MemberInfo, RecurringEventConfig, RoleDefinition } from "./scheduler.types";
+import {
+  filterSchedulableRoles,
+  getDependentRoleIds,
+  resolveHolidaysForMember,
+  EVENT_DEFAULTS,
+} from "./schedule-model";
 
 export interface ScheduleConfig {
   activeDayNames: string[];
-  /** Weekday name -> { type, label, recurringEventId, startTimeUtc, endTimeUtc } for schedule_date creation */
-  recurringTypeByDay: Record<string, { type: string; label: string; recurringEventId?: number; startTimeUtc: string; endTimeUtc: string }>;
+  recurringEvents: RecurringEventConfig[];
   roleDefinitions: RoleDefinition[];
   allRoles: typeof roles.$inferSelect[];
+  dependentRoleIds: Set<number>;
   memberInfos: MemberInfo[];
-  dayRolePriorityMap: Record<string, Record<number, number>>;
-  /** Event time window per day (Spanish day name). Used by scheduler to filter by availability overlap. */
-  dayEventTimeWindow: Record<string, { startUtc: string; endUtc: string }>;
 }
 
 /**
  * Load all configuration needed to run the scheduler for a group.
- * Builds activeDayNames from the canonical weekdays list so every active day is included (assignable and for_everyone).
+ * Returns every active recurring event (multiple per weekday allowed) with
+ * per-event role priorities. The caller passes this to generateGroupSchedule.
  */
 export async function loadScheduleConfig(groupId: number): Promise<ScheduleConfig> {
-  const weekdayRows = await db
-    .select({ id: weekdays.id, name: weekdays.name })
-    .from(weekdays)
-    .orderBy(weekdays.displayOrder);
-
   const allRecurringRows = await db
     .select({
       id: recurringEvents.id,
@@ -55,68 +52,42 @@ export async function loadScheduleConfig(groupId: number): Promise<ScheduleConfi
     .innerJoin(weekdays, eq(recurringEvents.weekdayId, weekdays.id))
     .where(eq(recurringEvents.groupId, groupId));
 
-  // Build map: one row per active weekday. If duplicates exist, prefer for_everyone so it's never lost.
-  const activeByWeekdayName = new Map<string, (typeof allRecurringRows)[number]>();
-  for (const d of allRecurringRows) {
-    if (!d.active || !d.weekdayName) continue;
-    const existing = activeByWeekdayName.get(d.weekdayName);
-    const isForEveryone = String(d.type).toLowerCase() === "for_everyone";
-    const existingIsForEveryone = existing ? String(existing.type).toLowerCase() === "for_everyone" : false;
-    if (!existing || (isForEveryone && !existingIsForEveryone)) {
-      activeByWeekdayName.set(d.weekdayName, d);
+  const activeRows = allRecurringRows.filter((d) => d.active && d.weekdayName);
+  const assignableIds = activeRows
+    .filter((d) => String(d.type).toLowerCase() !== "for_everyone")
+    .map((d) => d.id);
+
+  const allPriorities = assignableIds.length > 0
+    ? await db.select().from(eventRolePriorities).where(inArray(eventRolePriorities.recurringEventId, assignableIds))
+    : [];
+
+  const prioritiesByEvent = new Map<number, Record<number, number>>();
+  for (const p of allPriorities) {
+    if (!prioritiesByEvent.has(p.recurringEventId)) {
+      prioritiesByEvent.set(p.recurringEventId, {});
     }
+    prioritiesByEvent.get(p.recurringEventId)![p.roleId] = p.priority;
   }
 
-  const recurringTypeByDay: Record<string, { type: string; label: string; recurringEventId: number; startTimeUtc: string; endTimeUtc: string }> = {};
-  const activeDayNames: string[] = [];
+  const recurringEventConfigs: RecurringEventConfig[] = activeRows.map((d) => ({
+    id: d.id,
+    weekdayName: d.weekdayName!,
+    type: String(d.type).toLowerCase() === "for_everyone" ? "for_everyone" as const : "assignable" as const,
+    label: d.label ?? EVENT_DEFAULTS.label,
+    startTimeUtc: d.startTimeUtc ?? EVENT_DEFAULTS.startTimeUtc,
+    endTimeUtc: d.endTimeUtc ?? EVENT_DEFAULTS.endTimeUtc,
+    rolePriorities: prioritiesByEvent.get(d.id) ?? {},
+  }));
 
-  for (const w of weekdayRows) {
-    const name = w.name ?? "";
-    if (!name) continue;
-    const row = activeByWeekdayName.get(name);
-    if (row) {
-      activeDayNames.push(name);
-      const rawType = row.type;
-      const type = String(rawType).toLowerCase() === "for_everyone" ? "for_everyone" : "assignable";
-      recurringTypeByDay[name] = {
-        type,
-        label: row.label ?? "Evento",
-        recurringEventId: row.id,
-        startTimeUtc: row.startTimeUtc ?? "00:00",
-        endTimeUtc: row.endTimeUtc ?? "23:59",
-      };
-    }
-  }
-
-  const activeRecurringRows = allRecurringRows.filter((d) => d.active);
-  const assignableRecurringRows = activeRecurringRows.filter(
-    (d) => String(d.type).toLowerCase() !== "for_everyone"
-  );
-
-  // Event time window per day (assignable only). Scheduler uses this to filter members by time overlap.
-  const dayEventTimeWindow: Record<string, { startUtc: string; endUtc: string }> = {};
-  for (const row of assignableRecurringRows) {
-    const name = row.weekdayName ?? "";
-    if (name) {
-      dayEventTimeWindow[name] = {
-        startUtc: row.startTimeUtc ?? "00:00",
-        endUtc: row.endTimeUtc ?? "23:59",
-      };
-    }
-  }
+  const activeDayNames = [
+    ...new Set(recurringEventConfigs.map((e) => e.weekdayName)),
+  ];
 
   const allRoles = await db
     .select()
     .from(roles)
     .where(eq(roles.groupId, groupId));
-  const roleDefinitions: RoleDefinition[] = allRoles
-    .filter((r) => r.dependsOnRoleId == null)
-    .map((r) => ({
-      id: r.id,
-      name: r.name,
-      requiredCount: r.requiredCount,
-      exclusiveGroupId: r.exclusiveGroupId,
-    }));
+  const roleDefinitions: RoleDefinition[] = filterSchedulableRoles(allRoles);
 
   const allMembers = await db
     .select({
@@ -176,9 +147,11 @@ export async function loadScheduleConfig(groupId: number): Promise<ScheduleConfi
       });
     }
 
-    const mHolidays = allHolidays
-      .filter((h) => h.userId === m.userId || h.memberId === m.id)
-      .map((h) => ({ startDate: h.startDate, endDate: h.endDate }));
+    const mHolidays = resolveHolidaysForMember({
+      memberId: m.id,
+      linkedUserId: m.userId,
+      allHolidays,
+    });
 
     memberInfos.push({
       id: m.id,
@@ -190,30 +163,13 @@ export async function loadScheduleConfig(groupId: number): Promise<ScheduleConfi
     });
   }
 
-  // Build day role priorities map (only for assignable recurring events)
-  const assignableIds = assignableRecurringRows.map((d) => d.id);
-  const allPriorities = assignableIds.length > 0
-    ? await db.select().from(eventRolePriorities).where(inArray(eventRolePriorities.recurringEventId, assignableIds))
-    : [];
-  const dayRolePriorityMap: Record<string, Record<number, number>> = {};
-  for (const p of allPriorities) {
-    const ev = assignableRecurringRows.find((d) => d.id === p.recurringEventId);
-    if (ev?.weekdayName) {
-      if (!dayRolePriorityMap[ev.weekdayName]) {
-        dayRolePriorityMap[ev.weekdayName] = {};
-      }
-      dayRolePriorityMap[ev.weekdayName][p.roleId] = p.priority;
-    }
-  }
-
   return {
     activeDayNames,
-    recurringTypeByDay,
+    recurringEvents: recurringEventConfigs,
     roleDefinitions,
     allRoles,
+    dependentRoleIds: getDependentRoleIds(allRoles),
     memberInfos,
-    dayRolePriorityMap,
-    dayEventTimeWindow,
   };
 }
 
@@ -249,104 +205,3 @@ export async function getPreviousAssignments(groupId: number) {
   return previousAssignments;
 }
 
-/**
- * Rebuild future assignable assignments for a schedule (overwrite mode).
- * Used when a recurring event's day or times change so assignments respect the new config.
- * Logs the action for audit. Caller must ensure the user has access to the schedule's group.
- */
-export async function rebuildScheduleFutureAssignments(
-  scheduleId: number,
-  userId: string
-): Promise<{ applied: number }> {
-  const schedule = (await db.select().from(schedules).where(eq(schedules.id, scheduleId)))[0];
-  if (!schedule) {
-    throw new Error("Cronograma no encontrado");
-  }
-  const { groupId } = schedule;
-  const today = new Date().toISOString().split("T")[0];
-
-  const config = await loadScheduleConfig(groupId);
-
-  const assignableDatesRows = await db
-    .select({ date: scheduleDate.date, id: scheduleDate.id })
-    .from(scheduleDate)
-    .where(
-      and(
-        eq(scheduleDate.scheduleId, scheduleId),
-        eq(scheduleDate.type, "assignable")
-      )
-    );
-  const futureDates = [...new Set(assignableDatesRows.map((r) => r.date))]
-    .filter((d) => d >= today)
-    .sort();
-  const dateToSdIds = new Map<string, number[]>();
-  for (const r of assignableDatesRows) {
-    const list = dateToSdIds.get(r.date) ?? [];
-    list.push(r.id);
-    dateToSdIds.set(r.date, list);
-  }
-
-  if (futureDates.length === 0) {
-    return { applied: 0 };
-  }
-
-  const currentEntriesWithDate = await db
-    .select({
-      id: scheduleDateAssignments.id,
-      date: scheduleDate.date,
-      roleId: scheduleDateAssignments.roleId,
-      memberId: scheduleDateAssignments.memberId,
-    })
-    .from(scheduleDateAssignments)
-    .innerJoin(scheduleDate, eq(scheduleDateAssignments.scheduleDateId, scheduleDate.id))
-    .where(eq(scheduleDate.scheduleId, scheduleId));
-
-  const pastEntries = currentEntriesWithDate.filter((e) => e.date < today);
-  const futureEntries = currentEntriesWithDate.filter((e) => e.date >= today);
-
-  const previousAssignments = await getPreviousAssignments(groupId);
-  const allPrevious = [
-    ...previousAssignments,
-    ...pastEntries.map((e) => ({ date: e.date, roleId: e.roleId, memberId: e.memberId })),
-  ];
-
-  const result = generateSchedule({
-    dates: futureDates,
-    roles: config.roleDefinitions,
-    members: config.memberInfos,
-    previousAssignments: allPrevious,
-    dayRolePriorities:
-      Object.keys(config.dayRolePriorityMap).length > 0 ? config.dayRolePriorityMap : undefined,
-    dayEventTimeWindow:
-      Object.keys(config.dayEventTimeWindow).length > 0 ? config.dayEventTimeWindow : undefined,
-  });
-
-  for (const e of futureEntries) {
-    await db.delete(scheduleDateAssignments).where(eq(scheduleDateAssignments.id, e.id));
-  }
-
-  if (result.assignments.length > 0) {
-    const toInsert: { scheduleDateId: number; roleId: number; memberId: number }[] = [];
-    for (const a of result.assignments) {
-      const sdIds = dateToSdIds.get(a.date) ?? [];
-      for (const scheduleDateId of sdIds) {
-        toInsert.push({
-          scheduleDateId,
-          roleId: a.roleId,
-          memberId: a.memberId,
-        });
-      }
-    }
-    if (toInsert.length > 0) {
-      await db.insert(scheduleDateAssignments).values(toInsert);
-    }
-  }
-
-  await logScheduleAction(scheduleId, userId, "rebuild", {
-    message: `Reconstrucción por cambio de evento recurrente: ${result.assignments.length} asignación(es) regenerada(s)`,
-    source: "recurring_event_update",
-    applied: result.assignments.length,
-  });
-
-  return { applied: result.assignments.length };
-}

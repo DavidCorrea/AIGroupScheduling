@@ -9,10 +9,10 @@ import {
   formatDateShort as formatDate,
   formatDateWeekdayDay,
   formatDateRange,
-  getDayOfWeek,
   utcTimeToLocalDisplay,
   localTimeToUtc,
 } from "@/lib/timezone-utils";
+import { getEligibleMemberIds } from "@/lib/schedule-model";
 import LoadingScreen from "@/components/LoadingScreen";
 import BackLink from "@/components/BackLink";
 import { DangerZone } from "@/components/DangerZone";
@@ -287,14 +287,25 @@ export default function SchedulePreviewPage() {
     return list;
   }, [schedule]);
 
-  // Map dayOfWeek name -> weekdayId for availability lookups (member.availableDayIds are weekday ids)
-  const dayOfWeekToWeekdayId = useMemo(() => {
-    const map = new Map<string, number>();
+  const weekdayIdToDayName = useMemo(() => {
+    const map = new Map<number, string>();
     for (const d of scheduleDays) {
-      map.set(d.dayOfWeek, d.weekdayId);
+      map.set(d.weekdayId, d.dayOfWeek);
     }
     return map;
   }, [scheduleDays]);
+
+  const membersWithDayNames = useMemo(
+    () =>
+      members.map((m) => ({
+        id: m.id,
+        roleIds: m.roleIds,
+        availableDays: m.availableDayIds
+          .map((id) => weekdayIdToDayName.get(id))
+          .filter((n): n is string => n != null),
+      })),
+    [members, weekdayIdToDayName]
+  );
 
   // Build edit state from schedule whenever schedule changes (keyed by scheduleDateId)
   useEffect(() => {
@@ -559,42 +570,30 @@ export default function SchedulePreviewPage() {
     return <LoadingScreen fullPage={false} />;
   }
 
-  // Helper: check if a member is available on a given date
-  const isMemberAvailable = (member: Member, date: string): boolean => {
-    if (member.availableDayIds.length === 0) return true;
-    const dayName = getDayOfWeek(date);
-    const weekdayId = dayOfWeekToWeekdayId.get(dayName);
-    if (weekdayId == null) return true;
-    return member.availableDayIds.includes(weekdayId);
-  };
-
-  // Helper: get eligible members for a role slot (for a specific schedule date / event)
   const getEligibleMembers = (scheduleDateId: number, date: string, role: RoleInfo): Member[] => {
-    if (role.dependsOnRoleId != null) {
-      const sourceEntryMemberIds: number[] = [];
-      for (const sourceRole of roleOrder) {
-        if (sourceRole.id === role.dependsOnRoleId) {
-          const slotCount = Math.max(
-            sourceRole.requiredCount,
-            schedule.entries.filter(
-              (e) => e.scheduleDateId === scheduleDateId && e.roleId === sourceRole.id
-            ).length
-          );
-          for (let i = 0; i < slotCount; i++) {
-            const mid = editState.get(slotKey(scheduleDateId, sourceRole.id, i));
-            if (mid != null) sourceEntryMemberIds.push(mid);
-          }
-        }
-      }
-      return members.filter(
-        (m) =>
-          sourceEntryMemberIds.includes(m.id) &&
-          m.roleIds.includes(role.id)
+    const assignmentsOnDate: { roleId: number; memberId: number }[] = [];
+    for (const r of roleOrder) {
+      const slots = Math.max(
+        r.requiredCount,
+        schedule.entries.filter(
+          (e) => e.scheduleDateId === scheduleDateId && e.roleId === r.id
+        ).length
       );
+      for (let i = 0; i < slots; i++) {
+        const mid = editState.get(slotKey(scheduleDateId, r.id, i));
+        if (mid != null) assignmentsOnDate.push({ roleId: r.id, memberId: mid });
+      }
     }
-    return members.filter(
-      (m) => m.roleIds.includes(role.id) && isMemberAvailable(m, date)
+
+    const eligibleIds = new Set(
+      getEligibleMemberIds({
+        role: { id: role.id, dependsOnRoleId: role.dependsOnRoleId },
+        date,
+        members: membersWithDayNames,
+        assignmentsOnDate,
+      })
     );
+    return members.filter((m) => eligibleIds.has(m.id));
   };
 
   // Render a single select for a slot (for a specific schedule date / event)

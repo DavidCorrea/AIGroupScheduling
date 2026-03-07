@@ -156,8 +156,8 @@ async function main() {
     scheduleDateAssignments,
   } = await import("../src/db/schema");
   const { loadScheduleConfig, getPreviousAssignments } = await import("../src/lib/schedule-helpers");
-  const { getScheduleDates, getDayNameFromDateString } = await import("../src/lib/dates");
-  const { generateSchedule } = await import("../src/lib/scheduler");
+  const { getScheduleDates } = await import("../src/lib/dates");
+  const { generateGroupSchedule, applyPreferredSlots } = await import("../src/lib/schedule-model");
   const { logScheduleAction } = await import("../src/lib/audit-log");
   const { eq, and } = await import("drizzle-orm");
 
@@ -427,17 +427,12 @@ async function main() {
       const dates = getScheduleDates(month, year, config.activeDayNames);
       if (dates.length === 0) continue;
 
-      const assignableDates = dates.filter(
-        (d) => config.recurringTypeByDay[getDayNameFromDateString(d)]?.type === "assignable"
-      );
-
-      const result = generateSchedule({
-        dates: assignableDates,
+      const result = generateGroupSchedule({
+        dates,
+        events: config.recurringEvents,
         roles: config.roleDefinitions,
         members: config.memberInfos,
         previousAssignments,
-        dayRolePriorities: Object.keys(config.dayRolePriorityMap).length > 0 ? config.dayRolePriorityMap : undefined,
-        dayEventTimeWindow: Object.keys(config.dayEventTimeWindow).length > 0 ? config.dayEventTimeWindow : undefined,
       });
 
       const [schedule] = await db
@@ -446,58 +441,52 @@ async function main() {
         .returning();
       if (!schedule) continue;
 
-      const dateIds = new Map<string, number>();
-      for (const date of dates) {
-        const dayName = getDayNameFromDateString(date);
-        const info = config.recurringTypeByDay[dayName] ?? {
-          type: "assignable",
-          label: "Evento",
-          recurringEventId: undefined,
-          startTimeUtc: "00:00",
-          endTimeUtc: "23:59",
-        };
-        const type = String(info.type).toLowerCase() === "for_everyone" ? "for_everyone" : "assignable";
+      const sdIdByKey = new Map<string, number>();
+      for (const sd of result.scheduleDates) {
         const [inserted] = await db
           .insert(scheduleDate)
           .values({
             scheduleId: schedule.id,
-            date,
-            type,
-            label: info.label ?? null,
+            date: sd.date,
+            type: sd.type,
+            label: sd.label,
             note: null,
-            startTimeUtc: info.startTimeUtc ?? "00:00",
-            endTimeUtc: info.endTimeUtc ?? "23:59",
-            recurringEventId: info.recurringEventId ?? null,
+            startTimeUtc: sd.startTimeUtc,
+            endTimeUtc: sd.endTimeUtc,
+            recurringEventId: sd.recurringEventId,
           })
           .returning({ id: scheduleDate.id });
-        dateIds.set(date, inserted.id);
+        sdIdByKey.set(`${sd.date}|${sd.recurringEventId}`, inserted.id);
       }
 
-      // Reserve assignment slots for the owner first so they get assigned; then fill the rest from the scheduler.
-      const ownerSlotsToReserve = ownerMember ? Math.min(maxOwnerSlots, assignableDates.length) : 0;
-      const ownerAssignments: { date: string; roleId: number; memberId: number }[] = [];
-      if (ownerMember && ownerRoleIds.size > 0) {
-        const ownerRoleIdList = [...ownerRoleIds];
-        for (let i = 0; i < ownerSlotsToReserve; i++) {
-          const date = assignableDates[i];
-          if (!date) break;
-          const roleId = ownerRoleIdList[i % ownerRoleIdList.length];
-          ownerAssignments.push({ date, roleId, memberId: ownerMember.id });
+      const assignableDates = result.scheduleDates
+        .filter((sd) => sd.type === "assignable")
+        .map((sd) => sd.date);
+
+      const { preferred, remaining } = ownerMember
+        ? applyPreferredSlots({
+            preferredMemberId: ownerMember.id,
+            preferredRoleIds: [...ownerRoleIds],
+            maxSlots: maxOwnerSlots,
+            dates: assignableDates,
+            assignments: result.assignments,
+          })
+        : { preferred: [], remaining: result.assignments };
+
+      for (const a of preferred) {
+        for (const [key, id] of sdIdByKey) {
+          if (key.startsWith(`${a.date}|`)) {
+            await db.insert(scheduleDateAssignments).values({
+              scheduleDateId: id,
+              roleId: a.roleId,
+              memberId: a.memberId,
+            });
+            break;
+          }
         }
       }
-      const ownerSlotKeys = new Set(ownerAssignments.map((a) => `${a.date}:${a.roleId}`));
-      const remainingFromScheduler = result.assignments.filter((a) => {
-        const key = `${a.date}:${a.roleId}`;
-        if (ownerSlotKeys.has(key)) {
-          ownerSlotKeys.delete(key);
-          return false;
-        }
-        return true;
-      });
-      const allAssignments = [...ownerAssignments, ...remainingFromScheduler];
-
-      for (const a of allAssignments) {
-        const scheduleDateId = dateIds.get(a.date);
+      for (const a of remaining) {
+        const scheduleDateId = sdIdByKey.get(`${a.date}|${a.recurringEventId}`);
         if (!scheduleDateId) continue;
         await db.insert(scheduleDateAssignments).values({
           scheduleDateId,
@@ -505,6 +494,7 @@ async function main() {
           memberId: a.memberId,
         });
       }
+      const allAssignments = [...preferred, ...remaining];
 
       await logScheduleAction(
         schedule.id,

@@ -6,9 +6,9 @@ import {
   scheduleDate,
 } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { generateSchedule } from "@/lib/scheduler";
-import { getScheduleDates, getDayNameFromDateString } from "@/lib/dates";
+import { getScheduleDates } from "@/lib/dates";
 import { loadScheduleConfig, getPreviousAssignments } from "@/lib/schedule-helpers";
+import { generateGroupSchedule } from "@/lib/schedule-model";
 import { requireGroupAccess } from "@/lib/api-helpers";
 import { logScheduleAction } from "@/lib/audit-log";
 
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
   const { groupId } = accessResult;
 
   const body = await request.json();
-  const { months } = body; // Array of { month, year }
+  const { months } = body;
 
   if (!months || !Array.isArray(months) || months.length === 0) {
     return NextResponse.json(
@@ -47,9 +47,8 @@ export async function POST(request: NextRequest) {
   }
 
   const config = await loadScheduleConfig(groupId);
-  const { activeDayNames, recurringTypeByDay, roleDefinitions, memberInfos, dayRolePriorityMap } = config;
 
-  if (activeDayNames.length === 0) {
+  if (config.activeDayNames.length === 0) {
     return NextResponse.json(
       { error: "No active recurring events configured" },
       { status: 400 }
@@ -61,7 +60,6 @@ export async function POST(request: NextRequest) {
   const createdSchedules = [];
 
   for (const { month, year } of months) {
-    // Enforce one schedule per month/year per group
     const existing = (await db
       .select()
       .from(schedules)
@@ -73,23 +71,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const dates = getScheduleDates(month, year, activeDayNames);
+    const dates = getScheduleDates(month, year, config.activeDayNames);
     if (dates.length === 0) continue;
 
-    // Split dates into assignable (run scheduler) vs for_everyone (label only)
-    const assignableDates = dates.filter((d) => recurringTypeByDay[getDayNameFromDateString(d)]?.type === "assignable");
-
-    const result = generateSchedule({
-      dates: assignableDates,
-      roles: roleDefinitions,
-      members: memberInfos,
+    const result = generateGroupSchedule({
+      dates,
+      events: config.recurringEvents,
+      roles: config.roleDefinitions,
+      members: config.memberInfos,
       previousAssignments,
-      dayRolePriorities:
-        Object.keys(dayRolePriorityMap).length > 0 ? dayRolePriorityMap : undefined,
-      dayEventTimeWindow:
-        Object.keys(config.dayEventTimeWindow).length > 0
-          ? config.dayEventTimeWindow
-          : undefined,
     });
 
     const schedule = (await db
@@ -97,35 +87,32 @@ export async function POST(request: NextRequest) {
       .values({ month, year, status: "draft", groupId })
       .returning())[0];
 
-    const dateIds = new Map<string, number>();
-    for (const date of dates) {
-      const dayName = getDayNameFromDateString(date);
-      const info = recurringTypeByDay[dayName] ?? { type: "assignable", label: "Evento", recurringEventId: undefined, startTimeUtc: "00:00", endTimeUtc: "23:59" };
-      const type = String(info.type).toLowerCase() === "for_everyone" ? "for_everyone" : "assignable";
-      const label = info.label ?? null;
+    // Persist schedule_date rows from model output and build lookup for assignments
+    const sdIdByKey = new Map<string, number>();
+    for (const sd of result.scheduleDates) {
       const [inserted] = await db
         .insert(scheduleDate)
         .values({
           scheduleId: schedule.id,
-          date,
-          type,
-          label,
+          date: sd.date,
+          type: sd.type,
+          label: sd.label,
           note: null,
-          startTimeUtc: info.startTimeUtc ?? "00:00",
-          endTimeUtc: info.endTimeUtc ?? "23:59",
-          recurringEventId: info.recurringEventId ?? null,
+          startTimeUtc: sd.startTimeUtc,
+          endTimeUtc: sd.endTimeUtc,
+          recurringEventId: sd.recurringEventId,
         })
         .returning({ id: scheduleDate.id });
-      dateIds.set(date, inserted.id);
+      sdIdByKey.set(`${sd.date}|${sd.recurringEventId}`, inserted.id);
     }
 
-    for (const assignment of result.assignments) {
-      const scheduleDateId = dateIds.get(assignment.date);
+    for (const a of result.assignments) {
+      const scheduleDateId = sdIdByKey.get(`${a.date}|${a.recurringEventId}`);
       if (!scheduleDateId) continue;
       await db.insert(scheduleDateAssignments).values({
         scheduleDateId,
-        roleId: assignment.roleId,
-        memberId: assignment.memberId,
+        roleId: a.roleId,
+        memberId: a.memberId,
       });
     }
 

@@ -128,6 +128,12 @@ export function generateSchedule(input: SchedulerInput): SchedulerOutput {
     memberById.set(m.id, m);
   }
 
+  // Build role lookup by ID (for resolving exclusive groups from previousAssignments)
+  const roleById = new Map<number, RoleDefinition>();
+  for (const role of roles) {
+    roleById.set(role.id, role);
+  }
+
   // Build per-role rotation lists (alphabetically sorted by member name)
   const roleRotationLists = new Map<number, number[]>();
   for (const role of roles) {
@@ -171,10 +177,23 @@ export function generateSchedule(input: SchedulerInput): SchedulerOutput {
 
   for (const date of dates) {
     const dayOfWeek = getDayOfWeek(date);
-    // Track which exclusive groups each member is already filling on this date
-    const memberGroupsOnDate = new Map<number, Set<number>>();
+    // Track exclusive groups: memberId → exclusiveGroupId → roleId assigned.
+    // Allows same role across events but blocks different roles from the same group.
+    const memberExclusiveOnDate = new Map<number, Map<number, number>>();
     // Track which role IDs each member is already assigned on this date (to prevent duplicates)
     const memberRolesOnDate = new Map<number, Set<number>>();
+
+    // Pre-populate exclusive-group tracking from previousAssignments on this date
+    for (const pa of previousAssignments) {
+      if (pa.date !== date) continue;
+      const paRole = roleById.get(pa.roleId);
+      if (paRole?.exclusiveGroupId != null) {
+        if (!memberExclusiveOnDate.has(pa.memberId)) {
+          memberExclusiveOnDate.set(pa.memberId, new Map());
+        }
+        memberExclusiveOnDate.get(pa.memberId)!.set(paRole.exclusiveGroupId, pa.roleId);
+      }
+    }
 
     // Sort roles by day-specific priority
     const orderedRoles = sortRolesByPriority(roles, dayOfWeek, dayRolePriorities);
@@ -197,7 +216,11 @@ export function generateSchedule(input: SchedulerInput): SchedulerOutput {
           if (isOnHoliday(m, date)) return false;
           if (memberRolesOnDate.get(m.id)?.has(role.id)) return false;
           if (role.exclusiveGroupId) {
-            if (memberGroupsOnDate.get(m.id)?.has(role.exclusiveGroupId)) return false;
+            const memberExclusive = memberExclusiveOnDate.get(m.id);
+            if (memberExclusive?.has(role.exclusiveGroupId)) {
+              const existingRoleId = memberExclusive.get(role.exclusiveGroupId)!;
+              if (existingRoleId !== role.id) return false;
+            }
           }
           // If event has a time window, member must have at least one availability block overlapping it
           const eventWindow = dayEventTimeWindow?.[dayOfWeek];
@@ -228,12 +251,12 @@ export function generateSchedule(input: SchedulerInput): SchedulerOutput {
         assignments.push({ date, roleId: role.id, memberId: chosen.id });
         dayPointers.set(dayOfWeek, result.newPointer);
 
-        // Track exclusive group membership
+        // Track exclusive group: which role was assigned from this group
         if (role.exclusiveGroupId != null) {
-          if (!memberGroupsOnDate.has(chosen.id)) {
-            memberGroupsOnDate.set(chosen.id, new Set());
+          if (!memberExclusiveOnDate.has(chosen.id)) {
+            memberExclusiveOnDate.set(chosen.id, new Map());
           }
-          memberGroupsOnDate.get(chosen.id)!.add(role.exclusiveGroupId);
+          memberExclusiveOnDate.get(chosen.id)!.set(role.exclusiveGroupId, role.id);
         }
         // Track assigned role IDs to prevent duplicates
         if (!memberRolesOnDate.has(chosen.id)) {

@@ -14,7 +14,15 @@ import { eq, and, or, lt, gt, asc, desc, inArray } from "drizzle-orm";
 import { requireAuth, hasGroupAccess, apiError } from "@/lib/api-helpers";
 import { getHolidayConflicts } from "@/lib/holiday-conflicts";
 import { loadScheduleConfig, getPreviousAssignments } from "@/lib/schedule-helpers";
-import { generateSchedule } from "@/lib/scheduler";
+import {
+  generateGroupSchedule,
+  validateDependentRoleAssignment,
+  computeDatesWithGaps,
+  getDependentRoleIds,
+  isDependentRole,
+  filterRebuildableDates,
+  validateDateInScheduleMonth,
+} from "@/lib/schedule-model";
 import { logScheduleAction } from "@/lib/audit-log";
 
 export async function GET(
@@ -254,18 +262,6 @@ export async function PUT(
 
   // Assign a member to a dependent role on a specific schedule date (event)
   if (body.action === "assign" && body.roleId && body.memberId) {
-    const role = (await db
-      .select()
-      .from(roles)
-      .where(eq(roles.id, body.roleId)))[0];
-
-    if (!role || role.dependsOnRoleId == null) {
-      return NextResponse.json(
-        { error: "El rol no es un rol dependiente" },
-        { status: 400 }
-      );
-    }
-
     let sd: { id: number } | undefined;
     if (body.scheduleDateId != null) {
       const row = (await db
@@ -298,40 +294,33 @@ export async function PUT(
       );
     }
 
-    // Validate that the member is assigned to the source role on that date
-    const sourceEntry = (await db
-      .select()
-      .from(scheduleDateAssignments)
-      .where(
-        and(
-          eq(scheduleDateAssignments.scheduleDateId, sd.id),
-          eq(scheduleDateAssignments.roleId, role.dependsOnRoleId),
-          eq(scheduleDateAssignments.memberId, body.memberId)
-        )
-      ))[0];
+    const allRoles = await db
+      .select({ id: roles.id, dependsOnRoleId: roles.dependsOnRoleId })
+      .from(roles)
+      .where(eq(roles.groupId, schedule.groupId));
 
-    if (!sourceEntry) {
-      return NextResponse.json(
-        { error: "El miembro no está asignado al rol fuente en esta fecha" },
-        { status: 400 }
-      );
+    const existingAssignments = await db
+      .select({ roleId: scheduleDateAssignments.roleId, memberId: scheduleDateAssignments.memberId })
+      .from(scheduleDateAssignments)
+      .where(eq(scheduleDateAssignments.scheduleDateId, sd.id));
+
+    const validation = validateDependentRoleAssignment({
+      roleId: body.roleId,
+      memberId: body.memberId,
+      roles: allRoles,
+      assignmentsOnDate: existingAssignments,
+    });
+
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.reason }, { status: 400 });
     }
 
-    // Remove any existing entry for this dependent role on this date
-    const existingEntries = await db
-      .select()
-      .from(scheduleDateAssignments)
-      .where(
-        and(
-          eq(scheduleDateAssignments.scheduleDateId, sd.id),
-          eq(scheduleDateAssignments.roleId, body.roleId)
-        )
-      );
-
-    for (const existing of existingEntries) {
-      await db.delete(scheduleDateAssignments)
-        .where(eq(scheduleDateAssignments.id, existing.id));
-    }
+    await db.delete(scheduleDateAssignments).where(
+      and(
+        eq(scheduleDateAssignments.scheduleDateId, sd.id),
+        eq(scheduleDateAssignments.roleId, body.roleId)
+      )
+    );
 
     await db.insert(scheduleDateAssignments).values({
       scheduleDateId: sd.id,
@@ -356,13 +345,12 @@ export async function PUT(
       );
     }
 
-    // Verify the role is a dependent role
-    const role = (await db
-      .select()
+    const allRolesForCheck = await db
+      .select({ id: roles.id, dependsOnRoleId: roles.dependsOnRoleId })
       .from(roles)
-      .where(eq(roles.id, entry.roleId)))[0];
+      .where(eq(roles.groupId, schedule.groupId));
 
-    if (!role || role.dependsOnRoleId == null) {
+    if (!isDependentRole(entry.roleId, allRolesForCheck)) {
       return NextResponse.json(
         { error: "El rol de la entrada no es un rol dependiente" },
         { status: 400 }
@@ -381,9 +369,7 @@ export async function PUT(
       .select()
       .from(roles)
       .where(eq(roles.groupId, schedule.groupId));
-    const dependentRoleIdSet = new Set(
-      allRoles.filter((r) => r.dependsOnRoleId != null).map((r) => r.id)
-    );
+    const dependentRoleIdSet = getDependentRoleIds(allRoles);
 
     const scheduleDatesForSchedule = await db
       .select({ id: scheduleDate.id, date: scheduleDate.date })
@@ -514,9 +500,8 @@ export async function PUT(
 
     const config = await loadScheduleConfig(groupId);
 
-    // Get all assignable dates for this schedule (type = 'assignable')
     const assignableDatesRows = await db
-      .select({ date: scheduleDate.date, id: scheduleDate.id })
+      .select({ date: scheduleDate.date, id: scheduleDate.id, recurringEventId: scheduleDate.recurringEventId })
       .from(scheduleDate)
       .where(
         and(
@@ -525,15 +510,8 @@ export async function PUT(
         )
       );
     const allRegularDates = [...new Set(assignableDatesRows.map((r) => r.date))].sort();
-    const dateToSdIdsRebuild = new Map<string, number[]>();
-    for (const r of assignableDatesRows) {
-      const list = dateToSdIdsRebuild.get(r.date) ?? [];
-      list.push(r.id);
-      dateToSdIdsRebuild.set(r.date, list);
-    }
 
-    // Only dates from today onwards
-    const futureDates = allRegularDates.filter((d) => d >= today);
+    const futureDates = filterRebuildableDates(allRegularDates, today);
 
     if (futureDates.length === 0) {
       return NextResponse.json(
@@ -557,47 +535,26 @@ export async function PUT(
     const pastEntries = currentEntriesWithDate.filter((e) => e.date < today);
     const futureEntries = currentEntriesWithDate.filter((e) => e.date >= today);
 
-    // Previous assignments for rotation continuity
     const previousAssignments = await getPreviousAssignments(groupId);
-    // Also include past entries from this schedule
     const allPrevious = [
       ...previousAssignments,
       ...pastEntries.map((e) => ({ date: e.date, roleId: e.roleId, memberId: e.memberId })),
     ];
 
     let datesToGenerate: string[];
-    let keptFutureEntries: typeof futureEntries = [];
 
     if (mode === "overwrite") {
       datesToGenerate = futureDates;
     } else {
-      // fill_empty: find dates/roles that have unfilled slots
-      const dependentRoleIdSet = new Set(
-        config.allRoles.filter((r) => r.dependsOnRoleId != null).map((r) => r.id)
-      );
-      const filledSlots = new Map<string, number>();
-      for (const e of futureEntries) {
-        if (dependentRoleIdSet.has(e.roleId)) continue;
-        const key = `${e.date}|${e.roleId}`;
-        filledSlots.set(key, (filledSlots.get(key) ?? 0) + 1);
-      }
+      datesToGenerate = computeDatesWithGaps({
+        dates: futureDates,
+        currentAssignments: futureEntries,
+        roleDefinitions: config.roleDefinitions,
+        dependentRoleIds: config.dependentRoleIds,
+      });
 
-      const datesWithGaps = new Set<string>();
-      for (const date of futureDates) {
-        for (const role of config.roleDefinitions) {
-          const filled = filledSlots.get(`${date}|${role.id}`) ?? 0;
-          if (filled < role.requiredCount) {
-            datesWithGaps.add(date);
-          }
-        }
-      }
-      datesToGenerate = [...datesWithGaps].sort();
-      keptFutureEntries = futureEntries;
-
-      // Include kept future entries as previous assignments so the scheduler
-      // doesn't duplicate them
       allPrevious.push(
-        ...keptFutureEntries.map((e) => ({ date: e.date, roleId: e.roleId, memberId: e.memberId }))
+        ...futureEntries.map((e) => ({ date: e.date, roleId: e.roleId, memberId: e.memberId }))
       );
     }
 
@@ -608,22 +565,14 @@ export async function PUT(
       });
     }
 
-    const result = generateSchedule({
+    const result = generateGroupSchedule({
       dates: datesToGenerate,
+      events: config.recurringEvents,
       roles: config.roleDefinitions,
       members: config.memberInfos,
       previousAssignments: allPrevious,
-      dayRolePriorities:
-        Object.keys(config.dayRolePriorityMap).length > 0
-          ? config.dayRolePriorityMap
-          : undefined,
-      dayEventTimeWindow:
-        Object.keys(config.dayEventTimeWindow).length > 0
-          ? config.dayEventTimeWindow
-          : undefined,
     });
 
-    // Enrich assignments with names
     const memberMap = new Map(config.memberInfos.map((m) => [m.id, m.name]));
     const roleMap = new Map(config.allRoles.map((r) => [r.id, r.name]));
 
@@ -641,23 +590,25 @@ export async function PUT(
       return NextResponse.json({ preview, removedCount });
     }
 
-    // rebuild_apply: persist the changes
+    // rebuild_apply: persist
     if (mode === "overwrite") {
       for (const e of futureEntries) {
         await db.delete(scheduleDateAssignments).where(eq(scheduleDateAssignments.id, e.id));
       }
     }
 
+    // Build lookup: date|recurringEventId -> schedule_date id
+    const sdIdByKey = new Map<string, number>();
+    for (const r of assignableDatesRows) {
+      sdIdByKey.set(`${r.date}|${r.recurringEventId ?? ""}`, r.id);
+    }
+
     if (result.assignments.length > 0) {
       const toInsert: { scheduleDateId: number; roleId: number; memberId: number }[] = [];
       for (const a of result.assignments) {
-        const sdIds = dateToSdIdsRebuild.get(a.date) ?? [];
-        for (const scheduleDateId of sdIds) {
-          toInsert.push({
-            scheduleDateId,
-            roleId: a.roleId,
-            memberId: a.memberId,
-          });
+        const scheduleDateId = sdIdByKey.get(`${a.date}|${a.recurringEventId}`);
+        if (scheduleDateId) {
+          toInsert.push({ scheduleDateId, roleId: a.roleId, memberId: a.memberId });
         }
       }
       if (toInsert.length > 0) {
@@ -686,12 +637,13 @@ export async function PUT(
       return apiError("Tipo inválido", 400, "VALIDATION");
     }
 
-    const [dy, dm] = dateStr.split("-").map(Number);
-    if (dy !== schedule.year || dm !== schedule.month) {
-      return NextResponse.json(
-        { error: "La fecha debe estar dentro del mes del cronograma" },
-        { status: 400 }
-      );
+    const dateValidation = validateDateInScheduleMonth({
+      date: dateStr,
+      month: schedule.month,
+      year: schedule.year,
+    });
+    if (!dateValidation.valid) {
+      return apiError(dateValidation.reason, 400, "VALIDATION");
     }
 
     await db.insert(scheduleDate).values({
