@@ -14,10 +14,7 @@ export async function GET(request: NextRequest) {
   if (authResult.error) return authResult.error;
 
   if (!checkUserSearchRateLimit(request)) {
-    return NextResponse.json(
-      { error: "Demasiadas búsquedas. Intenta más tarde." },
-      { status: 429 }
-    );
+    return apiError("Demasiadas búsquedas. Intenta más tarde.", 429, "RATE_LIMITED");
   }
 
   const groupIdResult = await extractGroupIdOrSlug(request);
@@ -26,7 +23,7 @@ export async function GET(request: NextRequest) {
 
   const access = await hasGroupAccess(authResult.user.id, groupId);
   if (!access) {
-    return apiError("Forbidden", 403, "FORBIDDEN");
+    return apiError("Sin permiso", 403, "FORBIDDEN");
   }
 
   const { searchParams } = new URL(request.url);

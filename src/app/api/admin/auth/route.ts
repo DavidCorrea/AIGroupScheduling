@@ -21,7 +21,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Check if any admin users exist
   const admins = await db
     .select({ id: users.id })
     .from(users)

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireGroupAccess } from "@/lib/api-helpers";
+import { requireGroupAccess, apiError } from "@/lib/api-helpers";
 import {
   loadConfigContextForGroup,
   CONFIG_CONTEXT_SLICES,
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   const include = parseInclude(request.nextUrl.searchParams.get("include"));
   const data = await loadConfigContextForGroup(groupId, { include });
   if (!data) {
-    return NextResponse.json({ error: "Grupo no encontrado" }, { status: 404 });
+    return apiError("Grupo no encontrado", 404, "NOT_FOUND");
   }
 
   return NextResponse.json({

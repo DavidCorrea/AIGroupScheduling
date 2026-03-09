@@ -5,16 +5,7 @@ import { eq, and, ne } from "drizzle-orm";
 import { requireAuth, hasGroupAccess, apiError, parseBody } from "@/lib/api-helpers";
 import { memberUpdateSchema } from "@/lib/schemas/members";
 import { loadMemberById } from "@/lib/data-access";
-
-function normalizeHHMM(v: unknown): string | null {
-  if (v == null) return null;
-  const s = String(v).trim();
-  const m = /^(\d{1,2}):(\d{2})$/.exec(s);
-  if (!m) return null;
-  const h = Math.min(23, Math.max(0, parseInt(m[1], 10)));
-  const min = Math.min(59, Math.max(0, parseInt(m[2], 10)));
-  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
-}
+import { toTimeInputValue } from "@/lib/timezone-utils";
 
 export async function GET(
   _request: NextRequest,
@@ -33,7 +24,7 @@ export async function GET(
 
   const access = await hasGroupAccess(authResult.user.id, member.groupId);
   if (!access) {
-    return apiError("Forbidden", 403, "FORBIDDEN");
+    return apiError("Sin permiso", 403, "FORBIDDEN");
   }
 
   return NextResponse.json(member);
@@ -64,10 +55,9 @@ export async function PUT(
 
   const access = await hasGroupAccess(authResult.user.id, existing.groupId);
   if (!access) {
-    return apiError("Forbidden", 403, "FORBIDDEN");
+    return apiError("Sin permiso", 403, "FORBIDDEN");
   }
 
-  // Build update fields
   const updateFields: Record<string, unknown> = {};
 
   if (name !== undefined) {
@@ -115,7 +105,6 @@ export async function PUT(
     }
   }
 
-  // Check for duplicate email within the group
   const effectiveEmail = updateFields.email as string | null | undefined;
   if (effectiveEmail) {
     const duplicate = (await db
@@ -158,8 +147,8 @@ export async function PUT(
       for (const a of availabilityBody) {
         const weekdayId = a.weekdayId != null ? Number(a.weekdayId) : NaN;
         if (!Number.isInteger(weekdayId) || weekdayId < 1) continue;
-        const start = normalizeHHMM(a.startTimeUtc) ?? "00:00";
-        const end = normalizeHHMM(a.endTimeUtc) ?? "23:59";
+        const start = a.startTimeUtc != null ? toTimeInputValue(String(a.startTimeUtc)) : "00:00";
+        const end = a.endTimeUtc != null ? toTimeInputValue(String(a.endTimeUtc)) : "23:59";
         toInsert.push({ memberId, weekdayId, startTimeUtc: start, endTimeUtc: end });
       }
     } else if (Array.isArray(availableDayIds)) {
@@ -176,7 +165,6 @@ export async function PUT(
     }
   }
 
-  // Return updated member with user info
   const updated = (await db
     .select({
       id: members.id,
@@ -246,10 +234,9 @@ export async function DELETE(
 
   const access = await hasGroupAccess(authResult.user.id, existing.groupId);
   if (!access) {
-    return apiError("Forbidden", 403, "FORBIDDEN");
+    return apiError("Sin permiso", 403, "FORBIDDEN");
   }
 
-  // Check if member has schedule assignments
   const assignments = await db
     .select({ id: scheduleDateAssignments.id })
     .from(scheduleDateAssignments)

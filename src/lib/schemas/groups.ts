@@ -13,3 +13,7 @@ export const groupCreateSchema = z.object({
   roles: z.array(z.object({ name: z.string() })).optional(),
   collaboratorUserIds: z.array(z.string()).optional(),
 });
+
+export const collaboratorAddSchema = z.object({
+  userId: z.string().min(1, "userId es obligatorio"),
+});

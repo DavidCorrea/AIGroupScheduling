@@ -14,3 +14,14 @@ export const configHolidayCreateSchema = z
     path: ["endDate"],
   });
 export type ConfigHolidayCreate = z.infer<typeof configHolidayCreateSchema>;
+
+export const userHolidayCreateSchema = z
+  .object({
+    startDate: dateString,
+    endDate: dateString,
+    description: z.string().nullable().optional(),
+  })
+  .refine((data) => data.startDate <= data.endDate, {
+    message: "La fecha de inicio debe ser anterior o igual a la fecha de fin",
+    path: ["endDate"],
+  });

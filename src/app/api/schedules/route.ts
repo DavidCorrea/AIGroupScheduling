@@ -9,9 +9,10 @@ import { eq, and } from "drizzle-orm";
 import { getScheduleDates } from "@/lib/dates";
 import { loadScheduleConfig, getPreviousAssignments } from "@/lib/schedule-helpers";
 import { generateGroupSchedule } from "@/lib/schedule-model";
-import { requireGroupAccess } from "@/lib/api-helpers";
+import { requireGroupAccess, parseBody, apiError } from "@/lib/api-helpers";
 import { logScheduleAction } from "@/lib/audit-log";
 import { revalidateCronograma } from "@/lib/public-schedule";
+import { scheduleCreateSchema } from "@/lib/schemas/schedules";
 
 const MONTH_NAMES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -38,22 +39,14 @@ export async function POST(request: NextRequest) {
   const { groupId } = accessResult;
 
   const body = await request.json();
-  const { months } = body;
-
-  if (!months || !Array.isArray(months) || months.length === 0) {
-    return NextResponse.json(
-      { error: "months is required (array of { month, year })" },
-      { status: 400 }
-    );
-  }
+  const parsed = parseBody(scheduleCreateSchema, body);
+  if (parsed.error) return parsed.error;
+  const { months } = parsed.data;
 
   const config = await loadScheduleConfig(groupId);
 
   if (config.activeDayNames.length === 0) {
-    return NextResponse.json(
-      { error: "No active recurring events configured" },
-      { status: 400 }
-    );
+    return apiError("No hay eventos recurrentes activos", 400, "VALIDATION");
   }
 
   let previousAssignments = await getPreviousAssignments(groupId);
@@ -66,10 +59,7 @@ export async function POST(request: NextRequest) {
       .from(schedules)
       .where(and(eq(schedules.groupId, groupId), eq(schedules.month, month), eq(schedules.year, year))))[0];
     if (existing) {
-      return NextResponse.json(
-        { error: `Ya existe un cronograma para ${MONTH_NAMES[month - 1]} ${year}.` },
-        { status: 409 }
-      );
+      return apiError(`Ya existe un cronograma para ${MONTH_NAMES[month - 1]} ${year}.`, 409, "DUPLICATE");
     }
 
     const dates = getScheduleDates(month, year, config.activeDayNames);
@@ -88,12 +78,10 @@ export async function POST(request: NextRequest) {
       .values({ month, year, status: "draft", groupId })
       .returning())[0];
 
-    // Persist schedule_date rows from model output and build lookup for assignments
-    const sdIdByKey = new Map<string, number>();
-    for (const sd of result.scheduleDates) {
-      const [inserted] = await db
-        .insert(scheduleDate)
-        .values({
+    const insertedDates = await db
+      .insert(scheduleDate)
+      .values(
+        result.scheduleDates.map((sd) => ({
           scheduleId: schedule.id,
           date: sd.date,
           type: sd.type,
@@ -102,19 +90,25 @@ export async function POST(request: NextRequest) {
           startTimeUtc: sd.startTimeUtc,
           endTimeUtc: sd.endTimeUtc,
           recurringEventId: sd.recurringEventId,
-        })
-        .returning({ id: scheduleDate.id });
-      sdIdByKey.set(`${sd.date}|${sd.recurringEventId}`, inserted.id);
+        }))
+      )
+      .returning({ id: scheduleDate.id, date: scheduleDate.date, recurringEventId: scheduleDate.recurringEventId });
+
+    const sdIdByKey = new Map<string, number>();
+    for (const row of insertedDates) {
+      sdIdByKey.set(`${row.date}|${row.recurringEventId}`, row.id);
     }
 
-    for (const a of result.assignments) {
-      const scheduleDateId = sdIdByKey.get(`${a.date}|${a.recurringEventId}`);
-      if (!scheduleDateId) continue;
-      await db.insert(scheduleDateAssignments).values({
-        scheduleDateId,
-        roleId: a.roleId,
-        memberId: a.memberId,
-      });
+    const assignmentValues = result.assignments
+      .map((a) => {
+        const scheduleDateId = sdIdByKey.get(`${a.date}|${a.recurringEventId}`);
+        if (!scheduleDateId) return null;
+        return { scheduleDateId, roleId: a.roleId, memberId: a.memberId };
+      })
+      .filter((v): v is NonNullable<typeof v> => v !== null);
+
+    if (assignmentValues.length > 0) {
+      await db.insert(scheduleDateAssignments).values(assignmentValues);
     }
 
     await logScheduleAction(

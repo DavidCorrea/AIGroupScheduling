@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { holidays } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { requireAuth, apiError } from "@/lib/api-helpers";
+import { requireAuth, parseBody, apiError } from "@/lib/api-helpers";
 import { loadUserHolidays } from "@/lib/data-access";
+import { userHolidayCreateSchema } from "@/lib/schemas/holidays";
 
 export async function GET() {
   const authResult = await requireAuth();
@@ -18,21 +19,9 @@ export async function POST(request: NextRequest) {
   if (authResult.error) return authResult.error;
 
   const body = await request.json();
-  const { startDate, endDate, description } = body;
-
-  if (!startDate || !endDate) {
-    return NextResponse.json(
-      { error: "startDate y endDate son obligatorios" },
-      { status: 400 }
-    );
-  }
-
-  if (startDate > endDate) {
-    return NextResponse.json(
-      { error: "La fecha de inicio debe ser anterior o igual a la fecha de fin" },
-      { status: 400 }
-    );
-  }
+  const parsed = parseBody(userHolidayCreateSchema, body);
+  if (parsed.error) return parsed.error;
+  const { startDate, endDate, description } = parsed.data;
 
   const holiday = (await db
     .insert(holidays)
@@ -55,10 +44,7 @@ export async function DELETE(request: NextRequest) {
   const id = searchParams.get("id");
 
   if (!id) {
-    return NextResponse.json(
-      { error: "id es obligatorio" },
-      { status: 400 }
-    );
+    return apiError("id es obligatorio", 400, "VALIDATION");
   }
 
   const holidayId = parseInt(id, 10);
@@ -68,15 +54,12 @@ export async function DELETE(request: NextRequest) {
     .where(eq(holidays.id, holidayId)))[0];
 
   if (!existing) {
-    return NextResponse.json(
-      { error: "Fecha no encontrada" },
-      { status: 404 }
-    );
+    return apiError("Fecha no encontrada", 404, "NOT_FOUND");
   }
 
   // Verify the holiday belongs to the current user
   if (existing.userId !== authResult.user.id) {
-    return apiError("Forbidden", 403, "FORBIDDEN");
+    return apiError("Sin permiso", 403, "FORBIDDEN");
   }
 
   await db.delete(holidays).where(eq(holidays.id, holidayId));

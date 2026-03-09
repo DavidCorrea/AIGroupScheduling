@@ -30,7 +30,7 @@ export async function GET(
 
   const access = await hasGroupAccess(authResult.user.id, member.groupId);
   if (!access) {
-    return apiError("Forbidden", 403, "FORBIDDEN");
+    return apiError("Sin permiso", 403, "FORBIDDEN");
   }
 
   const hasEmail = member.email && member.email.trim().length > 0;

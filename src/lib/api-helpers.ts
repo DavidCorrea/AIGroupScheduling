@@ -31,28 +31,8 @@ export function parseBody<T extends z.ZodType>(
     return { data: result.data as z.infer<T> };
   }
   const first = result.error.issues[0];
-  const message = first?.message ?? "Invalid request body";
+  const message = first?.message ?? "Cuerpo de solicitud inválido";
   return { error: apiError(message, 400, "VALIDATION") };
-}
-
-/**
- * Extract groupId from a request's query string (?groupId=N).
- * Returns the parsed groupId or a NextResponse error.
- */
-export function extractGroupId(request: NextRequest): number | NextResponse {
-  const { searchParams } = new URL(request.url);
-  const groupIdStr = searchParams.get("groupId");
-
-  if (!groupIdStr) {
-    return apiError("groupId query parameter is required", 400, "MISSING_GROUP_ID");
-  }
-
-  const groupId = parseInt(groupIdStr, 10);
-  if (isNaN(groupId)) {
-    return apiError("groupId must be a number", 400, "INVALID_GROUP_ID");
-  }
-
-  return groupId;
 }
 
 /**
@@ -68,7 +48,7 @@ export async function extractGroupIdOrSlug(request: NextRequest): Promise<number
   if (groupIdStr) {
     const groupId = parseInt(groupIdStr, 10);
     if (isNaN(groupId)) {
-      return apiError("groupId must be a number", 400, "INVALID_GROUP_ID");
+      return apiError("groupId debe ser un número", 400, "INVALID_GROUP_ID");
     }
     return groupId;
   }
@@ -81,7 +61,7 @@ export async function extractGroupIdOrSlug(request: NextRequest): Promise<number
     return group.id;
   }
 
-  return apiError("groupId or slug query parameter is required", 400, "MISSING_GROUP_ID");
+  return apiError("Parámetro groupId o slug es obligatorio", 400, "MISSING_GROUP_ID");
 }
 
 /**
@@ -103,7 +83,7 @@ export async function requireAuth(): Promise<
 > {
   const user = await getAuthUser();
   if (!user) {
-    return { error: apiError("Unauthorized", 401, "UNAUTHORIZED") };
+    return { error: apiError("No autorizado", 401, "UNAUTHORIZED") };
   }
   return { user };
 }
@@ -112,7 +92,6 @@ export async function requireAuth(): Promise<
  * Check if a user has admin access to a group (is owner or collaborator).
  */
 export async function hasGroupAccess(userId: string, groupId: number): Promise<boolean> {
-  // Check if owner
   const group = await db
     .select({ id: groups.id })
     .from(groups)
@@ -121,7 +100,6 @@ export async function hasGroupAccess(userId: string, groupId: number): Promise<b
 
   if (group.length > 0) return true;
 
-  // Check if collaborator
   const collab = await db
     .select({ id: groupCollaborators.id })
     .from(groupCollaborators)
@@ -147,7 +125,7 @@ export async function requireGroupAccess(request: NextRequest): Promise<
 
   const access = await hasGroupAccess(authResult.user.id, groupId);
   if (!access) {
-    return { error: apiError("Forbidden", 403, "FORBIDDEN") };
+    return { error: apiError("Sin permiso", 403, "FORBIDDEN") };
   }
 
   return { user: authResult.user, groupId };
@@ -198,7 +176,6 @@ export async function requireAdmin(request: NextRequest): Promise<
       return { isBootstrap: true };
     }
 
-    // Check Basic Auth header
     const authHeader = request.headers.get("authorization");
     if (authHeader?.startsWith("Basic ")) {
       const decoded = atob(authHeader.slice(6));
@@ -211,5 +188,5 @@ export async function requireAdmin(request: NextRequest): Promise<
     }
   }
 
-  return { error: apiError("Forbidden", 403, "FORBIDDEN") };
+  return { error: apiError("Sin permiso", 403, "FORBIDDEN") };
 }

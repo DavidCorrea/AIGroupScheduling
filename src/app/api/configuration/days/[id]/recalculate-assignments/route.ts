@@ -23,7 +23,7 @@ export async function POST(
   const { id } = await params;
   const recurringEventId = parseInt(id, 10);
   if (isNaN(recurringEventId)) {
-    return apiError("Invalid event id", 400, "VALIDATION");
+    return apiError("ID de evento inválido", 400, "VALIDATION");
   }
 
   const event = (await db
@@ -53,7 +53,7 @@ export async function POST(
   const config = await loadScheduleConfig(groupId);
   const today = new Date().toISOString().split("T")[0];
   let totalApplied = 0;
-  const errors: string[] = [];
+  let failedCount = 0;
 
   for (const scheduleId of scheduleIds) {
     try {
@@ -129,15 +129,17 @@ export async function POST(
       });
 
       totalApplied += result.assignments.length;
-    } catch (e) {
-      errors.push(String(e));
+    } catch (error) {
+      console.error(`Failed to recalculate schedule ${scheduleId}:`, error);
+      failedCount++;
     }
   }
 
-  if (errors.length > 0) {
-    return NextResponse.json(
-      { error: "Error al recalcular algunas asignaciones", details: errors },
-      { status: 500 }
+  if (failedCount > 0) {
+    return apiError(
+      `Error al recalcular ${failedCount} cronograma(s)`,
+      500,
+      "RECALCULATE_ERROR"
     );
   }
 

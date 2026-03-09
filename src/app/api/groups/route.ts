@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     const access = await hasGroupAccess(userId, group.id);
     if (!access) {
-      return apiError("Forbidden", 403, "FORBIDDEN");
+      return apiError("Sin permiso", 403, "FORBIDDEN");
     }
 
     return NextResponse.json(group);
@@ -41,7 +41,6 @@ export async function POST(request: NextRequest) {
   if (authResult.error) return authResult.error;
   const userId = authResult.user.id;
 
-  // Check if user has permission to create groups
   const dbUser = (await db
     .select({ isAdmin: users.isAdmin, canCreateGroups: users.canCreateGroups })
     .from(users)

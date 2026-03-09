@@ -47,7 +47,7 @@ export function middleware(request: NextRequest) {
   if (!hasSession) {
     // API calls get 401, page requests get redirected to login
     if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
     return NextResponse.redirect(new URL("/login", request.url));
   }

@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { groups } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { requireAdmin } from "@/lib/api-helpers";
+import { requireAdmin, parseBody, apiError } from "@/lib/api-helpers";
 import { loadAdminGroups } from "@/lib/data-access";
+import { adminGroupPatchSchema } from "@/lib/schemas/admin";
 
 export async function GET(request: NextRequest) {
   const adminResult = await requireAdmin(request);
@@ -18,14 +19,9 @@ export async function PATCH(request: NextRequest) {
   if (adminResult.error) return adminResult.error;
 
   const body = await request.json();
-  const { groupId, calendarExportEnabled } = body;
-
-  if (!groupId || typeof groupId !== "number") {
-    return NextResponse.json(
-      { error: "groupId es obligatorio y debe ser un número" },
-      { status: 400 }
-    );
-  }
+  const parsed = parseBody(adminGroupPatchSchema, body);
+  if (parsed.error) return parsed.error;
+  const { groupId, calendarExportEnabled } = parsed.data;
 
   const existing = (await db
     .select()
@@ -33,17 +29,7 @@ export async function PATCH(request: NextRequest) {
     .where(eq(groups.id, groupId)))[0];
 
   if (!existing) {
-    return NextResponse.json(
-      { error: "Grupo no encontrado" },
-      { status: 404 }
-    );
-  }
-
-  if (typeof calendarExportEnabled !== "boolean") {
-    return NextResponse.json(
-      { error: "calendarExportEnabled debe ser true o false" },
-      { status: 400 }
-    );
+    return apiError("Grupo no encontrado", 404, "NOT_FOUND");
   }
 
   await db
@@ -74,10 +60,7 @@ export async function DELETE(request: NextRequest) {
   const groupId = groupIdParam != null ? parseInt(groupIdParam, 10) : NaN;
 
   if (Number.isNaN(groupId) || groupId < 1) {
-    return NextResponse.json(
-      { error: "groupId es obligatorio y debe ser un número válido" },
-      { status: 400 }
-    );
+    return apiError("groupId es obligatorio y debe ser un número válido", 400, "VALIDATION");
   }
 
   const existing = (await db
@@ -86,10 +69,7 @@ export async function DELETE(request: NextRequest) {
     .where(eq(groups.id, groupId)))[0];
 
   if (!existing) {
-    return NextResponse.json(
-      { error: "Grupo no encontrado" },
-      { status: 404 }
-    );
+    return apiError("Grupo no encontrado", 404, "NOT_FOUND");
   }
 
   await db.delete(groups).where(eq(groups.id, groupId));

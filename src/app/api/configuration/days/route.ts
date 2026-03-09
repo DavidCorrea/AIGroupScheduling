@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import { recurringEvents, weekdays, scheduleDate } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { dayIndex } from "@/lib/constants";
-import { requireGroupAccess, apiError } from "@/lib/api-helpers";
+import { requireGroupAccess, apiError, parseBody } from "@/lib/api-helpers";
+import { eventCreateSchema, eventUpdateSchema } from "@/lib/schemas/events";
 
 export async function GET(request: NextRequest) {
   const accessResult = await requireGroupAccess(request);
@@ -36,14 +37,9 @@ export async function PUT(request: NextRequest) {
   const { groupId } = accessResult;
 
   const body = await request.json();
-  const { id, active, type, label, startTimeUtc, endTimeUtc, notes, dayOfWeek: bodyDayOfWeek } = body;
-
-  if (!id) {
-    return NextResponse.json(
-      { error: "Day id is required" },
-      { status: 400 }
-    );
-  }
+  const parsed = parseBody(eventUpdateSchema, body);
+  if (parsed.error) return parsed.error;
+  const { id, active, type, label, startTimeUtc, endTimeUtc, notes, dayOfWeek } = parsed.data;
 
   const existing = (await db
     .select()
@@ -51,7 +47,7 @@ export async function PUT(request: NextRequest) {
     .where(eq(recurringEvents.id, id)))[0];
 
   if (!existing || existing.groupId !== groupId) {
-    return apiError("Day not found", 404, "NOT_FOUND");
+    return apiError("Evento no encontrado", 404, "NOT_FOUND");
   }
 
   const updates: Partial<{
@@ -63,45 +59,25 @@ export async function PUT(request: NextRequest) {
     endTimeUtc: string;
     notes: string | null;
   }> = {};
-  if (typeof active === "boolean") updates.active = active;
-  if (typeof bodyDayOfWeek === "string" && bodyDayOfWeek.trim() !== "") {
-    const dayOfWeek = bodyDayOfWeek.trim();
+  if (active !== undefined) updates.active = active;
+  if (dayOfWeek !== undefined && dayOfWeek !== "") {
     const weekdayRow = (await db.select().from(weekdays).where(eq(weekdays.name, dayOfWeek)))[0];
     if (!weekdayRow) {
-      return NextResponse.json(
-        { error: "Invalid dayOfWeek" },
-        { status: 400 }
-      );
+      return apiError("Día de la semana inválido", 400, "VALIDATION");
     }
     updates.weekdayId = weekdayRow.id;
   }
-  if (type === "assignable" || type === "for_everyone") {
+  if (type !== undefined) {
     updates.type = type;
     if (type === "for_everyone") updates.active = true;
-  } else if (typeof type === "string" && type.toLowerCase() === "for_everyone") {
-    updates.type = "for_everyone";
-    updates.active = true;
-  } else if (typeof type === "string" && type.toLowerCase() === "assignable") {
-    updates.type = "assignable";
   }
-  if (typeof label === "string") {
-    updates.label = label.trim() || "Evento";
-  }
-  if (typeof startTimeUtc === "string" && /^\d{1,2}:\d{2}$/.test(startTimeUtc)) {
-    updates.startTimeUtc = startTimeUtc;
-  }
-  if (typeof endTimeUtc === "string" && /^\d{1,2}:\d{2}$/.test(endTimeUtc)) {
-    updates.endTimeUtc = endTimeUtc;
-  }
-  if (notes !== undefined) {
-    updates.notes = typeof notes === "string" ? notes.trim() || null : null;
-  }
+  if (label !== undefined) updates.label = label;
+  if (startTimeUtc !== undefined) updates.startTimeUtc = startTimeUtc;
+  if (endTimeUtc !== undefined) updates.endTimeUtc = endTimeUtc;
+  if (notes !== undefined) updates.notes = notes;
 
   if (Object.keys(updates).length === 0) {
-    return NextResponse.json(
-      { error: "At least one of active, dayOfWeek, type, label, startTimeUtc, endTimeUtc, or notes must be provided" },
-      { status: 400 }
-    );
+    return apiError("Al menos un campo debe ser proporcionado", 400, "VALIDATION");
   }
 
   // When deactivating, remove this event's dates from all schedules so they are "hidden"
@@ -139,40 +115,13 @@ export async function POST(request: NextRequest) {
   const { groupId } = accessResult;
 
   const body = await request.json();
-  const dayOfWeek = typeof body.dayOfWeek === "string" ? body.dayOfWeek.trim() : "";
-  const active = typeof body.active === "boolean" ? body.active : true;
-  let type: string = "assignable";
-  if (body.type === "for_everyone" || (typeof body.type === "string" && body.type.toLowerCase() === "for_everyone")) {
-    type = "for_everyone";
-  } else if (body.type === "assignable" || (typeof body.type === "string" && body.type.toLowerCase() === "assignable")) {
-    type = "assignable";
-  }
-  const label =
-    typeof body.label === "string" && body.label.trim() !== ""
-      ? body.label.trim()
-      : "Evento";
-  const notes =
-    typeof body.notes === "string" ? (body.notes.trim() || null) : null;
-  const startTimeUtc = typeof body.startTimeUtc === "string" && /^\d{1,2}:\d{2}$/.test(body.startTimeUtc)
-    ? body.startTimeUtc
-    : "00:00";
-  const endTimeUtc = typeof body.endTimeUtc === "string" && /^\d{1,2}:\d{2}$/.test(body.endTimeUtc)
-    ? body.endTimeUtc
-    : "23:59";
-
-  if (!dayOfWeek) {
-    return NextResponse.json(
-      { error: "dayOfWeek is required" },
-      { status: 400 }
-    );
-  }
+  const parsed = parseBody(eventCreateSchema, body);
+  if (parsed.error) return parsed.error;
+  const { dayOfWeek, active, type, label, notes, startTimeUtc, endTimeUtc } = parsed.data;
 
   const weekdayRow = (await db.select().from(weekdays).where(eq(weekdays.name, dayOfWeek)))[0];
   if (!weekdayRow) {
-    return NextResponse.json(
-      { error: "Invalid dayOfWeek" },
-      { status: 400 }
-    );
+    return apiError("Día de la semana inválido", 400, "VALIDATION");
   }
 
   const [created] = await db

@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { groupCollaborators, groups, users, members } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { requireAuth, hasGroupAccess, apiError } from "@/lib/api-helpers";
+import { requireAuth, hasGroupAccess, apiError, parseBody } from "@/lib/api-helpers";
 import { loadGroupCollaborators } from "@/lib/data-access";
+import { collaboratorAddSchema } from "@/lib/schemas/groups";
 
 export async function GET(
   _request: NextRequest,
@@ -17,7 +18,7 @@ export async function GET(
 
   const access = await hasGroupAccess(authResult.user.id, groupId);
   if (!access) {
-    return apiError("Forbidden", 403, "FORBIDDEN");
+    return apiError("Sin permiso", 403, "FORBIDDEN");
   }
 
   const result = await loadGroupCollaborators(groupId);
@@ -36,59 +37,41 @@ export async function POST(
 
   const access = await hasGroupAccess(authResult.user.id, groupId);
   if (!access) {
-    return apiError("Forbidden", 403, "FORBIDDEN");
+    return apiError("Sin permiso", 403, "FORBIDDEN");
   }
 
   const body = await request.json();
-  const { userId } = body;
+  const parsed = parseBody(collaboratorAddSchema, body);
+  if (parsed.error) return parsed.error;
+  const { userId } = parsed.data;
 
-  if (!userId || typeof userId !== "string") {
-    return NextResponse.json(
-      { error: "userId es obligatorio" },
-      { status: 400 }
-    );
-  }
-
-  // Verify user exists
   const user = (await db
     .select()
     .from(users)
     .where(eq(users.id, userId)))[0];
 
   if (!user) {
-    return NextResponse.json(
-      { error: "Usuario no encontrado" },
-      { status: 404 }
-    );
+    return apiError("Usuario no encontrado", 404, "NOT_FOUND");
   }
 
-  // Check not already a collaborator
   const existing = (await db
     .select()
     .from(groupCollaborators)
     .where(and(eq(groupCollaborators.groupId, groupId), eq(groupCollaborators.userId, userId))))[0];
 
   if (existing) {
-    return NextResponse.json(
-      { error: "El usuario ya es colaborador" },
-      { status: 409 }
-    );
+    return apiError("El usuario ya es colaborador", 409, "CONFLICT");
   }
 
-  // Check not the owner
   const group = (await db
     .select({ ownerId: groups.ownerId })
     .from(groups)
     .where(eq(groups.id, groupId)))[0];
 
   if (group && group.ownerId === userId) {
-    return NextResponse.json(
-      { error: "El usuario ya es dueño del grupo" },
-      { status: 409 }
-    );
+    return apiError("El usuario ya es dueño del grupo", 409, "CONFLICT");
   }
 
-  // Must be a member of the group (linked by userId) to be added as collaborator
   const groupMember = (await db
     .select({ id: members.id })
     .from(members)
@@ -100,10 +83,7 @@ export async function POST(
     ))[0];
 
   if (!groupMember) {
-    return NextResponse.json(
-      { error: "Solo se pueden agregar como colaboradores a miembros del grupo" },
-      { status: 400 }
-    );
+    return apiError("Solo se pueden agregar como colaboradores a miembros del grupo", 400, "VALIDATION");
   }
 
   const collab = (await db
@@ -129,20 +109,29 @@ export async function DELETE(
 
   const access = await hasGroupAccess(authResult.user.id, groupId);
   if (!access) {
-    return apiError("Forbidden", 403, "FORBIDDEN");
+    return apiError("Sin permiso", 403, "FORBIDDEN");
   }
 
   const { searchParams } = new URL(request.url);
   const collabId = searchParams.get("collabId");
 
   if (!collabId) {
-    return NextResponse.json(
-      { error: "collabId query parameter is required" },
-      { status: 400 }
-    );
+    return apiError("Parámetro collabId es obligatorio", 400, "VALIDATION");
   }
 
-  await db.delete(groupCollaborators).where(eq(groupCollaborators.id, parseInt(collabId, 10)));
+  const parsedId = parseInt(collabId, 10);
+  if (isNaN(parsedId)) {
+    return apiError("collabId debe ser un número", 400, "VALIDATION");
+  }
+
+  const deleted = await db
+    .delete(groupCollaborators)
+    .where(and(eq(groupCollaborators.id, parsedId), eq(groupCollaborators.groupId, groupId)))
+    .returning({ id: groupCollaborators.id });
+
+  if (deleted.length === 0) {
+    return apiError("Colaborador no encontrado", 404, "NOT_FOUND");
+  }
 
   return NextResponse.json({ success: true });
 }

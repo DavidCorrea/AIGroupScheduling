@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { requireAdmin } from "@/lib/api-helpers";
+import { requireAdmin, parseBody, apiError } from "@/lib/api-helpers";
 import { loadAdminUsers } from "@/lib/data-access";
+import { adminUserUpdateSchema } from "@/lib/schemas/admin";
 
 export async function GET(request: NextRequest) {
   const adminResult = await requireAdmin(request);
@@ -18,14 +19,9 @@ export async function PUT(request: NextRequest) {
   if (adminResult.error) return adminResult.error;
 
   const body = await request.json();
-  const { userId, isAdmin, canCreateGroups, canExportCalendars } = body;
-
-  if (!userId || typeof userId !== "string") {
-    return NextResponse.json(
-      { error: "userId es obligatorio" },
-      { status: 400 }
-    );
-  }
+  const parsed = parseBody(adminUserUpdateSchema, body);
+  if (parsed.error) return parsed.error;
+  const { userId, isAdmin, canCreateGroups, canExportCalendars } = parsed.data;
 
   const existing = (await db
     .select()
@@ -33,10 +29,7 @@ export async function PUT(request: NextRequest) {
     .where(eq(users.id, userId)))[0];
 
   if (!existing) {
-    return NextResponse.json(
-      { error: "Usuario no encontrado" },
-      { status: 404 }
-    );
+    return apiError("Usuario no encontrado", 404, "NOT_FOUND");
   }
 
   const updateFields: Record<string, unknown> = {};
@@ -45,10 +38,7 @@ export async function PUT(request: NextRequest) {
   if (typeof canExportCalendars === "boolean") updateFields.canExportCalendars = canExportCalendars;
 
   if (Object.keys(updateFields).length === 0) {
-    return NextResponse.json(
-      { error: "No hay campos para actualizar" },
-      { status: 400 }
-    );
+    return apiError("No hay campos para actualizar", 400, "VALIDATION");
   }
 
   await db.update(users)
@@ -79,10 +69,7 @@ export async function DELETE(request: NextRequest) {
   const userId = searchParams.get("id");
 
   if (!userId) {
-    return NextResponse.json(
-      { error: "id es obligatorio" },
-      { status: 400 }
-    );
+    return apiError("id es obligatorio", 400, "VALIDATION");
   }
 
   const existing = (await db
@@ -91,10 +78,7 @@ export async function DELETE(request: NextRequest) {
     .where(eq(users.id, userId)))[0];
 
   if (!existing) {
-    return NextResponse.json(
-      { error: "Usuario no encontrado" },
-      { status: 404 }
-    );
+    return apiError("Usuario no encontrado", 404, "NOT_FOUND");
   }
 
   await db.delete(users).where(eq(users.id, userId));

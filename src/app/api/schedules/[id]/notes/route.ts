@@ -23,7 +23,7 @@ export async function GET(
   }
   const access = await hasGroupAccess(authResult.user.id, schedule.groupId);
   if (!access) {
-    return apiError("Forbidden", 403, "FORBIDDEN");
+    return apiError("Sin permiso", 403, "FORBIDDEN");
   }
 
   const rows = await db
@@ -53,7 +53,7 @@ export async function POST(
   }
   const access = await hasGroupAccess(authResult.user.id, schedule.groupId);
   if (!access) {
-    return apiError("Forbidden", 403, "FORBIDDEN");
+    return apiError("Sin permiso", 403, "FORBIDDEN");
   }
   const raw = await request.json();
   const parsed = parseBody(scheduleNoteSchema, raw);
@@ -99,16 +99,13 @@ export async function DELETE(
   }
   const access = await hasGroupAccess(authResult.user.id, schedule.groupId);
   if (!access) {
-    return apiError("Forbidden", 403, "FORBIDDEN");
+    return apiError("Sin permiso", 403, "FORBIDDEN");
   }
   const { searchParams } = new URL(request.url);
   const date = searchParams.get("date");
 
   if (!date) {
-    return NextResponse.json(
-      { error: "date query param is required" },
-      { status: 400 }
-    );
+    return apiError("Parámetro date es obligatorio", 400, "VALIDATION");
   }
 
   const existing = (await db
@@ -122,10 +119,7 @@ export async function DELETE(
     ))[0];
 
   if (!existing) {
-    return NextResponse.json(
-      { error: "Fecha no encontrada" },
-      { status: 404 }
-    );
+    return apiError("Fecha no encontrada", 404, "NOT_FOUND");
   }
 
   await db

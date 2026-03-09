@@ -21,7 +21,7 @@ export async function GET(
   const { id } = await params;
   const recurringEventId = parseInt(id, 10);
   if (isNaN(recurringEventId)) {
-    return apiError("Invalid event id", 400, "VALIDATION");
+    return apiError("ID de evento inválido", 400, "VALIDATION");
   }
 
   const event = (await db

@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { eventRolePriorities, recurringEvents, roles } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { requireGroupAccess, apiError } from "@/lib/api-helpers";
+import { requireGroupAccess, apiError, parseBody } from "@/lib/api-helpers";
 import { loadEventPriorities } from "@/lib/data-access";
+import { priorityCreateSchema, priorityBulkUpdateSchema } from "@/lib/schemas/priorities";
 
 export async function GET(request: NextRequest) {
   const accessResult = await requireGroupAccess(request);
@@ -20,19 +21,14 @@ export async function POST(request: NextRequest) {
   const { groupId } = accessResult;
 
   const body = await request.json();
-  const { recurringEventId, roleId, priority } = body;
-
-  if (!recurringEventId || !roleId || priority === undefined) {
-    return NextResponse.json(
-      { error: "recurringEventId, roleId, and priority are required" },
-      { status: 400 }
-    );
-  }
+  const parsed = parseBody(priorityCreateSchema, body);
+  if (parsed.error) return parsed.error;
+  const { recurringEventId, roleId, priority } = parsed.data;
 
   const event = (await db.select({ groupId: recurringEvents.groupId }).from(recurringEvents).where(eq(recurringEvents.id, recurringEventId)))[0];
   const role = (await db.select({ groupId: roles.groupId }).from(roles).where(eq(roles.id, roleId)))[0];
   if (!event || event.groupId !== groupId || !role || role.groupId !== groupId) {
-    return apiError("Forbidden", 403, "FORBIDDEN");
+    return apiError("Sin permiso", 403, "FORBIDDEN");
   }
 
   const existing = (await db
@@ -71,26 +67,22 @@ export async function PUT(request: NextRequest) {
   const { groupId } = accessResult;
 
   const body = await request.json();
-  const { recurringEventId, priorities } = body;
-
-  if (!recurringEventId || !Array.isArray(priorities)) {
-    return NextResponse.json(
-      { error: "recurringEventId and priorities array are required" },
-      { status: 400 }
-    );
-  }
+  const parsed = parseBody(priorityBulkUpdateSchema, body);
+  if (parsed.error) return parsed.error;
+  const { recurringEventId, priorities } = parsed.data;
 
   const event = (await db.select({ groupId: recurringEvents.groupId }).from(recurringEvents).where(eq(recurringEvents.id, recurringEventId)))[0];
   if (!event || event.groupId !== groupId) {
-    return apiError("Forbidden", 403, "FORBIDDEN");
+    return apiError("Sin permiso", 403, "FORBIDDEN");
   }
 
   await db.delete(eventRolePriorities)
     .where(eq(eventRolePriorities.recurringEventId, recurringEventId));
 
-  for (const { roleId, priority } of priorities) {
-    await db.insert(eventRolePriorities)
-      .values({ recurringEventId, roleId, priority });
+  if (priorities.length > 0) {
+    await db.insert(eventRolePriorities).values(
+      priorities.map(({ roleId, priority }) => ({ recurringEventId, roleId, priority }))
+    );
   }
 
   const updated = await db
@@ -110,16 +102,13 @@ export async function DELETE(request: NextRequest) {
   const recurringEventId = searchParams.get("recurringEventId");
 
   if (!recurringEventId) {
-    return NextResponse.json(
-      { error: "recurringEventId query param is required" },
-      { status: 400 }
-    );
+    return apiError("Parámetro recurringEventId es obligatorio", 400, "VALIDATION");
   }
 
   const eventId = parseInt(recurringEventId, 10);
   const event = (await db.select({ groupId: recurringEvents.groupId }).from(recurringEvents).where(eq(recurringEvents.id, eventId)))[0];
   if (!event || event.groupId !== groupId) {
-    return apiError("Forbidden", 403, "FORBIDDEN");
+    return apiError("Sin permiso", 403, "FORBIDDEN");
   }
 
   await db.delete(eventRolePriorities)

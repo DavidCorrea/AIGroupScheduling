@@ -41,7 +41,7 @@ export async function DELETE(
     .where(and(eq(members.id, existing.memberId), eq(members.groupId, groupId))))[0];
 
   if (!member) {
-    return apiError("Forbidden", 403, "FORBIDDEN");
+    return apiError("Sin permiso", 403, "FORBIDDEN");
   }
 
   await db.delete(holidays).where(eq(holidays.id, holidayId));

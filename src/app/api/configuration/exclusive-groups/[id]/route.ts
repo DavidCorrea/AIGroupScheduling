@@ -28,11 +28,11 @@ export async function DELETE(
     .where(eq(exclusiveGroups.id, exGroupId)))[0];
 
   if (!existing) {
-    return apiError("Group not found", 404, "NOT_FOUND");
+    return apiError("Grupo no encontrado", 404, "NOT_FOUND");
   }
 
   if (existing.groupId !== groupId) {
-    return apiError("Forbidden", 403, "FORBIDDEN");
+    return apiError("Sin permiso", 403, "FORBIDDEN");
   }
 
   await db.delete(exclusiveGroups).where(eq(exclusiveGroups.id, exGroupId));

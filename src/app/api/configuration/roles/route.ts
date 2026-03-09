@@ -65,10 +65,10 @@ export async function PUT(request: NextRequest) {
 
   const existing = (await db.select().from(roles).where(eq(roles.id, id)))[0];
   if (!existing) {
-    return apiError("Role not found", 404, "NOT_FOUND");
+    return apiError("Rol no encontrado", 404, "NOT_FOUND");
   }
   if (existing.groupId !== groupId) {
-    return apiError("Forbidden", 403, "FORBIDDEN");
+    return apiError("Sin permiso", 403, "FORBIDDEN");
   }
 
   const updates: Partial<{ name: string; requiredCount: number; dependsOnRoleId: number | null; exclusiveGroupId: number | null; isRelevant: boolean }> = {};
@@ -120,17 +120,17 @@ export async function DELETE(request: NextRequest) {
   const id = searchParams.get("id");
 
   if (!id) {
-    return apiError("Role id is required", 400, "MISSING_ID");
+    return apiError("ID del rol es obligatorio", 400, "MISSING_ID");
   }
 
   const roleId = parseInt(id, 10);
 
   const existing = (await db.select().from(roles).where(eq(roles.id, roleId)))[0];
   if (!existing) {
-    return apiError("Role not found", 404, "NOT_FOUND");
+    return apiError("Rol no encontrado", 404, "NOT_FOUND");
   }
   if (existing.groupId !== groupId) {
-    return apiError("Forbidden", 403, "FORBIDDEN");
+    return apiError("Sin permiso", 403, "FORBIDDEN");
   }
 
   // Cascade: delete schedule entries referencing this role
