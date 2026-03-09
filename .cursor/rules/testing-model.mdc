@@ -1,0 +1,42 @@
+---
+description: Model code must have exhaustive tests — every change requires test updates
+alwaysApply: true
+---
+
+# Model testing
+
+The model layer is the critical core of the app. Every model function must have corresponding tests. When touching model code, tests are not optional — they are part of the change.
+
+**Conventions:** Jest in `spec/` (ts-jest). `npm test` / `npm run test:watch`. Test descriptions use real scenario language, no technical jargon (e.g. "linked member gets both user and member holidays" not "filter returns union of arrays"). Describe real scenarios; avoid testing implementation details.
+
+**When modifying any model file:**
+
+1. **Read** the matching test file first — tests are the authoritative spec for that module.
+2. **Green baseline** — run the tests before changing anything.
+3. **After the change**, add or update tests for every affected scenario. If a function's contract changed, its tests must reflect the new contract.
+4. **New behaviour** → write the test first, then implement (TDD).
+5. **All tests must pass** (`npx jest --no-cache`) before the change is considered complete.
+
+**Current model → test mapping:**
+
+| Model file | Test file |
+|------------|-----------|
+| `src/lib/schedule-model.ts` | `spec/schedule-model.spec.ts` |
+| `src/lib/scheduler.ts` | `spec/scheduler.spec.ts` |
+| `src/lib/scheduler-types.ts` | (covered by both above) |
+| `src/lib/dashboard-conflicts.ts` | `spec/dashboard-conflicts.spec.ts` |
+| `src/lib/constants.ts` | `spec/constants.spec.ts` |
+| `src/lib/admin-bootstrap-token.ts` | `spec/admin-bootstrap-token.spec.ts` |
+| `src/lib/intl-utils.ts` | `spec/intl-utils.spec.ts` |
+| `src/lib/timezone-utils.ts` | `spec/timezone-utils.spec.ts` |
+| `src/lib/holiday-conflicts.ts` | `spec/holiday-conflicts.spec.ts` |
+
+As the model layer grows (see model-boundary rule), new model modules get their own test file in `spec/`. Add the mapping here when you create one.
+
+**Scheduling algorithm scenario index** (reference for scheduler and schedule-model tests):
+
+- **Scenarios 1–9** (Eligibility): availability, time windows, holidays.
+- **Scenarios 10–17** (Role-priority): fill order, exclusive group impact, tight max.
+- **Scenarios 18–26** (Exclusive groups): cross-event blocking, same-role allowed, processing order, priority order.
+- **Scenarios 27–31** (Cross-group conflicts): in `spec/dashboard-conflicts.spec.ts`.
+- **Scenarios 32–40** (Month continuity): pointer carryover, returning members, new members, changed availability.

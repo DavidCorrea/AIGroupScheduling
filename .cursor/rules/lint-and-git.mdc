@@ -1,9 +1,0 @@
----
-description: ESLint, pre-commit, no --no-verify; one logical change per commit
-alwaysApply: true
----
-
-# Linting and Git
-
-- **Lint:** ESLint config in `eslint.config.mjs`. Run `npm run lint`; `eslint --fix` auto-fixes. Pre-commit (Husky) runs lint-staged on staged `.js`, `.mjs`, `.cjs`, `.ts`, `.tsx`; failed lint aborts commit. Do not introduce new lint errors; fix or suppress only with explicit justification.
-- **Git:** Commits = only related changes (one feature/task per commit). Multiple features requested → one commit per feature. **Do not commit with `--no-verify`**; fix lint and pre-commit checks so the hook passes.

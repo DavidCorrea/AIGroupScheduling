@@ -1,0 +1,10 @@
+---
+description: ESLint, pre-commit hooks, lint-staged — no lint errors allowed
+alwaysApply: true
+---
+
+# Linting
+
+- **Config:** ESLint in `eslint.config.mjs`. Run `npm run lint`; `eslint --fix` auto-fixes.
+- **Pre-commit:** Husky runs lint-staged on staged `.js`, `.mjs`, `.cjs`, `.ts`, `.tsx`; failed lint aborts commit.
+- **Rule:** Do not introduce new lint errors; fix or suppress only with explicit justification.
