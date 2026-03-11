@@ -169,7 +169,6 @@ export default function SharedScheduleView({
     tableScheduleDatesByWeek,
     useScheduleDateRows,
     getDateDisplayLabel,
-    getNoteForScheduleDate,
     hasConflict,
     isPast,
     hasDependentRoleOnDate,
@@ -274,7 +273,6 @@ export default function SharedScheduleView({
             getNonDependentRolesForDate={getNonDependentRolesForDate}
             hasDependentRoleOnDate={hasDependentRoleOnDate}
             getDependentRoleNamesOnDate={getDependentRoleNamesOnDate}
-            getNoteForScheduleDate={getNoteForScheduleDate}
             scheduleDateByDateMap={scheduleDateByDateMap}
             t={t}
           />
@@ -304,7 +302,6 @@ export default function SharedScheduleView({
                         filteredMemberId &&
                         entriesOnSd.some((e) => data.relevantRoleIdSet.has(e.roleId));
                       const highlighted = depRoleDate || relevantRoleDate;
-                      const note = getNoteForScheduleDate(sd);
                       return (
                         <div key={sd.id ?? sd.date}>
                           {isForEveryone ? (
@@ -333,9 +330,6 @@ export default function SharedScheduleView({
                                 <p className="text-xs text-muted-foreground mt-0.5">
                                   {getDateDisplayTimeRange(sd)}
                                 </p>
-                              )}
-                              {note && (
-                                <p className="text-xs text-accent mt-1">{note}</p>
                               )}
                             </button>
                           ) : (
@@ -383,11 +377,6 @@ export default function SharedScheduleView({
                                     </span>
                                   </div>
                                 </div>
-                                {note && (
-                                  <p className="text-xs text-accent mt-1">
-                                    {note}
-                                  </p>
-                                )}
                               </div>
                             </button>
                           )}
@@ -447,11 +436,6 @@ export default function SharedScheduleView({
                                   {getDateDisplayTimeRange(sd)}
                                 </p>
                               )}
-                              {getNoteForScheduleDate(sd) && (
-                                <p className="text-xs text-accent mt-1">
-                                  {getNoteForScheduleDate(sd)}
-                                </p>
-                              )}
                             </button>
                           ) : (
                             <button
@@ -495,11 +479,6 @@ export default function SharedScheduleView({
                                     </span>
                                   </div>
                                 </div>
-                                {getNoteForScheduleDate(sd) && (
-                                  <p className="text-xs text-accent mt-1">
-                                    {getNoteForScheduleDate(sd)}
-                                  </p>
-                                )}
                               </div>
                             </button>
                           )}
@@ -545,7 +524,6 @@ export default function SharedScheduleView({
             weekDateRangeLabel={weekDateRangeLabel}
             desktopContainerWidth={desktopContainerWidth}
             getDateDisplayLabel={getDateDisplayLabel}
-            getNoteForScheduleDate={getNoteForScheduleDate}
             hasConflict={hasConflict}
             isPast={isPast}
             t={t}
@@ -574,7 +552,6 @@ export default function SharedScheduleView({
         scheduleDateByDateMap={scheduleDateByDateMap}
         getDateDisplayLabel={getDateDisplayLabel}
         getDateDisplayTimeRange={getDateDisplayTimeRange}
-        getNoteForScheduleDate={getNoteForScheduleDate}
         hasConflict={hasConflict}
         filteredMemberId={filteredMemberId}
         t={t}

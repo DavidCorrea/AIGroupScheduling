@@ -64,6 +64,9 @@ const addDateAction = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
   type: z.enum(["assignable", "for_everyone"]).default("assignable"),
   label: z.string().optional(),
+  startTimeUtc: z.string().regex(/^\d{2}:\d{2}$/, "Must be HH:MM").optional(),
+  endTimeUtc: z.string().regex(/^\d{2}:\d{2}$/, "Must be HH:MM").optional(),
+  note: z.string().optional(),
 });
 
 const hhmmPattern = z.string().regex(/^\d{2}:\d{2}$/, "Must be HH:MM");
@@ -72,9 +75,11 @@ const updateDateAction = z.object({
   action: z.literal("update_date"),
   scheduleDateId: z.number().int().optional(),
   date: z.string().optional(),
+  newDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD").optional(),
   startTimeUtc: hhmmPattern.optional(),
   endTimeUtc: hhmmPattern.optional(),
   note: z.string().optional(),
+  label: z.string().optional(),
 });
 
 const removeDateAction = z.object({

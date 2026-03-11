@@ -433,7 +433,7 @@ export async function rebuildSchedule(
 export async function addScheduleDate(ctx: ActionContext, body: ActionBody<"add_date">) {
   const dateStr = body.date;
   const type = body.type;
-  const label = type === "for_everyone" ? (body.label ?? "Ensayo") : null;
+  const label = body.label?.trim() || null;
 
   const dateValidation = validateDateInScheduleMonth({
     date: dateStr,
@@ -449,9 +449,9 @@ export async function addScheduleDate(ctx: ActionContext, body: ActionBody<"add_
     date: dateStr,
     type,
     label,
-    note: null,
-    startTimeUtc: "00:00",
-    endTimeUtc: "23:59",
+    note: body.note ?? null,
+    startTimeUtc: body.startTimeUtc ?? "00:00",
+    endTimeUtc: body.endTimeUtc ?? "23:59",
     recurringEventId: null,
   });
 
@@ -463,7 +463,7 @@ export async function addScheduleDate(ctx: ActionContext, body: ActionBody<"add_
 }
 
 export async function updateScheduleDate(ctx: ActionContext, body: ActionBody<"update_date">) {
-  const { startTimeUtc, endTimeUtc, note } = body;
+  const { startTimeUtc, endTimeUtc, note, newDate, label } = body;
 
   let sd: { id: number; date: string } | undefined;
   if (body.scheduleDateId != null) {
@@ -493,16 +493,36 @@ export async function updateScheduleDate(ctx: ActionContext, body: ActionBody<"u
     return apiError("Fecha no encontrada en el cronograma", 404, "NOT_FOUND");
   }
 
-  const updates: Partial<{ startTimeUtc: string; endTimeUtc: string; note: string | null }> = {};
+  const updates: Partial<{ date: string; startTimeUtc: string; endTimeUtc: string; note: string | null; label: string | null; recurringEventId: null }> = {};
+
+  if (newDate !== undefined && newDate !== sd.date) {
+    const dateValidation = validateDateInScheduleMonth({
+      date: newDate,
+      month: ctx.schedule.month,
+      year: ctx.schedule.year,
+    });
+    if (!dateValidation.valid) {
+      return apiError(dateValidation.reason, 400, "VALIDATION");
+    }
+    updates.date = newDate;
+    updates.recurringEventId = null;
+  }
+
   if (startTimeUtc !== undefined) updates.startTimeUtc = startTimeUtc;
   if (endTimeUtc !== undefined) updates.endTimeUtc = endTimeUtc;
   if (note !== undefined) {
     updates.note = note === "" ? null : (note?.trim() ?? null);
   }
+  if (label !== undefined) {
+    updates.label = label === "" ? null : (label?.trim() ?? null);
+  }
 
   if (Object.keys(updates).length > 0) {
     await db.update(scheduleDate).set(updates).where(eq(scheduleDate.id, sd.id));
-    await logScheduleAction(ctx.scheduleId, ctx.userId, "date_updated", `Fecha actualizada: ${sd.date}`);
+    const detail = updates.date
+      ? `Fecha movida: ${sd.date} → ${updates.date}`
+      : `Fecha actualizada: ${sd.date}`;
+    await logScheduleAction(ctx.scheduleId, ctx.userId, "date_updated", detail);
   }
 
   await revalidate(ctx);

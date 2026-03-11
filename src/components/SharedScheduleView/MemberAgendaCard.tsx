@@ -12,7 +12,6 @@ interface MemberAgendaCardProps {
   getNonDependentRolesForDate: (date: string) => string;
   hasDependentRoleOnDate: (date: string) => boolean;
   getDependentRoleNamesOnDate: (date: string) => string[];
-  getNoteForScheduleDate: (sd: ScheduleDateInfo) => string | undefined;
   scheduleDateByDateMap: Map<string, ScheduleDateInfo>;
   t: (key: string, values?: Record<string, string | number>) => string;
 }
@@ -25,7 +24,6 @@ export function MemberAgendaCard({
   getNonDependentRolesForDate,
   hasDependentRoleOnDate,
   getDependentRoleNamesOnDate,
-  getNoteForScheduleDate,
   scheduleDateByDateMap,
   t,
 }: MemberAgendaCardProps) {
@@ -65,11 +63,6 @@ export function MemberAgendaCard({
                 </span>
               )}
             </p>
-            {getNoteForScheduleDate(upcomingSd) && (
-              <p className="text-xs text-accent mt-2">
-                {getNoteForScheduleDate(upcomingSd)}
-              </p>
-            )}
           </div>
         )}
       </div>
@@ -108,11 +101,6 @@ export function MemberAgendaCard({
                 )}
               </span>
             </div>
-            {getNoteForScheduleDate(upcomingSd) && (
-              <p className="text-xs text-accent mt-2">
-                {getNoteForScheduleDate(upcomingSd)}
-              </p>
-            )}
           </div>
         )}
       </div>

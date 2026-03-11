@@ -20,7 +20,6 @@ interface DesktopTableProps {
   weekDateRangeLabel: (weekNumber: number) => string;
   desktopContainerWidth: number;
   getDateDisplayLabel: (sd: ScheduleDateInfo) => string;
-  getNoteForScheduleDate: (sd: ScheduleDateInfo) => string | undefined;
   hasConflict: (date: string, memberId: number) => boolean;
   isPast: (date: string) => boolean;
   t: (key: string) => string;
@@ -39,7 +38,6 @@ function DesktopTableInner({
   weekDateRangeLabel,
   desktopContainerWidth,
   getDateDisplayLabel,
-  getNoteForScheduleDate,
   hasConflict,
   isPast,
   t,
@@ -119,7 +117,6 @@ function DesktopTableInner({
                       e.date === date &&
                       (!filteredRoleId || e.roleId === filteredRoleId),
                   );
-                  const note = getNoteForScheduleDate(sd);
                   const label = !isForEveryone
                     ? getDateDisplayLabel(sd)
                     : null;
@@ -200,9 +197,6 @@ function DesktopTableInner({
                           </table>
                         </div>
                       ) : null}
-                      {note && (
-                        <p className="text-xs text-accent mt-1.5">{note}</p>
-                      )}
                     </div>
                   );
                 })}
@@ -238,7 +232,6 @@ function DesktopTableInner({
                           e.date === date &&
                           (!filteredRoleId || e.roleId === filteredRoleId),
                       );
-                      const note = getNoteForScheduleDate(sd);
                       return (
                         <tr
                           key={date}
@@ -264,11 +257,6 @@ function DesktopTableInner({
                                   {getDateDisplayTimeRange(sd)}
                                 </div>
                               )}
-                            {note && (
-                              <div className="text-xs text-accent font-normal mt-0.5">
-                                {note}
-                              </div>
-                            )}
                           </td>
                           {isForEveryone ? (
                             <td

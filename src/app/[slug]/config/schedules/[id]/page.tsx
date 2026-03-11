@@ -28,6 +28,7 @@ export default async function ScheduleDetailPage({
     name: m.name,
     roleIds: m.roleIds,
     availableDayIds: m.availableDayIds,
+    availability: m.availability,
   }));
 
   const scheduleDays = (configContext?.days ?? []).map((d) => ({

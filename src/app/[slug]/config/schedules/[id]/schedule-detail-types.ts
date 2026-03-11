@@ -62,6 +62,7 @@ export interface Member {
   name: string;
   roleIds: number[];
   availableDayIds: number[];
+  availability: { weekdayId: number; startTimeUtc: string; endTimeUtc: string }[];
 }
 
 export interface ScheduleDay {

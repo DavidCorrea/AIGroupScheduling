@@ -11,7 +11,7 @@ import {
   localTimeToUtc,
 } from "@/lib/timezone-utils";
 import { getEligibleMemberIds } from "@/lib/schedule-model";
-import BackLink from "@/components/BackLink";
+import { getDayNameFromDateString } from "@/lib/dates";
 import { DangerZone } from "@/components/DangerZone";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { TogglePill } from "@/components/TogglePill";
@@ -25,7 +25,7 @@ import type {
 } from "./schedule-detail-types";
 import { getWeekDateRange, slotKey } from "./schedule-detail-helpers";
 import { RebuildModal } from "./RebuildModal";
-import { EditDateModal } from "./EditDateModal";
+import { DateFormModal } from "./DateFormModal";
 import { AuditLogSection } from "./AuditLogSection";
 
 export default function ScheduleDetailClient({
@@ -69,8 +69,12 @@ export default function ScheduleDetailClient({
 
   const [extraDateValue, setExtraDateValue] = useState("");
   const [extraDateType, setExtraDateType] = useState<"assignable" | "for_everyone">("assignable");
-  const [extraDateLabel, setExtraDateLabel] = useState("Ensayo");
+  const [extraDateLabel, setExtraDateLabel] = useState("");
+  const [extraDateStartUtc, setExtraDateStartUtc] = useState("");
+  const [extraDateEndUtc, setExtraDateEndUtc] = useState("");
+  const [extraDateNote, setExtraDateNote] = useState("");
   const [showAddDate, setShowAddDate] = useState(false);
+  const [addDateSaving, setAddDateSaving] = useState(false);
 
   const [rebuildOpen, setRebuildOpen] = useState(false);
   const [rebuildMode, setRebuildMode] = useState<"overwrite" | "fill_empty" | null>(null);
@@ -80,9 +84,11 @@ export default function ScheduleDetailClient({
 
   const [editDateModal, setEditDateModal] = useState<ScheduleDateInfo | null>(null);
   const [confirmDeleteDateOpen, setConfirmDeleteDateOpen] = useState(false);
+  const [editDateNewDate, setEditDateNewDate] = useState("");
   const [editDateStartUtc, setEditDateStartUtc] = useState("00:00");
   const [editDateEndUtc, setEditDateEndUtc] = useState("23:59");
   const [editDateNote, setEditDateNote] = useState("");
+  const [editDateLabel, setEditDateLabel] = useState("");
   const [editDateSaving, setEditDateSaving] = useState(false);
 
   const [logOpen, setLogOpen] = useState(false);
@@ -135,15 +141,6 @@ export default function ScheduleDetailClient({
       ),
     [schedule]
   );
-  const noteMap = useMemo(
-    () =>
-      new Map(
-        schedule.scheduleDates
-          .filter((sd) => sd.note != null && sd.note.trim() !== "")
-          .map((sd) => [sd.id, sd.note!])
-      ),
-    [schedule]
-  );
   const visibleScheduleDates = useMemo(() => {
     const list = [...schedule.scheduleDates];
     list.sort((a, b) => {
@@ -171,6 +168,30 @@ export default function ScheduleDetailClient({
           .map((id) => weekdayIdToDayName.get(id))
           .filter((n): n is string => n != null),
       })),
+    [members, weekdayIdToDayName]
+  );
+
+  const getUnavailableMembers = useCallback(
+    (date: string, sdStartUtc: string, sdEndUtc: string): Map<number, "day" | "time"> => {
+      const dayName = getDayNameFromDateString(date);
+      const result = new Map<number, "day" | "time">();
+      for (const m of members) {
+        const dayBlocks = m.availability.filter(
+          (a) => weekdayIdToDayName.get(a.weekdayId) === dayName
+        );
+        if (dayBlocks.length === 0) {
+          if (m.availability.length > 0) result.set(m.id, "day");
+          continue;
+        }
+        const isFullDay = sdStartUtc === "00:00" && sdEndUtc === "23:59";
+        if (!isFullDay) {
+          const toMin = (t: string) => { const [h, mm] = t.split(":").map(Number); return h * 60 + mm; };
+          const overlaps = dayBlocks.some((b) => toMin(sdStartUtc) < toMin(b.endTimeUtc) && toMin(b.startTimeUtc) < toMin(sdEndUtc));
+          if (!overlaps) result.set(m.id, "time");
+        }
+      }
+      return result;
+    },
     [members, weekdayIdToDayName]
   );
 
@@ -257,8 +278,24 @@ export default function ScheduleDetailClient({
     }
   };
 
+  const resetAddDateState = () => {
+    setExtraDateValue("");
+    setExtraDateType("assignable");
+    setExtraDateLabel("");
+    setExtraDateStartUtc("");
+    setExtraDateEndUtc("");
+    setExtraDateNote("");
+    setAddDateSaving(false);
+  };
+
+  const closeAddDate = () => {
+    setShowAddDate(false);
+    resetAddDateState();
+  };
+
   const handleAddExtraDate = async () => {
     if (!extraDateValue) return;
+    setAddDateSaving(true);
     const res = await fetch(`/api/schedules/${scheduleId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -266,12 +303,15 @@ export default function ScheduleDetailClient({
         action: "add_date",
         date: extraDateValue,
         type: extraDateType,
-        label: extraDateType === "for_everyone" ? extraDateLabel : undefined,
+        label: extraDateLabel.trim() || undefined,
+        startTimeUtc: extraDateStartUtc ? localTimeToUtc(extraDateStartUtc) : undefined,
+        endTimeUtc: extraDateEndUtc ? localTimeToUtc(extraDateEndUtc) : undefined,
+        note: extraDateNote || undefined,
       }),
     });
+    setAddDateSaving(false);
     if (res.ok) {
-      setExtraDateValue("");
-      setShowAddDate(false);
+      closeAddDate();
       fetchData();
     } else {
       const data = await res.json();
@@ -281,9 +321,11 @@ export default function ScheduleDetailClient({
 
   const openEditDateModal = (sd: ScheduleDateInfo) => {
     setEditDateModal(sd);
+    setEditDateNewDate(sd.date);
     setEditDateStartUtc(utcTimeToLocalDisplay(sd.startTimeUtc ?? "00:00"));
     setEditDateEndUtc(utcTimeToLocalDisplay(sd.endTimeUtc ?? "23:59"));
     setEditDateNote(sd.note ?? "");
+    setEditDateLabel(sd.label ?? "");
   };
 
   const closeEditDateModal = () => {
@@ -293,16 +335,21 @@ export default function ScheduleDetailClient({
   const handleSaveEditDate = async () => {
     if (!editDateModal) return;
     setEditDateSaving(true);
+    const payload: Record<string, unknown> = {
+      action: "update_date",
+      scheduleDateId: editDateModal.id,
+      startTimeUtc: localTimeToUtc(editDateStartUtc),
+      endTimeUtc: localTimeToUtc(editDateEndUtc),
+      note: editDateNote.trim() || null,
+      label: editDateLabel.trim() || null,
+    };
+    if (editDateNewDate && editDateNewDate !== editDateModal.date) {
+      payload.newDate = editDateNewDate;
+    }
     const res = await fetch(`/api/schedules/${scheduleId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "update_date",
-        scheduleDateId: editDateModal.id,
-        startTimeUtc: localTimeToUtc(editDateStartUtc),
-        endTimeUtc: localTimeToUtc(editDateEndUtc),
-        note: editDateNote.trim() || null,
-      }),
+      body: JSON.stringify(payload),
     });
     setEditDateSaving(false);
     if (res.ok) {
@@ -427,29 +474,32 @@ export default function ScheduleDetailClient({
   }, [schedule.id, visibleScheduleDatesByWeek, todayISO]);
 
   const getEligibleMembers = (scheduleDateId: number, date: string, role: RoleInfo): Member[] => {
-    const assignmentsOnDate: { roleId: number; memberId: number }[] = [];
-    for (const r of roleOrder) {
-      const slots = Math.max(
-        r.requiredCount,
-        schedule.entries.filter(
-          (e) => e.scheduleDateId === scheduleDateId && e.roleId === r.id
-        ).length
-      );
-      for (let i = 0; i < slots; i++) {
-        const mid = editState.get(slotKey(scheduleDateId, r.id, i));
-        if (mid != null) assignmentsOnDate.push({ roleId: r.id, memberId: mid });
+    if (role.dependsOnRoleId != null) {
+      const assignmentsOnDate: { roleId: number; memberId: number }[] = [];
+      for (const r of roleOrder) {
+        const slots = Math.max(
+          r.requiredCount,
+          schedule.entries.filter(
+            (e) => e.scheduleDateId === scheduleDateId && e.roleId === r.id
+          ).length
+        );
+        for (let i = 0; i < slots; i++) {
+          const mid = editState.get(slotKey(scheduleDateId, r.id, i));
+          if (mid != null) assignmentsOnDate.push({ roleId: r.id, memberId: mid });
+        }
       }
+      const eligibleIds = new Set(
+        getEligibleMemberIds({
+          role: { id: role.id, dependsOnRoleId: role.dependsOnRoleId },
+          date,
+          members: membersWithDayNames,
+          assignmentsOnDate,
+        })
+      );
+      return members.filter((m) => eligibleIds.has(m.id));
     }
 
-    const eligibleIds = new Set(
-      getEligibleMemberIds({
-        role: { id: role.id, dependsOnRoleId: role.dependsOnRoleId },
-        date,
-        members: membersWithDayNames,
-        assignmentsOnDate,
-      })
-    );
-    return members.filter((m) => eligibleIds.has(m.id));
+    return members.filter((m) => m.roleIds.includes(role.id));
   };
 
   const renderSlotSelect = (
@@ -457,7 +507,9 @@ export default function ScheduleDetailClient({
     date: string,
     role: RoleInfo,
     slotIndex: number,
-    totalSlots?: number
+    totalSlots?: number,
+    sdStartUtc?: string,
+    sdEndUtc?: string,
   ) => {
     const key = slotKey(scheduleDateId, role.id, slotIndex);
     const currentMemberId = editState.get(key) ?? null;
@@ -475,8 +527,21 @@ export default function ScheduleDetailClient({
       (m) => !takenByOtherSlots.has(m.id) || m.id === currentMemberId
     );
 
+    const unavailable = role.dependsOnRoleId == null
+      ? getUnavailableMembers(date, sdStartUtc ?? "00:00", sdEndUtc ?? "23:59")
+      : new Map<number, "day" | "time">();
+
     const showConflict =
       currentMemberId != null && conflictSet.has(`${date}-${currentMemberId}`);
+    const unavailReason = currentMemberId != null ? unavailable.get(currentMemberId) : undefined;
+
+    const warningText = showConflict
+      ? t("onHoliday")
+      : unavailReason === "day"
+        ? t("notAvailableDay")
+        : unavailReason === "time"
+          ? t("notAvailableTime")
+          : null;
 
     return (
       <div key={key} className="w-full">
@@ -495,176 +560,132 @@ export default function ScheduleDetailClient({
           <option value="">{t("emptySlot")}</option>
           {options.map((m) => (
             <option key={m.id} value={m.id}>
-              {m.name}
+              {m.name}{unavailable.has(m.id) ? ` ${t("notAvailableTag")}` : ""}
             </option>
           ))}
         </select>
-        {showConflict && (
-          <p className="text-xs text-amber-500 mt-0.5">{t("onHoliday")}</p>
-        )}
+        <p className={`text-xs mt-0.5 min-h-4 ${showConflict ? "text-amber-500" : "text-muted-foreground"}`}>
+          {warningText ?? "\u00A0"}
+        </p>
       </div>
     );
   };
 
   return (
     <div className="space-y-8">
-      <BackLink href={`/${slug}/config/schedules`} label={t("backToScheduleList")} />
       {/* Header */}
       <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-3">
-            {schedule.prevScheduleId && (
-              <a
-                href={`/${slug}/config/schedules/${schedule.prevScheduleId}`}
-                className="rounded-md border border-border px-3 py-2 text-sm hover:border-foreground transition-colors"
-              >
-                {t("previous")}
-              </a>
-            )}
+        <div className="flex items-center justify-between">
+          {schedule.prevScheduleId ? (
+            <a
+              href={`/${slug}/config/schedules/${schedule.prevScheduleId}`}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              ←
+            </a>
+          ) : (
+            <span className="text-sm text-muted-foreground/40 cursor-default">←</span>
+          )}
+          <div className="text-center">
             <h1 className="font-[family-name:var(--font-display)] font-semibold text-2xl sm:text-3xl uppercase">
               {monthNames[schedule.month - 1]} {schedule.year}
             </h1>
-            {schedule.nextScheduleId && (
+            {schedule.status === "committed" ? (
               <a
-                href={`/${slug}/config/schedules/${schedule.nextScheduleId}`}
-                className="rounded-md border border-border px-3 py-2 text-sm hover:border-foreground transition-colors"
+                href={`/${slug}/cronograma/${schedule.year}/${schedule.month}`}
+                className="inline-block rounded-full border border-success/40 text-success px-2.5 py-0.5 text-xs mt-1 hover:opacity-80 transition-opacity"
               >
-                {t("next")}
+                {t("statusPublished")} ↗
               </a>
+            ) : (
+              <span className="inline-block rounded-full border border-amber-400/40 text-amber-600 px-2.5 py-0.5 text-xs mt-1">
+                {t("statusDraft")}
+              </span>
             )}
           </div>
-          <div className="flex gap-2 w-full sm:w-auto">
+          {schedule.nextScheduleId ? (
+            <a
+              href={`/${slug}/config/schedules/${schedule.nextScheduleId}`}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              →
+            </a>
+          ) : (
+            <span className="text-sm text-muted-foreground/40 cursor-default">→</span>
+          )}
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowAddDate(true)}
+              className="rounded-md border border-border px-4 py-2.5 text-sm hover:border-foreground transition-colors"
+            >
+              {t("addDate")}
+            </button>
             {hasFutureDates && (
               <button
                 onClick={() => setRebuildOpen(true)}
                 disabled={isDirty}
-                className="flex-1 sm:flex-none rounded-md border border-border px-4 py-2.5 text-sm hover:border-foreground transition-colors disabled:opacity-50"
+                className="rounded-md border border-border px-4 py-2.5 text-sm hover:border-foreground transition-colors disabled:opacity-50"
                 title={isDirty ? t("rebuildTitleSaveFirst") : t("rebuildTitle")}
               >
                 {t("rebuild")}
               </button>
             )}
-            {schedule.status === "draft" && (
-              <button
-                onClick={handleCommit}
-                disabled={isDirty}
-                className="flex-1 sm:flex-none rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
-                title={isDirty ? t("rebuildTitleSaveFirst") : undefined}
-              >
-                {t("createSchedule")}
-              </button>
-            )}
           </div>
+          {isDirty ? (
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="sm:ml-auto rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {saving ? t("saving") : t("saveChanges")}
+            </button>
+          ) : schedule.status === "draft" ? (
+            <button
+              onClick={handleCommit}
+              className="sm:ml-auto rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+            >
+              {t("createSchedule")}
+            </button>
+          ) : null}
         </div>
-        <p className="text-sm text-muted-foreground">
-          {schedule.status === "committed" ? (
-            <>
-              {t("scheduleCreated")}{" "}
-              <a
-                href={`/${slug}/cronograma/${schedule.year}/${schedule.month}`}
-                className="text-accent hover:opacity-80 transition-opacity"
-              >
-                {t("viewSharedLink")}
-              </a>
-            </>
-          ) : (
-            t("draftNote")
-          )}
-        </p>
       </div>
 
-      {/* Add extra date + past dates toggle */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => setShowAddDate(!showAddDate)}
-          className="text-sm text-accent hover:opacity-80 transition-opacity"
-        >
-          {showAddDate ? tCommon("cancel") : t("addDate")}
-        </button>
-        {hasPastDates && (
+      {hasPastDates && (
+        <div className="flex justify-end">
           <TogglePill
             checked={showPastDates}
             onChange={setShowPastDatesTransition}
             label={t("showPastDates")}
             id="show-past-dates"
           />
-        )}
-      </div>
-      {showAddDate && (
-          <div className="mt-3 flex flex-wrap items-end gap-3 border border-border rounded-md p-4">
-            <div>
-              <label className="block text-xs text-muted-foreground mb-1">{t("dateLabel")}</label>
-              <input
-                type="date"
-                value={extraDateValue}
-                onChange={(e) => setExtraDateValue(e.target.value)}
-                min={`${schedule.year}-${String(schedule.month).padStart(2, "0")}-01`}
-                max={`${schedule.year}-${String(schedule.month).padStart(2, "0")}-${new Date(Date.UTC(schedule.year, schedule.month, 0)).getUTCDate()}`}
-                className="rounded-md border border-border bg-transparent px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-muted-foreground mb-1">{t("typeLabel")}</label>
-              <div className="flex gap-1">
-                <button
-                  onClick={() => setExtraDateType("assignable")}
-                  className={`rounded-md px-3 py-2 text-sm border transition-colors ${
-                    extraDateType === "assignable"
-                      ? "border-foreground text-foreground"
-                      : "border-border text-muted-foreground"
-                  }`}
-                >
-                  {t("typeAssignable")}
-                </button>
-                <button
-                  onClick={() => setExtraDateType("for_everyone")}
-                  className={`rounded-md px-3 py-2 text-sm border transition-colors ${
-                    extraDateType === "for_everyone"
-                      ? "border-foreground text-foreground"
-                      : "border-border text-muted-foreground"
-                  }`}
-                >
-                  {t("typeForEveryone")}
-                </button>
-              </div>
-            </div>
-            {extraDateType === "for_everyone" && (
-              <div>
-                <label className="block text-xs text-muted-foreground mb-1">{t("labelLabel")}</label>
-                <input
-                  type="text"
-                  value={extraDateLabel}
-                  onChange={(e) => setExtraDateLabel(e.target.value)}
-                  placeholder={t("labelPlaceholder")}
-                  className="rounded-md border border-border bg-transparent px-3 py-2 text-sm w-40"
-                />
-              </div>
-            )}
-            <button
-              onClick={handleAddExtraDate}
-              disabled={!extraDateValue}
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              {tCommon("add")}
-            </button>
-          </div>
-        )}
-
-      {/* Sticky save bar */}
-      {isDirty && (
-        <div className="sticky top-0 z-20 bg-background border-b border-border py-3 -mx-4 px-4 sm:-mx-6 sm:px-6 flex items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">
-            {t("unsavedChanges")}
-          </p>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50 shrink-0"
-          >
-            {saving ? t("saving") : t("saveChanges")}
-          </button>
         </div>
       )}
+      <DateFormModal
+        mode="add"
+        open={showAddDate}
+        date={extraDateValue}
+        minDate={`${schedule.year}-${String(schedule.month).padStart(2, "0")}-01`}
+        maxDate={`${schedule.year}-${String(schedule.month).padStart(2, "0")}-${new Date(Date.UTC(schedule.year, schedule.month, 0)).getUTCDate()}`}
+        startUtc={extraDateStartUtc}
+        endUtc={extraDateEndUtc}
+        note={extraDateNote}
+        saving={addDateSaving}
+        dateType={extraDateType}
+        onDateTypeChange={setExtraDateType}
+        dateLabel={extraDateLabel}
+        onDateLabelChange={setExtraDateLabel}
+        onDateChange={setExtraDateValue}
+        onStartChange={setExtraDateStartUtc}
+        onEndChange={setExtraDateEndUtc}
+        onNoteChange={setExtraDateNote}
+        onSave={handleAddExtraDate}
+        onClose={closeAddDate}
+        t={t}
+        tCommon={tCommon}
+      />
+
 
       {/* Mobile card view */}
       <div className="md:hidden space-y-8">
@@ -699,7 +720,6 @@ export default function ScheduleDetailClient({
             <div className="p-4 space-y-4">
         {scheduleDates.map((sd) => {
           const isForEveryone = forEveryoneSet.has(sd.id);
-          const note = noteMap.get(sd.id);
           const timeRange = sd.startTimeUtc && sd.endTimeUtc && (sd.startTimeUtc !== "00:00" || sd.endTimeUtc !== "23:59")
             ? `${utcTimeToLocalDisplay(sd.startTimeUtc)} – ${utcTimeToLocalDisplay(sd.endTimeUtc)}`
             : null;
@@ -710,31 +730,22 @@ export default function ScheduleDetailClient({
               className={`border border-border rounded-md overflow-hidden ${isForEveryone ? "bg-muted/30" : "bg-background"}`}
             >
               <div className="px-4 py-3 border-b border-border">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="font-medium text-sm">{formatDateWeekdayDay(sd.date)}</span>
-                    {timeRange && (
-                      <span className="text-xs text-muted-foreground">{timeRange}</span>
-                    )}
-                    {!isForEveryone && getDateDisplayLabel(sd) && (
-                      <span className="text-xs text-muted-foreground italic">
-                        {getDateDisplayLabel(sd)}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {note ? (
-                      <span className="text-xs text-muted-foreground">{note}</span>
-                    ) : null}
-                    <button
-                      onClick={() => openEditDateModal(sd)}
-                      className="text-xs text-accent hover:opacity-80"
-                      title={t("editEvent")}
-                    >
-                      {tCommon("edit")}
-                    </button>
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => openEditDateModal(sd)}
+                  className="flex flex-col gap-0.5 text-left w-full hover:text-accent transition-colors"
+                  title={t("editEvent")}
+                >
+                  <span className="font-medium text-sm">{formatDateWeekdayDay(sd.date)}</span>
+                  {timeRange && (
+                    <span className="text-xs text-muted-foreground">{timeRange}</span>
+                  )}
+                  {!isForEveryone && getDateDisplayLabel(sd) && (
+                    <span className="text-xs text-muted-foreground italic">
+                      {getDateDisplayLabel(sd)}
+                    </span>
+                  )}
+                </button>
               </div>
 
               {isForEveryone && (
@@ -758,7 +769,7 @@ export default function ScheduleDetailClient({
                         </div>
                         <div className={slotCount > 1 ? "grid grid-cols-2 gap-2" : ""}>
                           {Array.from({ length: slotCount }).map((_, i) =>
-                            renderSlotSelect(sd.id, sd.date, role, i, slotCount)
+                            renderSlotSelect(sd.id, sd.date, role, i, slotCount, sd.startTimeUtc, sd.endTimeUtc)
                           )}
                         </div>
                       </div>
@@ -818,15 +829,11 @@ export default function ScheduleDetailClient({
                   {role.name}
                 </th>
               ))}
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                {t("actions")}
-              </th>
             </tr>
           </thead>
           <tbody>
             {scheduleDates.map((sd) => {
               const isForEveryone = forEveryoneSet.has(sd.id);
-              const note = noteMap.get(sd.id);
               const timeRange = sd.startTimeUtc && sd.endTimeUtc && (sd.startTimeUtc !== "00:00" || sd.endTimeUtc !== "23:59")
                 ? `${utcTimeToLocalDisplay(sd.startTimeUtc)} – ${utcTimeToLocalDisplay(sd.endTimeUtc)}`
                 : null;
@@ -836,8 +843,13 @@ export default function ScheduleDetailClient({
                   key={sd.id}
                   className={`border-b border-border ${isForEveryone ? "bg-muted/20" : "hover:bg-muted/30"} transition-colors`}
                 >
-                  <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">
-                    <div>
+                  <td className="px-4 py-3 text-sm font-medium whitespace-nowrap align-top">
+                    <button
+                      type="button"
+                      onClick={() => openEditDateModal(sd)}
+                      className="text-left hover:text-accent transition-colors"
+                      title={t("editEvent")}
+                    >
                       <div>{formatDateWeekdayDay(sd.date)}</div>
                       {timeRange && (
                         <div className="text-xs text-muted-foreground mt-0.5">{timeRange}</div>
@@ -847,15 +859,12 @@ export default function ScheduleDetailClient({
                           {getDateDisplayLabel(sd)}
                         </div>
                       )}
-                    </div>
-                    {note ? (
-                      <div className="mt-0.5 text-xs text-muted-foreground">{note}</div>
-                    ) : null}
+                    </button>
                   </td>
                   {isForEveryone ? (
                     <td
                       colSpan={roleOrder.length}
-                      className="px-4 py-3 text-sm text-muted-foreground italic text-center"
+                      className="px-4 py-3 text-sm text-muted-foreground italic text-center align-top"
                     >
                       {getDateDisplayLabel(sd) || "Ensayo"}
                     </td>
@@ -867,25 +876,16 @@ export default function ScheduleDetailClient({
                       const slotCount = Math.max(role.requiredCount, existingEntries.length);
 
                       return (
-                        <td key={role.id} className="px-4 py-3 text-sm">
+                        <td key={role.id} className="px-4 py-3 text-sm align-top">
                           <div className={slotCount > 1 ? "grid grid-cols-2 gap-1.5" : ""}>
                             {Array.from({ length: slotCount }).map((_, i) =>
-                              renderSlotSelect(sd.id, sd.date, role, i, slotCount)
+                              renderSlotSelect(sd.id, sd.date, role, i, slotCount, sd.startTimeUtc, sd.endTimeUtc)
                             )}
                           </div>
                         </td>
                       );
                     })
                   )}
-                  <td className="px-4 py-3 text-sm">
-                    <button
-                      onClick={() => openEditDateModal(sd)}
-                      className="text-xs text-accent hover:opacity-80"
-                      title={t("editEvent")}
-                    >
-                      {tCommon("edit")}
-                    </button>
-                  </td>
                 </tr>
               );
             })}
@@ -918,37 +918,42 @@ export default function ScheduleDetailClient({
         </button>
       </DangerZone>
 
-      {rebuildOpen && (
-        <RebuildModal
-          rebuildMode={rebuildMode}
-          rebuildLoading={rebuildLoading}
-          rebuildPreview={rebuildPreview}
-          rebuildRemovedCount={rebuildRemovedCount}
-          onPreview={handleRebuildPreview}
-          onApply={handleRebuildApply}
-          onClose={closeRebuild}
-          t={t}
-          tCommon={tCommon}
-        />
-      )}
+      <RebuildModal
+        open={rebuildOpen}
+        rebuildMode={rebuildMode}
+        rebuildLoading={rebuildLoading}
+        rebuildPreview={rebuildPreview}
+        rebuildRemovedCount={rebuildRemovedCount}
+        onPreview={handleRebuildPreview}
+        onApply={handleRebuildApply}
+        onClose={closeRebuild}
+        t={t}
+        tCommon={tCommon}
+      />
 
-      {editDateModal && (
-        <EditDateModal
-          date={editDateModal.date}
-          startUtc={editDateStartUtc}
-          endUtc={editDateEndUtc}
-          note={editDateNote}
-          saving={editDateSaving}
-          onStartChange={setEditDateStartUtc}
-          onEndChange={setEditDateEndUtc}
-          onNoteChange={setEditDateNote}
-          onSave={handleSaveEditDate}
-          onDelete={handleDeleteFromEditModal}
-          onClose={closeEditDateModal}
-          t={t}
-          tCommon={tCommon}
-        />
-      )}
+      <DateFormModal
+        mode="edit"
+        open={!!editDateModal}
+        originalDate={editDateModal?.date ?? ""}
+        date={editDateNewDate}
+        minDate={`${schedule.year}-${String(schedule.month).padStart(2, "0")}-01`}
+        maxDate={`${schedule.year}-${String(schedule.month).padStart(2, "0")}-${new Date(Date.UTC(schedule.year, schedule.month, 0)).getUTCDate()}`}
+        startUtc={editDateStartUtc}
+        endUtc={editDateEndUtc}
+        note={editDateNote}
+        dateLabel={editDateLabel}
+        saving={editDateSaving}
+        onDateChange={setEditDateNewDate}
+        onStartChange={setEditDateStartUtc}
+        onEndChange={setEditDateEndUtc}
+        onNoteChange={setEditDateNote}
+        onDateLabelChange={setEditDateLabel}
+        onSave={handleSaveEditDate}
+        onDelete={handleDeleteFromEditModal}
+        onClose={closeEditDateModal}
+        t={t}
+        tCommon={tCommon}
+      />
 
       <ConfirmDialog
         open={confirmDeleteDateOpen}

@@ -89,26 +89,6 @@ export function useScheduleData({
     return order;
   }, [schedule.roles, schedule.entries]);
 
-  const noteMap = useMemo(
-    () => new Map(schedule.notes.map((n) => [n.date, n.description])),
-    [schedule.notes],
-  );
-
-  const noteMapByScheduleDateId = useMemo(
-    () =>
-      new Map(
-        schedule.notes
-          .filter(
-            (n) =>
-              (n as { scheduleDateId?: number }).scheduleDateId != null,
-          )
-          .map((n) => [
-            (n as { scheduleDateId: number }).scheduleDateId,
-            n.description,
-          ]),
-      ),
-    [schedule.notes],
-  );
 
   const forEveryoneSet = useMemo(
     () =>
@@ -339,13 +319,6 @@ export function useScheduleData({
     [t],
   );
 
-  const getNoteForScheduleDate = useCallback(
-    (sd: ScheduleDateInfo): string | undefined =>
-      (sd.id != null ? noteMapByScheduleDateId.get(sd.id) : undefined) ??
-      noteMap.get(sd.date),
-    [noteMap, noteMapByScheduleDateId],
-  );
-
   const hasConflict = useCallback(
     (date: string, memberId: number) =>
       conflictSet.has(`${date}-${memberId}`),
@@ -437,7 +410,6 @@ export function useScheduleData({
     tableScheduleDatesByWeek,
     useScheduleDateRows,
     getDateDisplayLabel,
-    getNoteForScheduleDate,
     hasConflict,
     isPast,
     hasDependentRoleOnDate,
