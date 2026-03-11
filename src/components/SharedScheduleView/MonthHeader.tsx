@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { getRawArray } from "@/lib/intl-utils";
 import { MONTH_NAMES } from "./types";
@@ -66,12 +67,12 @@ export function MonthHeader({
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between">
           {schedule.prevSchedule ? (
-            <a
+            <Link
               href={`${basePath}/${schedule.prevSchedule.year}/${schedule.prevSchedule.month}`}
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               ←
-            </a>
+            </Link>
           ) : (
             <span className="text-sm text-muted-foreground/40 cursor-default">
               ←
@@ -88,12 +89,12 @@ export function MonthHeader({
             </h1>
           </div>
           {schedule.nextSchedule ? (
-            <a
+            <Link
               href={`${basePath}/${schedule.nextSchedule.year}/${schedule.nextSchedule.month}`}
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               →
-            </a>
+            </Link>
           ) : (
             <span className="text-sm text-muted-foreground/40 cursor-default">
               →

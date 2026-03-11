@@ -24,27 +24,37 @@ export default async function SharedSchedulePage({
     notFound();
   }
 
-  return (
-    <Suspense fallback={<CronogramaLoadingSkeleton />}>
-      <ScheduleContent slug={slug} year={year} month={month} />
-    </Suspense>
-  );
-}
-
-async function ScheduleContent({
-  slug,
-  year,
-  month,
-}: {
-  slug: string;
-  year: number;
-  month: number;
-}) {
   const group = await resolveGroupBySlug(slug);
   if (!group) {
     notFound();
   }
 
+  return (
+    <Suspense
+      fallback={
+        <CronogramaLoadingSkeleton
+          groupName={group.name}
+          month={month}
+          year={year}
+        />
+      }
+    >
+      <ScheduleContent group={group} slug={slug} year={year} month={month} />
+    </Suspense>
+  );
+}
+
+async function ScheduleContent({
+  group,
+  slug,
+  year,
+  month,
+}: {
+  group: { id: number; name: string };
+  slug: string;
+  year: number;
+  month: number;
+}) {
   const schedule = (
     await db
       .select()
