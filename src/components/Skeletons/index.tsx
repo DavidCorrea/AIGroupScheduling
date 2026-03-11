@@ -184,6 +184,76 @@ export function RootLoadingSkeleton() {
 }
 
 /**
+ * Content-only skeleton for dashboard (no heading, no outer wrappers).
+ * Used as Suspense fallback in page.tsx when the heading is rendered outside Suspense.
+ */
+export function DashboardContentSkeleton() {
+  return (
+    <SkeletonRegion className="space-y-8 lg:grid lg:grid-cols-[1fr_1px_1fr] lg:gap-8 lg:space-y-0">
+      <div className="space-y-8">
+        <div className="rounded-xl border border-border p-6" aria-hidden>
+          <div className="h-3 w-32 animate-pulse rounded bg-muted mb-4" />
+          <div className="h-5 w-48 animate-pulse rounded bg-muted" />
+          <div className="mt-3 space-y-2">
+            <SkeletonRow avatar={false} lines={2} />
+          </div>
+        </div>
+        <div className="rounded-xl border border-border p-6" aria-hidden>
+          <div className="h-3 w-24 animate-pulse rounded bg-muted mb-4" />
+          <div className="grid grid-cols-7 gap-1">
+            {Array.from({ length: 35 }).map((_, i) => (
+              <div key={i} className="aspect-square animate-pulse rounded-md bg-muted" />
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="hidden lg:block bg-border" aria-hidden />
+      <div>
+        <div className="rounded-xl border border-border p-6" aria-hidden>
+          <div className="flex items-center justify-between mb-4">
+            <div className="h-3 w-24 animate-pulse rounded bg-muted" />
+            <div className="h-4 w-20 animate-pulse rounded bg-muted" />
+          </div>
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="rounded-lg border border-border p-4">
+                <SkeletonRow avatar={false} lines={2} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </SkeletonRegion>
+  );
+}
+
+/**
+ * Content-only skeleton for /asignaciones (no heading, no outer wrappers).
+ * Used as Suspense fallback when the heading is rendered outside Suspense.
+ */
+export function AssignmentsContentSkeleton() {
+  return (
+    <SkeletonRegion>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-8" aria-hidden>
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i}>
+            <div className="h-3 w-16 animate-pulse rounded bg-muted mb-1" />
+            <div className="h-10 animate-pulse rounded bg-muted" />
+          </div>
+        ))}
+      </div>
+      <div className="border border-border rounded-lg divide-y divide-border overflow-hidden" aria-hidden>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="px-4 py-3">
+            <SkeletonRow avatar={false} lines={2} />
+          </div>
+        ))}
+      </div>
+    </SkeletonRegion>
+  );
+}
+
+/**
  * Config-area skeleton (sub-nav + list cards). Used by config loading.tsx and LoadingScreen (!fullPage).
  */
 export function ConfigContentSkeleton() {

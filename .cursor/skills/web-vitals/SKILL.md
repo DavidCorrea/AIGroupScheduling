@@ -95,6 +95,10 @@ async function PageContent({ userId }: { userId: string }) {
 
 Config pages are excluded — they have fast queries and already benefit from `[slug]/config/loading.tsx`.
 
+**LCP headings outside Suspense:** On `/` and `/asignaciones`, the page heading (`h1` + subtitle) is rendered by the server page component *above* the `<Suspense>` boundary. The heading text comes from `getTranslations` (near-instant since messages are statically imported). This lets the LCP element paint as soon as the page shell streams, without waiting for data.
+
+**Cronograma streaming:** `[slug]/cronograma/[year]/[month]` wraps all DB work (group lookup, schedule query, `buildPublicScheduleResponse`) in `<Suspense>` with the route's loading skeleton as fallback. On ISR cache misses the skeleton streams immediately; cached responses serve the fully-resolved HTML.
+
 ### Avoid
 
 - **Top-level `await` in page components** when the page has other content to show — it blocks the entire page from streaming. Extract the slow fetch into a child component wrapped in `<Suspense>`.
@@ -151,7 +155,7 @@ const MyModal = dynamic(
 - Complex forms or editors with large dependency trees (e.g. `EventForm`, `AvailabilityWeekGrid`).
 - Components behind tabs, accordions, or feature flags.
 
-**Adopted in this project:** `EventForm` (events pages), `AvailabilityWeekGrid` (member pages), `DateDetailModal` (SharedScheduleView) are dynamically imported.
+**Adopted in this project:** `EventForm` (events pages), `AvailabilityWeekGrid` (member pages), `DateDetailModal`, `CalendarGrid`, `MemberAgendaCard` (SharedScheduleView) are dynamically imported.
 
 ### `useTransition` for heavy state updates
 

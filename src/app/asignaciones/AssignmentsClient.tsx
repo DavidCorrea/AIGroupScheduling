@@ -90,18 +90,8 @@ export default function AssignmentsClient({
   }, [filterGroupId, filterYear, filterMonth]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="font-[family-name:var(--font-display)] font-semibold text-4xl sm:text-5xl uppercase">
-            {t("title")}
-          </h1>
-          <p className="mt-3 text-muted-foreground">
-            {t("subtitle")}
-          </p>
-        </div>
-
-        {calendarResult === "success" && (
+    <>
+      {calendarResult === "success" && (
           <p className="mb-4 text-sm text-green-600 dark:text-green-400" role="status">
             {tCronograma("saveInCalendarSuccess")}
           </p>
@@ -223,8 +213,7 @@ export default function AssignmentsClient({
               </li>
             ))}
           </ul>
-        )}
-      </div>
-    </div>
+      )}
+    </>
   );
 }

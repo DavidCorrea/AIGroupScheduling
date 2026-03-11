@@ -160,18 +160,8 @@ export default function DashboardClient({
   const hasAssignments = assignments.length > 0;
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:py-12 sm:px-6 lg:px-8">
-        <div className="mb-10">
-          <h1 className="font-[family-name:var(--font-display)] font-semibold text-3xl sm:text-4xl uppercase tracking-tight">
-            {t("title")}
-          </h1>
-          <p className="mt-2 text-muted-foreground">
-            {t("subtitle")}
-          </p>
-        </div>
-
-        <div className="space-y-8 lg:grid lg:grid-cols-[1fr_1px_1fr] lg:gap-8 lg:space-y-0">
+    <>
+      <div className="space-y-8 lg:grid lg:grid-cols-[1fr_1px_1fr] lg:gap-8 lg:space-y-0">
           {/* Left column: assignments + calendar */}
           <div className="space-y-8">
             {nextAssignment && (
@@ -323,7 +313,6 @@ export default function DashboardClient({
             </section>
           </div>
         </div>
-      </div>
 
       {calendarSelectedDate && (
         <div
@@ -396,9 +385,9 @@ export default function DashboardClient({
                 </>
               )}
             </div>
-        </div>
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

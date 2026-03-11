@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
+import esMessages from "../../messages/es.json";
 import SessionProvider from "@/components/SessionProvider";
 import QueryProvider from "@/components/QueryProvider";
 import AppNavBar from "@/components/AppNavBar";
@@ -48,7 +49,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const messages = (await getMessages()) ?? (await import("../../messages/es.json")).default;
+  const messages = (await getMessages()) ?? esMessages;
   return (
     <html lang="es" suppressHydrationWarning>
       <body

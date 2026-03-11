@@ -1,23 +1,38 @@
 import { Suspense } from "react";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { loadUserGroups } from "@/lib/data-access";
 import { getAssignments } from "@/lib/user-assignments";
 import { buildConflicts } from "@/lib/dashboard-conflicts";
 import { db } from "@/lib/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { RootLoadingSkeleton } from "@/components/Skeletons";
+import { DashboardContentSkeleton } from "@/components/Skeletons";
 import DashboardClient from "./DashboardClient";
 
 export default async function HomePage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
+  const t = await getTranslations("home");
+
   return (
-    <Suspense fallback={<RootLoadingSkeleton />}>
-      <DashboardContent userId={session.user.id} />
-    </Suspense>
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:py-12 sm:px-6 lg:px-8">
+        <div className="mb-10">
+          <h1 className="font-[family-name:var(--font-display)] font-semibold text-3xl sm:text-4xl uppercase tracking-tight">
+            {t("title")}
+          </h1>
+          <p className="mt-2 text-muted-foreground">
+            {t("subtitle")}
+          </p>
+        </div>
+        <Suspense fallback={<DashboardContentSkeleton />}>
+          <DashboardContent userId={session.user.id} />
+        </Suspense>
+      </div>
+    </div>
   );
 }
 

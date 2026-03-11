@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { db } from "@/lib/db";
@@ -6,6 +7,7 @@ import { eq, and } from "drizzle-orm";
 import { resolveGroupBySlug } from "@/lib/group";
 import { buildPublicScheduleResponse } from "@/lib/public-schedule";
 import SharedScheduleView from "@/components/SharedScheduleView";
+import CronogramaLoadingSkeleton from "./loading";
 
 export const revalidate = 300;
 
@@ -22,6 +24,22 @@ export default async function SharedSchedulePage({
     notFound();
   }
 
+  return (
+    <Suspense fallback={<CronogramaLoadingSkeleton />}>
+      <ScheduleContent slug={slug} year={year} month={month} />
+    </Suspense>
+  );
+}
+
+async function ScheduleContent({
+  slug,
+  year,
+  month,
+}: {
+  slug: string;
+  year: number;
+  month: number;
+}) {
   const group = await resolveGroupBySlug(slug);
   if (!group) {
     notFound();
