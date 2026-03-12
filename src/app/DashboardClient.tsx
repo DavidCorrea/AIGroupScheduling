@@ -134,6 +134,15 @@ export default function DashboardClient({
     return timespans.length > 0 ? timespans : null;
   }, [calendarSelectedDate, conflictDateSet, assignmentsByDate]);
 
+  const calendarDateConflictGroups = useMemo(() => {
+    if (!calendarDateConflictContent) return new Set<string>();
+    const names = new Set<string>();
+    for (const ts of calendarDateConflictContent) {
+      for (const name of ts.groupNames) names.add(name);
+    }
+    return names;
+  }, [calendarDateConflictContent]);
+
   const monthPrefix = `${currentYear}-${String(currentMonth).padStart(2, "0")}-`;
   const allConflictDetails = useMemo(() => {
     if (conflicts.length === 0) return [];
@@ -392,44 +401,49 @@ export default function DashboardClient({
             </Dialog.Description>
 
             <div className="px-6 py-4 space-y-2">
-              {calendarDateConflictContent && (
-                <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 mb-3 space-y-1">
-                  <p className="text-xs font-medium text-destructive uppercase tracking-wide">
-                    {t("conflict")}
-                  </p>
-                  {calendarDateConflictContent.map((ts, idx) => (
-                    <p key={idx} className="text-sm text-foreground">
-                      {ts.groupNames.join(" · ")}: {utcTimeToLocalDisplay(ts.startUtc)}–{utcTimeToLocalDisplay(ts.endUtc)}
-                    </p>
-                  ))}
-                </div>
-              )}
               {calendarDateDetailRows.length === 0 ? (
                 <p className="text-sm text-muted-foreground">{t("noAssignments")}</p>
               ) : (
                 <>
-                  {calendarDateDetailRows.map((row) => (
-                    <div
-                      key={`${calendarSelectedDate}-${row.groupSlug}`}
-                      className="flex items-center justify-between text-sm rounded-lg bg-muted/30 px-3 py-2"
-                    >
-                      <span className="text-muted-foreground text-xs uppercase tracking-wide">
-                        {row.roles.join(", ")}
-                        {row.startTimeUtc != null && row.endTimeUtc != null && (
-                          <span className="normal-case ml-1.5 text-muted-foreground">
-                            {utcTimeToLocalDisplay(row.startTimeUtc)}–{utcTimeToLocalDisplay(row.endTimeUtc)}
-                          </span>
-                        )}
-                      </span>
-                      <Link
-                        href={`/${row.groupSlug}/cronograma`}
-                        onClick={() => setCalendarSelectedDate(null)}
-                        className="text-xs font-medium text-accent hover:opacity-80 transition-opacity"
+                  {calendarDateDetailRows.map((row) => {
+                    const isConflicting = calendarDateConflictGroups.has(row.groupName);
+                    return (
+                      <div
+                        key={`${calendarSelectedDate}-${row.groupSlug}`}
+                        className="rounded-lg border border-border bg-background/50 px-4 py-3"
                       >
-                        {row.groupName} &rarr;
-                      </Link>
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium text-foreground">
+                            {row.groupName}
+                            {isConflicting && (
+                              <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-destructive align-middle" />
+                            )}
+                          </p>
+                          <Link
+                            href={`/${row.groupSlug}/cronograma`}
+                            onClick={() => setCalendarSelectedDate(null)}
+                            className="shrink-0 text-xs font-medium text-accent hover:opacity-80 transition-opacity"
+                          >
+                            {t("view")} &rarr;
+                          </Link>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {row.roles.join(", ")}
+                          {row.startTimeUtc != null && row.endTimeUtc != null && (
+                            <span className="ml-1.5">
+                              · {utcTimeToLocalDisplay(row.startTimeUtc)}–{utcTimeToLocalDisplay(row.endTimeUtc)}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    );
+                  })}
+                  {calendarDateConflictContent && (
+                    <div className="flex items-center gap-1.5 pt-2">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-destructive shrink-0" />
+                      <span className="text-xs text-muted-foreground">{t("possibleConflict")}</span>
                     </div>
-                  ))}
+                  )}
                 </>
               )}
             </div>
